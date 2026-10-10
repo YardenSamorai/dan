@@ -1,0 +1,799 @@
+/* ════════════════════════════════════════════════════════════════
+   Hero: one day in 3D, ending on a real booking page and the
+   business calendar it books into. Every value that moves is a
+   CSS variable written by Hero3D.tsx from scroll progress.
+   ════════════════════════════════════════════════════════════════ */
+
+.h3 {
+  position: relative;
+  height: 620vh;
+  background: var(--bg);
+}
+
+@media (max-width: 899px), (max-aspect-ratio: 1/1) {
+  .h3 {
+    height: 540vh;
+  }
+}
+
+.h3__sticky {
+  position: sticky;
+  inset-block-start: 0;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.h3__scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.h3__poster,
+.h3__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.h3__poster {
+  object-fit: cover;
+  transition: opacity 500ms var(--ease-out);
+}
+
+.h3__poster[data-hidden='true'] {
+  opacity: 0;
+}
+
+.h3[data-mode='pending'] .h3__canvas,
+.h3__film {
+  visibility: hidden;
+}
+
+.h3__ground {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  opacity: 0;
+}
+
+/* ── Her booking page, on the monitor ────────────────────────────── */
+.h3-panel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  transform-origin: 0 0;
+  visibility: hidden;
+  backface-visibility: hidden;
+  pointer-events: none;
+  font-size: 15px;
+}
+
+.h3-panel__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  height: 52px;
+  padding-inline: 28px;
+  border-block-end: 1px solid var(--line);
+  font-size: 15px;
+}
+
+.h3-panel__logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: color-mix(in srgb, #c24d6b 22%, var(--white));
+}
+
+.h3-panel__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 26px 28px 24px;
+}
+
+.h3-panel__svc {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--ink-3);
+  font-size: 14px;
+}
+
+.h3-panel__svc strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.h3-panel__title {
+  margin-block: 8px 20px;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.h3-panel__days {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.h3-panel__day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding-block: 10px;
+  border-radius: var(--r-md);
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.h3-panel__day b {
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.h3-panel__day[data-on='true'] {
+  background: var(--ink);
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.h3-panel__day[data-on='true'] b {
+  color: var(--white);
+}
+
+.h3-panel__slots {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-block-start: 22px;
+}
+
+/* Same look as the booking page's time buttons (booking.css isn't loaded on the home page). */
+.h3-panel__slots .slot {
+  min-height: 50px;
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.h3-panel__slots .slot[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--white);
+  box-shadow: none;
+}
+
+.h3-panel__cta {
+  align-self: flex-end;
+  margin-block-start: auto;
+  pointer-events: none;
+}
+
+/* ── The time she picked, becoming an appointment ───────────────── */
+.h3-chip {
+  --k: 0;
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  transform-origin: 0 0;
+  visibility: hidden;
+  pointer-events: none;
+  backface-visibility: hidden;
+}
+
+.h3-chip__slot {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--white);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  opacity: calc(1 - var(--k) * 1.5);
+}
+
+.h3-chip__appt.cal-appt {
+  position: absolute;
+  inset: 0;
+  cursor: default;
+  pointer-events: none;
+  transition: none;
+  box-shadow: 0 1px 2px rgba(28, 28, 30, calc(0.08 * var(--k)));
+  opacity: clamp(0, calc(var(--k) * 1.8 - 0.5), 1);
+}
+
+.h3-chip__new {
+  margin-inline-start: 6px;
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--white);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+/* ── Final: the pivot, beside the business calendar ─────────────── */
+.h3__final {
+  --copy: 0;
+  position: absolute;
+  inset: var(--header-h) 0 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  align-items: center;
+  gap: clamp(32px, 5vw, 88px);
+  padding-block: clamp(24px, 5vh, 56px);
+  pointer-events: none;
+}
+
+.h3__copy {
+  opacity: var(--copy);
+  transform: translate3d(0, calc((1 - var(--copy)) * 14px), 0);
+}
+
+.h3__final[data-revealed='true'] .h3__copy {
+  pointer-events: auto;
+}
+
+.h3__title {
+  font-size: var(--display-md);
+  text-wrap: balance;
+}
+
+.h3__body {
+  margin-block-start: var(--s-5);
+  max-width: 27em;
+  font-size: var(--text-lg);
+  line-height: 1.55;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.h3__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-4) var(--s-6);
+  margin-block-start: var(--s-8);
+}
+
+.h3-cal {
+  position: relative;
+  align-self: stretch;
+  max-height: 740px;
+}
+
+.h3-cal__card {
+  --card: 0;
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  opacity: var(--card);
+  transform: scale(calc(0.985 + 0.015 * var(--card)));
+}
+
+.h3-cal__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  height: 52px;
+  padding-inline: 18px;
+  padding-block-start: 17px;
+  border-block-end: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.h3-cal__head strong {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.h3-cal__head span {
+  font-size: 12px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.h3-cal__col {
+  --ppm: 1;
+  --hour: 60px;
+  position: absolute;
+  inset-block: calc(52px + 14px) 14px;
+  inset-inline: 64px 12px;
+}
+
+.h3-cal__col .cal-lines {
+  border-inline-start: 1px solid var(--line);
+}
+
+.h3-cal__appt.cal-appt {
+  position: absolute;
+  inset-inline: 3px;
+  top: calc(var(--m0) * var(--ppm) * 1px);
+  height: calc((var(--m1) - var(--m0)) * var(--ppm) * 1px);
+  cursor: default;
+  pointer-events: none;
+  transition: none;
+  container-type: size;
+  opacity: clamp(0, calc(var(--card) * 2.2 - var(--i) * 0.28), 1);
+}
+
+.h3-chip__appt.cal-appt {
+  container-type: size;
+}
+
+/* Like the app: a short appointment drops its service, then sets time and name on one line. */
+@container (max-height: 52px) {
+  .h3-cal__appt .cal-appt__svc,
+  .h3-chip__appt .cal-appt__svc {
+    display: none;
+  }
+}
+
+.h3-in {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+@container (max-height: 40px) {
+  .h3-in {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
+  }
+}
+
+/* ── The rail: her clock, then the calendar's hours ──────────────── */
+.h3-rail {
+  --y0: 0;
+  --k: 1;
+  --r: 0;
+  --now: 540;
+  --odd: 1;
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* A faint veil of the page colour behind the rail, so it reads over any room. */
+.h3-rail::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -32px;
+  inset-inline-end: -64px;
+  background: linear-gradient(90deg, rgb(246 246 244 / 0.6), rgb(246 246 244 / 0.28) 55%, rgb(246 246 244 / 0));
+  opacity: calc(1 - var(--r) * 1.4);
+}
+
+[dir='rtl'] .h3-rail::before {
+  background: linear-gradient(270deg, rgb(246 246 244 / 0.6), rgb(246 246 244 / 0.28) 55%, rgb(246 246 244 / 0));
+}
+
+.h3-rail__clock {
+  position: absolute;
+  inset-block-start: calc(var(--header-h) + 22px);
+  inset-inline: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.h3-rail__time {
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+[dir='rtl'] .h3-rail__time {
+  text-align: left;
+}
+
+.h3-rail__scene {
+  position: relative;
+  height: 40px;
+}
+
+.h3-rail__scene span {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: 0;
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  width: max-content;
+  max-width: 180px;
+  text-align: end;
+  opacity: 0;
+  transform: translate3d(0, 6px, 0);
+  transition:
+    opacity 360ms var(--ease-out),
+    transform 360ms var(--ease-out);
+}
+
+.h3-rail__scene b {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* The appointment in progress: one accent dot, the same colour as the now marker. */
+.h3-rail__scene b::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.h3-rail__scene small {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.h3-rail__scene[data-scene='nails'] [data-for='nails'],
+.h3-rail__scene[data-scene='pilates'] [data-for='pilates'],
+.h3-rail__scene[data-scene='hair'] [data-for='hair'],
+.h3-rail__scene[data-scene='clinic'] [data-for='clinic'],
+.h3-rail__scene[data-scene='home'] [data-for='home'] {
+  opacity: 1;
+  transform: none;
+}
+
+.h3-rail__line {
+  position: absolute;
+  inset-inline-end: 0;
+  top: calc(var(--y0) * 1px);
+  width: 1px;
+  height: calc(840px * var(--k));
+  background: var(--line-strong);
+  opacity: calc(1 - var(--r));
+}
+
+.h3-rail__hour {
+  position: absolute;
+  inset-inline-end: 12px;
+  top: calc((var(--y0) + var(--m) * var(--k)) * 1px);
+  --dist: max(calc(var(--now) - 480 - var(--m)), calc(var(--m) + 480 - var(--now)));
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-3);
+  /* Hours close to now darken, so the eye finds the current hour without a second marker. */
+  color: color-mix(in srgb, var(--ink) calc(clamp(0, 1 - var(--dist) / 80, 1) * (1 - var(--r)) * 100%), var(--ink-3));
+  font-variant-numeric: tabular-nums;
+  transform: translate3d(0, -50%, 0);
+  white-space: nowrap;
+}
+
+.h3-rail__hour[data-even='false'] {
+  opacity: var(--odd);
+}
+
+.h3-rail__hour[data-past='true'] {
+  opacity: calc(1 - var(--r) * 1.4);
+}
+
+/* Her appointments, filling in as the day passes them. */
+.h3-rail__appt {
+  --fill: clamp(0, calc((var(--now) - var(--start)) / var(--len)), 1);
+  position: absolute;
+  inset-inline-end: -1px;
+  top: calc((var(--y0) + var(--m0) * var(--k)) * 1px);
+  width: 3px;
+  height: calc((var(--m1) - var(--m0)) * var(--k) * 1px);
+  border-radius: 2px;
+  background: linear-gradient(to bottom, var(--ink) calc(var(--fill) * 100%), var(--line-strong) 0);
+  opacity: calc(1 - var(--r) * 1.6);
+}
+
+.h3-rail__now {
+  position: absolute;
+  inset-inline-end: -4px;
+  top: calc((var(--y0) + (var(--now) - 480) * var(--k)) * 1px);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  transform: translate3d(0, -50%, 0);
+  opacity: calc(1 - var(--r) * 2);
+}
+
+/* A short tick toward the content, like a calendar's now line. */
+.h3-rail__now::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  inset-inline-start: 100%;
+  width: 10px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--accent);
+  transform: translate3d(0, -50%, 0);
+}
+
+@media (max-width: 699px), (max-aspect-ratio: 1/1) {
+  .h3-rail {
+    --odd: var(--r);
+  }
+  .h3-rail__clock {
+    inset-block-start: calc(var(--header-h) + 14px);
+    gap: 4px;
+  }
+  .h3-rail__time {
+    font-size: 24px;
+  }
+  .h3-rail__scene {
+    height: 34px;
+  }
+  .h3-rail__scene b {
+    font-size: var(--text-xs);
+  }
+  .h3-rail__scene small {
+    font-size: 11px;
+  }
+  .h3-rail__hour {
+    inset-inline-end: 9px;
+    font-size: 10px;
+  }
+}
+
+/* ── Opening line ───────────────────────────────────────────────── */
+.h3__intro {
+  position: absolute;
+  z-index: 4;
+  inset-inline: 0;
+  inset-block-end: clamp(24px, 6vh, 56px);
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  pointer-events: none;
+  animation: h3In 900ms var(--ease-out) 300ms both;
+}
+
+.h3__intro p {
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: 0 0 0 1px var(--line);
+  font-size: var(--text-md);
+  font-weight: 550;
+}
+
+.h3__cue {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.h3__cue i {
+  position: relative;
+  width: 1px;
+  height: 30px;
+  background: var(--line-strong);
+  overflow: hidden;
+}
+
+.h3__cue i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--ink-2);
+  transform: translateY(-100%);
+  animation: h3Cue 2.4s var(--ease-in-out) 1.4s infinite;
+}
+
+@keyframes h3Cue {
+  60%,
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes h3In {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+}
+
+/* ── Portrait: copy over the calendar ───────────────────────────── */
+@media (max-aspect-ratio: 1/1), (max-width: 599px) {
+  .h3__final {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    align-items: stretch;
+    gap: var(--s-5);
+    padding-block: var(--s-5) var(--s-6);
+  }
+  .h3__title {
+    font-size: clamp(1.875rem, 1.2rem + 3vw, 2.5rem);
+  }
+  .h3__body {
+    margin-block-start: var(--s-3);
+    font-size: var(--text-md);
+  }
+  .h3__actions {
+    margin-block-start: var(--s-5);
+  }
+  .h3__actions .link-arrow {
+    display: none;
+  }
+  .h3-cal {
+    max-height: none;
+  }
+  .h3-cal__col {
+    inset-inline-start: 52px;
+  }
+}
+
+@media (max-width: 899px) and (max-height: 700px) {
+  .h3__body {
+    display: none;
+  }
+}
+
+@media (max-height: 500px) and (min-aspect-ratio: 1/1) {
+  .h3__final {
+    gap: var(--s-6);
+    padding-block: var(--s-3);
+  }
+  .h3__title {
+    font-size: clamp(1.625rem, 1rem + 2.4vw, 2.25rem);
+  }
+  .h3__actions {
+    margin-block-start: var(--s-4);
+  }
+  .h3__actions .link-arrow {
+    display: none;
+  }
+}
+
+/* The section after the hero picks up from the settled calendar. */
+.h3 + .mk-bridge {
+  padding-block-start: clamp(24px, 4vw, 64px);
+}
+
+/* ── Still version: reduced motion, or a device that should not run WebGL ── */
+.h3[data-mode='static'] {
+  height: auto;
+}
+
+.h3[data-mode='static'] .h3__sticky {
+  position: relative;
+  height: 100svh;
+  min-height: 620px;
+  max-height: 880px;
+}
+
+.h3__final--static {
+  --copy: 1;
+}
+
+.h3__final--static .h3__copy {
+  pointer-events: auto;
+}
+
+.h3__final--static .h3-cal__card {
+  --card: 1;
+}
+
+.h3-stills {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--s-3);
+  margin-block: 0 var(--s-12);
+  padding: 0;
+  list-style: none;
+}
+
+.h3-still {
+  display: grid;
+  gap: 2px;
+  animation: h3In 600ms ease both;
+}
+
+.h3-still img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  margin-block-end: var(--s-2);
+  border-radius: var(--r-lg);
+  background: var(--surface-sunken);
+}
+
+.h3-still__time {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  text-align: start;
+}
+
+.h3-still__what {
+  font-size: var(--text-sm);
+  font-weight: 550;
+}
+
+@media (max-width: 899px) {
+  .h3-stills {
+    grid-template-columns: repeat(5, minmax(220px, 1fr));
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-block-end: var(--s-2);
+  }
+  .h3-still {
+    scroll-snap-align: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .h3-still,
+  .h3__intro {
+    animation: none;
+  }
+  .h3-rail__scene span {
+    transition: none;
+  }
+}
+
+/* ── Internal motion debug (dev only, ?herodebug) ─────────────────── */
+.hero-debug {
+  position: absolute;
+  z-index: 60;
+  inset-inline-start: 12px;
+  inset-block-end: 12px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #9ef;
+  font: 11px/1.5 var(--font-mono);
+  direction: ltr;
+  white-space: pre;
+}

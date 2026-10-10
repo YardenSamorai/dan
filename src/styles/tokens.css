@@ -1,0 +1,170 @@
+/*
+ * Design tokens — one system for the marketing site, booking pages and the
+ * business app.
+ *
+ *   Ground      a near-neutral off-white; content sits on white surfaces.
+ *   Hierarchy   weight + size + grey, not colour.
+ *   Colour      one product accent (lagoon) for action, focus and the current
+ *               place; semantic colours only for appointment status.
+ *   Glass       only where layers overlap: sticky bars, the phone tab bar,
+ *               menus. Never on content.
+ *   Density     the marketing site breathes; the app is compact and quiet.
+ */
+:root {
+  /* ── Neutrals ── */
+  --bg: #f6f6f4;
+  --surface: #ffffff;
+  --surface-2: #fafaf9;
+  --fill: rgba(28, 28, 30, 0.045);
+  --fill-2: rgba(28, 28, 30, 0.07);
+  --press: rgba(28, 28, 30, 0.09);
+  --track: #e6e6e3;
+
+  --ink: #1c1c1e;
+  --ink-2: #3f3f44;
+  --ink-3: #6e6e73;
+  --ink-4: #a1a1a6;
+  --faint: #d1d1d6;
+  --line: rgba(28, 28, 30, 0.08);
+  --line-strong: rgba(28, 28, 30, 0.14);
+
+  /* ── Product accent: lagoon. 6.3:1 on white. ── */
+  --brand: #0f6b66;
+  --accent: var(--brand);
+
+  /* ── Semantic (appointment status, validation). Muted, never decorative. ── */
+  --success: #1f7a4d;
+  --success-tint: #e8f3ec;
+  --info: #2b5fb4;
+  --info-tint: #e9effa;
+  --warning: #a35a00;
+  --warning-tint: #fbf1e3;
+  --danger: #c0352b;
+  --danger-tint: #fbeceb;
+
+  /* ── Legacy aliases (kept so older rules map onto the new palette) ── */
+  --white: #ffffff;
+  --porcelain: var(--bg);
+  --porcelain-2: #efefec;
+  --paper: var(--surface);
+  --app-bg: var(--bg);
+  --surface-sunken: #f2f2f0;
+  --hover: var(--fill);
+
+  /* ── Type: the platform face everywhere; each script resolves to its own system font. ── */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI Variable Text', 'Segoe UI', system-ui,
+    'Noto Sans Hebrew', 'Arial Hebrew', sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+
+  --text-2xs: 0.6875rem; /* 11 — captions, tab labels */
+  --text-xs: 0.75rem; /* 12 — meta */
+  --text-13: 0.8125rem; /* 13 — dense secondary */
+  --text-sm: 0.875rem; /* 14 — app body */
+  --text-15: 0.9375rem; /* 15 — list titles, booking body */
+  --text-md: 1rem; /* 16 — inputs, marketing body */
+  --text-lg: 1.125rem; /* 18 — ledes */
+  --text-xl: 1.375rem; /* 22 — section titles */
+  --title: 1.75rem; /* 28 — page titles */
+  --display-sm: clamp(1.875rem, 1.3rem + 2.2vw, 2.75rem);
+  --display-md: clamp(2.25rem, 1.4rem + 3.4vw, 3.75rem);
+  --display-lg: clamp(2.75rem, 1.4rem + 5vw, 5.25rem);
+
+  /* ── Space (4pt) ── */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+  --s-20: 80px;
+  --s-24: 96px;
+  --section-y: clamp(72px, 5vw + 48px, 136px);
+  --gutter: clamp(20px, 4vw, 40px);
+  --max: 1120px;
+
+  /* ── Radii: named tiers, nothing in between ── */
+  --r-xs: 6px; /* chips, tiny marks */
+  --r-sm: 10px; /* controls, fields, buttons */
+  --r-md: 14px; /* thumbnails, popovers, inner groups */
+  --r-lg: 18px; /* panels */
+  --r-xl: 26px; /* hero / focal surfaces */
+  --r-sheet: 22px; /* sheet top corners */
+  --r-pill: 999px;
+
+  /* ── Elevation: always two layers, neutral ── */
+  --edge: 0 0 0 0.5px rgba(0, 0, 0, 0.07);
+  --shadow-1: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 1px 3px rgba(0, 0, 0, 0.05), 0 12px 32px rgba(0, 0, 0, 0.06);
+  --shadow-3: 0 2px 8px rgba(0, 0, 0, 0.08), 0 28px 72px rgba(0, 0, 0, 0.2);
+
+  /* ── Glass (overlapping layers only) ── */
+  --glass: rgba(246, 246, 244, 0.78);
+  --glass-light: rgba(255, 255, 255, 0.82);
+  --glass-blur: saturate(180%) blur(20px);
+  --scrim: rgba(0, 0, 0, 0.28);
+
+  /* ── Motion ── */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --t-press: 120ms;
+  --t-fast: 150ms;
+  --t-base: 220ms;
+  --t-sheet: 380ms;
+  --t-slow: 520ms;
+
+  /* ── App density ── */
+  --ctl-h: 34px;
+  --row-h: 52px;
+  --sidebar-w: 240px;
+  --topbar-h: 52px;
+  --header-h: 60px;
+  --tabbar-h: 52px;
+  --focus: 0 0 0 2px var(--white), 0 0 0 4px var(--accent);
+}
+
+/*
+ * Accent derivatives are recomputed wherever the accent changes, so a tenant
+ * scope ([data-accent]) gets matching hover/tint/glow shades automatically.
+ */
+:root,
+[data-accent] {
+  --accent-hover: color-mix(in oklab, var(--accent) 86%, #000);
+  --accent-deep: color-mix(in oklab, var(--accent) 62%, #000);
+  --accent-tint: color-mix(in oklab, var(--accent) 8%, #fff);
+  --accent-glow: color-mix(in srgb, var(--accent) 18%, transparent);
+  --focus: 0 0 0 2px var(--white), 0 0 0 4px var(--accent);
+}
+
+/* Curated tenant accents: all pass 4.5:1 against white for text and buttons. */
+[data-accent='fig'] { --accent: #6b2236; }
+[data-accent='rose'] { --accent: #9c3f5a; }
+[data-accent='clay'] { --accent: #94482f; }
+[data-accent='sage'] { --accent: #44614c; }
+[data-accent='ocean'] { --accent: #275a73; }
+[data-accent='plum'] { --accent: #5b3a6e; }
+[data-accent='ink'] { --accent: #262224; }
+[data-accent='gold'] { --accent: #7c5b1c; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-press: 1ms;
+    --t-fast: 1ms;
+    --t-base: 120ms;
+    --t-sheet: 160ms;
+    --t-slow: 1ms;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass: #f6f6f4;
+    --glass-light: #ffffff;
+    --glass-blur: none;
+  }
+}

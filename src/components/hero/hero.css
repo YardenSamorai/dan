@@ -1,0 +1,258 @@
+/* ════════════════════════════════════════════════════════════════
+   Marketing hero: the pitch beside the app's day calendar on a device.
+   On wide screens a short pinned stretch books the day as you scroll.
+   ════════════════════════════════════════════════════════════════ */
+
+.hc {
+  position: relative;
+  background: var(--bg);
+}
+
+.hc__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 9fr);
+  align-items: center;
+  gap: clamp(32px, 4vw, 64px);
+}
+
+.hc__title {
+  font-size: clamp(2.25rem, 1.4rem + 1.8vw, 3rem);
+  text-wrap: balance;
+}
+
+.hc__title span {
+  display: block;
+}
+
+.hc__body {
+  margin-block-start: var(--s-5);
+  max-width: 27em;
+  font-size: var(--text-lg);
+  line-height: 1.55;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.hc__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-4) var(--s-6);
+  margin-block-start: var(--s-8);
+}
+
+/* ── Wide screens: pinned for a short stretch ───────────────────── */
+@media (min-width: 900px) {
+  .hc[data-motion='true'] {
+    height: 175vh;
+  }
+  .hc__stage {
+    position: sticky;
+    inset-block-start: 0;
+    display: grid;
+    align-items: center;
+    height: 100vh;
+    height: 100svh;
+    min-height: 600px;
+    max-height: 1000px;
+    padding-block: calc(var(--header-h) + 24px) 32px;
+  }
+  .hc[data-motion='false'] .hc__stage {
+    position: relative;
+  }
+}
+
+/* ── The device ─────────────────────────────────────────────────── */
+.hc__device {
+  --bezel: 12px;
+  justify-self: center;
+  width: 100%;
+  padding: var(--bezel);
+  border-radius: 30px;
+  background: #1c1c1e;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 1px 2px rgba(28, 28, 30, 0.12),
+    0 24px 60px -18px rgba(28, 28, 30, 0.32);
+}
+
+.hc__device[data-kind='tablet'] {
+  max-width: min(860px, (100svh - var(--header-h) - 96px) * 1.42);
+}
+
+.hc__device[data-kind='phone'] {
+  --bezel: 9px;
+  max-width: min(300px, 76vw);
+  border-radius: 46px;
+}
+
+.hc__screen {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.hc__device[data-kind='phone'] .hc__screen {
+  border-radius: 37px;
+}
+
+/* The app at its real size, scaled down to the screen (from its top-left corner in either direction). */
+.hc-app {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  transform-origin: 0 0;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.hc-app__status {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  padding-inline: 34px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.hc-app__island {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  width: 104px;
+  height: 30px;
+  margin-left: -52px;
+  border-radius: 15px;
+  background: #0b0b0c;
+}
+
+.hc-app__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  padding-inline: 20px;
+}
+
+.hc-app__title {
+  margin-inline-end: auto;
+  font-size: var(--text-md);
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  white-space: nowrap;
+}
+
+.hc-app .segmented button {
+  pointer-events: none;
+}
+
+.hc-grid {
+  display: grid;
+  grid-template-columns: 56px repeat(var(--cols), minmax(0, 1fr));
+  flex: none;
+  border-block-start: 1px solid var(--line);
+}
+
+/* Nothing scrolls inside the demo, and backdrop blur misdraws under the scale. */
+.hc-app .cal__corner,
+.hc-app .cal__head {
+  position: relative;
+  background: var(--surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.hc-gutter {
+  position: relative;
+  background: var(--surface);
+}
+
+.hc-col {
+  background: var(--surface);
+  cursor: default;
+  overflow: hidden;
+}
+
+.hc-app .cal-appt {
+  cursor: default;
+  pointer-events: none;
+}
+
+/* ── Booking ─────────────────────────────────────────────────────── */
+.hc-slot {
+  transition:
+    opacity 320ms var(--ease-out),
+    transform 420ms var(--ease-out);
+}
+
+.hc-slot[data-on='false'] {
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
+}
+
+.hc-slot[data-new='true'] .cal-appt {
+  box-shadow: 0 0 0 2px var(--tone), 0 8px 20px -8px color-mix(in srgb, var(--tone) 60%, transparent);
+  animation: hcLand 520ms var(--ease-out);
+}
+
+.hc-new {
+  margin-inline-start: 6px;
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  background: var(--tone);
+  color: var(--white);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+  vertical-align: 1px;
+}
+
+@keyframes hcLand {
+  from {
+    transform: scale(0.94);
+  }
+  60% {
+    transform: scale(1.015);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.hc + .mk-bridge {
+  padding-block-start: clamp(24px, 4vw, 64px);
+}
+
+/* ── Small screens: copy, then the phone ─────────────────────────── */
+@media (max-width: 899px) {
+  .hc__stage {
+    padding-block: calc(var(--header-h) + 36px) 56px;
+  }
+  .hc__inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 44px;
+  }
+  .hc__copy {
+    text-align: center;
+  }
+  .hc__body {
+    margin-inline: auto;
+    font-size: var(--text-md);
+  }
+  .hc__actions {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hc-slot,
+  .hc-slot[data-new='true'] .cal-appt {
+    transition: none;
+    animation: none;
+  }
+}

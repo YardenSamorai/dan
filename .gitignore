@@ -1,0 +1,11 @@
+node_modules
+dist
+qa/shots
+*.log
+*.tsbuildinfo
+__pycache__/
+
+# Blender: downloaded third-party assets and generated output (rebuilt by the scripts in tools/blender and qa/)
+tools/blender/assets/
+tools/blender/out/
+tools/blender/data/

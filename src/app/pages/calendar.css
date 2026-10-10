@@ -1,0 +1,711 @@
+/* ════════════════════════════════════════════════════════════════
+   Calendar. White = bookable time. Everything else is a flat,
+   labelled tone. Appointments carry the staff colour, and status is
+   expressed by fill weight and outline, never by pattern.
+   ════════════════════════════════════════════════════════════════ */
+
+.cal {
+  --off: #f3f3f1;
+  --now: #e0443a;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.cal__bar {
+  display: grid;
+  gap: 10px;
+  padding: 4px 28px 12px;
+  flex: none;
+}
+
+.cal__bar .toolbar {
+  gap: 8px;
+}
+
+.cal__nav {
+  display: inline-flex;
+}
+
+.cal__title {
+  margin-inline-start: 4px;
+  font-size: var(--text-md);
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  white-space: nowrap;
+}
+
+.cal__jump {
+  width: auto;
+}
+
+.cal__staff {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-inline: -2px;
+  padding: 2px;
+}
+
+.cal__staff .chip {
+  min-height: 30px;
+  font-size: var(--text-13);
+  white-space: nowrap;
+}
+
+.cal__staff-chip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+.cal__toggle {
+  display: inline-flex;
+  margin-inline-start: auto;
+  padding-inline-start: 8px;
+  font-size: var(--text-13);
+  white-space: nowrap;
+}
+
+.cal__hint {
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.cal__special {
+  flex: none;
+  max-width: 120px;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--warning);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Agenda (list view) ─────────────────────────────────────────── */
+.agenda {
+  display: grid;
+  gap: var(--s-6);
+  max-width: 760px;
+  width: 100%;
+  margin-inline: auto;
+  padding: var(--s-2) var(--s-6) var(--s-12);
+  overflow-y: auto;
+}
+
+.agenda__day {
+  display: grid;
+  gap: 8px;
+}
+
+.agenda__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 32px;
+  padding-inline: 4px;
+}
+
+.agenda__head h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-inline-end: auto;
+  font-size: var(--text-15);
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.agenda__wd {
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.agenda__day[data-today] .agenda__wd {
+  color: var(--accent);
+}
+
+.agenda__day .list {
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.agenda__empty {
+  padding: 10px 4px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+}
+
+.agenda__block {
+  background: var(--off);
+  color: var(--ink-3);
+}
+
+.agenda__block[data-kind='break'] {
+  background: var(--off);
+}
+
+/* ── Grid ───────────────────────────────────────────────────────── */
+.cal__scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border-block-start: 1px solid var(--line);
+}
+
+.cal__grid {
+  --gutter: 60px;
+  --col-min: 180px;
+  display: grid;
+  grid-template-columns: var(--gutter) repeat(var(--cols), minmax(var(--col-min), 1fr));
+  grid-template-rows: auto var(--h);
+  min-width: 100%;
+  width: max-content;
+}
+
+.cal[data-view='week'] .cal__grid {
+  --col-min: 156px;
+}
+
+/* Whole-team week: one narrow lane per person; colour carries identity. */
+.cal__col[data-lanes='true'] .cal-slot {
+  margin-inline-start: -1px;
+}
+
+.cal__col[data-lanes='true'] .cal-appt {
+  padding: 3px 4px 2px 6px;
+  padding-inline: 6px 4px;
+}
+
+.cal__col[data-lanes='true'] .cal-appt__svc {
+  display: none;
+}
+
+.cal__col[data-lanes='true'] .cal-appt__name {
+  font-weight: 550;
+  font-size: var(--text-2xs);
+}
+
+.cal__corner,
+.cal__head {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 6;
+  background: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-block-end: 1px solid var(--line);
+}
+
+.cal__corner {
+  inset-inline-start: 0;
+  z-index: 8;
+}
+
+.cal__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 6px 12px;
+  border-inline-start: 1px solid var(--line);
+  min-width: 0;
+}
+
+.cal__head-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.cal__head-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal__head-sub {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal__head-day {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  column-gap: 6px;
+  width: 100%;
+  min-height: 40px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  text-align: start;
+  transition: background var(--t-fast);
+}
+
+.cal__head-day:active {
+  background: var(--press);
+}
+
+.cal__head-wd {
+  color: var(--ink-3);
+  font-size: var(--text-13);
+  font-weight: 500;
+}
+
+.cal__head-num {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding-inline: 4px;
+  border-radius: 14px;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal__head-day .cal__head-sub {
+  grid-column: 1 / -1;
+}
+
+.cal__head[data-today='true'] .cal__head-num {
+  background: var(--now);
+  color: var(--white);
+  font-size: var(--text-15);
+}
+
+.cal__head[data-today='true'] .cal__head-wd {
+  color: var(--now);
+  font-weight: 600;
+}
+
+.cal__gutter {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 5;
+  background: var(--surface);
+}
+
+.cal__hour {
+  position: absolute;
+  inset-inline-end: 10px;
+  transform: translateY(-50%);
+  color: var(--ink-4);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+}
+
+/* A column is off-hours by default; shifts paint the working time. */
+.cal__col {
+  position: relative;
+  border-inline-start: 1px solid var(--line);
+  background: var(--off);
+  cursor: cell;
+}
+
+.cal-shift {
+  position: absolute;
+  inset-inline: 0;
+  background: var(--surface);
+}
+
+.cal-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px var(--hour)),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--hour) / 2),
+      rgba(28, 28, 30, 0.035) calc(var(--hour) / 2) calc(var(--hour) / 2 + 1px),
+      transparent calc(var(--hour) / 2 + 1px) var(--hour)
+    );
+}
+
+.cal-break,
+.cal-block {
+  position: absolute;
+  inset-inline: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 4px 8px;
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  color: var(--ink-3);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cal-break {
+  background: var(--off);
+}
+
+.cal-block {
+  inset-inline: 3px;
+  border-radius: 6px;
+  background: rgba(28, 28, 30, 0.07);
+  color: var(--ink-2);
+}
+
+.cal-block[data-kind='break'] {
+  inset-inline: 0;
+  border-radius: 0;
+  background: var(--off);
+  color: var(--ink-3);
+}
+
+.cal-block[data-kind='personal'] {
+  background: var(--info-tint);
+  color: var(--info);
+}
+
+.cal-away {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  padding-block-start: var(--s-8);
+  pointer-events: none;
+}
+
+.cal-away span {
+  position: sticky;
+  inset-block-start: 80px;
+  height: max-content;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.cal-away-strip {
+  position: absolute;
+  inset-inline: 4px;
+  inset-block-start: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.cal-away-strip .badge {
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: var(--text-2xs);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+/* ── Appointments ───────────────────────────────────────────────── */
+.cal-slot {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.cal-appt {
+  --bg: color-mix(in srgb, var(--tone) 15%, var(--white));
+  --bar: var(--tone);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-height: 20px;
+  padding: 4px 8px 3px 10px;
+  padding-inline: 10px 8px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  text-align: start;
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: manipulation;
+  transition:
+    background-color var(--t-fast),
+    box-shadow var(--t-fast),
+    opacity var(--t-fast);
+}
+
+.cal-appt::before {
+  content: '';
+  position: absolute;
+  inset-block: 3px;
+  inset-inline-start: 3px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--bar);
+}
+
+.cal-appt:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.cal-appt[data-compact='true'] {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding-block: 0;
+}
+
+.cal-appt__time {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: color-mix(in srgb, var(--tone) 62%, var(--ink));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cal-appt__name {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.cal-appt__svc {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Status: pending = outlined, awaiting a decision; arrived = full tone; done = quiet; gone = struck. */
+.cal-appt[data-status='pending'] {
+  --bg: var(--white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 55%, transparent);
+}
+
+.cal-appt[data-status='pending']::before {
+  background: repeating-linear-gradient(to bottom, var(--tone) 0 3px, transparent 3px 6px);
+}
+
+.cal-appt[data-status='arrived'] {
+  --bg: color-mix(in srgb, var(--tone) 30%, var(--white));
+}
+
+.cal-appt[data-status='completed'] {
+  --bg: color-mix(in srgb, var(--tone) 8%, var(--white));
+  --bar: color-mix(in srgb, var(--tone) 45%, var(--white));
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.cal-appt[data-status='completed'] .cal-appt__time {
+  color: var(--ink-4);
+}
+
+.cal-appt[data-status='no_show'] {
+  opacity: 0.55;
+}
+
+.cal-appt[data-status='no_show'] .cal-appt__name,
+.cal-appt[data-status='cancelled'] .cal-appt__name {
+  text-decoration: line-through;
+}
+
+/* Cancelled/no-show cards no longer hold the slot: faded, behind live work. */
+.cal-slot[data-inactive] {
+  z-index: 2;
+}
+
+.cal-appt[data-status='cancelled'] {
+  --bg: transparent;
+  opacity: 0.6;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent);
+}
+
+.cal-appt[data-status='cancelled']::before {
+  display: none;
+}
+
+.cal-slot[data-inactive] .cal-buffer {
+  display: none;
+}
+
+.cal-appt[data-dragging='true'] {
+  opacity: 0.35;
+}
+
+.cal-appt[data-saving='true'] {
+  opacity: 0.6;
+}
+
+/* Buffers: the appointment's own colour, thinned out. */
+.cal-buffer {
+  flex: none;
+  margin-inline: 3px;
+  border-radius: 0 0 6px 6px;
+  background: color-mix(in srgb, var(--tone) 7%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--tone) 18%, transparent);
+}
+
+.cal-buffer--before {
+  border-radius: 6px 6px 0 0;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--tone) 18%, transparent);
+}
+
+.cal-ghost {
+  position: absolute;
+  inset-inline: 3px;
+  z-index: 7;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--tone) 22%, var(--white));
+  box-shadow: 0 0 0 2px var(--tone), var(--shadow-2);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.cal-ghost[data-tone='warn'] {
+  box-shadow: 0 0 0 2px var(--warning), var(--shadow-2);
+}
+
+.cal-ghost[data-tone='danger'] {
+  background: var(--danger-tint);
+  box-shadow: 0 0 0 2px var(--danger), var(--shadow-2);
+}
+
+.cal-ghost__why {
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.cal-hover {
+  position: absolute;
+  inset-inline: 3px;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.cal-now {
+  position: absolute;
+  inset-inline: 0;
+  z-index: 4;
+  height: 1.5px;
+  margin-block-start: -0.75px;
+  background: var(--now);
+  pointer-events: none;
+}
+
+.cal-now::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -4px;
+  inset-block-start: -3.25px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--now);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cal-appt:hover {
+    --bg: color-mix(in srgb, var(--tone) 22%, var(--white));
+    z-index: 1;
+  }
+  .cal-appt[data-status='pending']:hover {
+    --bg: color-mix(in srgb, var(--tone) 6%, var(--white));
+  }
+  .cal__head-day:hover {
+    background: var(--fill);
+  }
+}
+
+@media (max-width: 860px) {
+  .cal__bar {
+    padding: 2px 16px 10px;
+  }
+
+  .cal__jump,
+  .cal__hint {
+    display: none;
+  }
+
+  .agenda {
+    padding: var(--s-2) var(--s-4) var(--s-10);
+  }
+
+  .cal__title {
+    order: 10;
+    flex-basis: 100%;
+    margin: 2px 4px 0;
+    font-size: var(--text-15);
+  }
+
+  .cal__grid {
+    --gutter: 46px;
+    --col-min: 150px;
+  }
+
+  .cal[data-view='week'] .cal__grid {
+    --col-min: 104px;
+  }
+
+  .cal__head {
+    padding-inline: 8px;
+  }
+}
+
+@media (hover: none) {
+  .cal__col {
+    cursor: default;
+  }
+
+  .cal-appt {
+    cursor: pointer;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .cal-appt {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 70%, var(--ink));
+  }
+  .cal-block {
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+}

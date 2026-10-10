@@ -1,0 +1,176 @@
+.tenant {
+  min-height: 100vh;
+  background: var(--porcelain);
+}
+
+.tenant-draft {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-4);
+  padding: 8px var(--gutter);
+  background: var(--ink);
+  color: #fff;
+  font-size: var(--text-sm);
+}
+
+.tenant-hero {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  padding-block: calc(var(--header-h) + 64px) 32px;
+  animation: tenantIn 640ms var(--ease-out) both;
+}
+
+.tenant-hero__cover {
+  width: 100%;
+  max-height: 320px;
+  margin-block-end: var(--s-8);
+  border-radius: var(--r-lg);
+  object-fit: cover;
+}
+
+.tenant-hero__title {
+  margin-block-start: var(--s-6);
+  font-size: var(--display-lg);
+}
+
+.tenant-hero__tagline {
+  margin-block-start: var(--s-3);
+  font-size: var(--text-xl);
+  color: var(--ink-2);
+}
+
+.tenant-hero__desc {
+  margin-block-start: var(--s-4);
+  max-width: 34em;
+  color: var(--ink-3);
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.tenant-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-4) var(--s-6);
+  margin-block-start: var(--s-8);
+}
+
+.tenant-hero__actions .hero__opening {
+  margin: 0;
+}
+
+/* The pill styles live with the marketing hero; the tenant page reuses them. */
+.hero__opening {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding-inline: 12px 16px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: var(--text-sm);
+  transition: box-shadow var(--t-fast);
+}
+
+.hero__opening:hover {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.hero__opening-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-tint);
+}
+
+.tenant-section {
+  padding-block: var(--s-16);
+  border-block-start: 1px solid var(--line);
+}
+
+.tenant-section > .display {
+  margin-block-end: var(--s-8);
+}
+
+.tenant-info {
+  display: grid;
+  gap: var(--s-12);
+}
+
+@media (min-width: 900px) {
+  .tenant-info {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-16);
+  }
+}
+
+.tenant-info__sub {
+  margin-block-start: var(--s-8);
+}
+
+.tenant-info__col {
+  display: grid;
+  gap: var(--s-8);
+  align-content: start;
+}
+
+.tenant-info__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block: var(--s-3);
+}
+
+.tenant-info__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-start: var(--s-3);
+}
+
+.tenant-policies {
+  display: grid;
+  gap: 8px;
+  margin-block-start: var(--s-3);
+  color: var(--ink-2);
+}
+
+.tenant-policies li {
+  position: relative;
+  padding-inline-start: 18px;
+}
+
+.tenant-policies li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 2px;
+  top: 0.62em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.mine__list:not(:empty) + .mine__empty,
+.mine__past:has(.mine__list:empty) {
+  display: none;
+}
+
+.confirmed__mark[data-pending='true'] {
+  background: var(--warning-tint);
+  color: var(--warning);
+}
+
+@keyframes tenantIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+}

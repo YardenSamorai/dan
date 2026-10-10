@@ -1,0 +1,626 @@
+.btn.mk-signin {
+  display: none;
+}
+
+@media (min-width: 720px) {
+  .btn.mk-signin {
+    display: inline-flex;
+  }
+}
+
+/* ── Product chapters ─────────────────────────────────────────── */
+.showcase {
+  display: grid;
+  gap: clamp(72px, 10vw, 140px);
+  margin-block-start: clamp(48px, 7vw, 96px);
+}
+
+.chapter {
+  display: grid;
+  gap: var(--s-8);
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .chapter {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: clamp(40px, 6vw, 96px);
+  }
+  .chapter[data-flip] {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+  .chapter[data-flip] .chapter__text {
+    order: 2;
+  }
+}
+
+.chapter__text {
+  display: grid;
+  gap: var(--s-4);
+  max-width: 30em;
+}
+
+.chapter__title {
+  font-size: clamp(26px, 2.6vw, 34px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.026em;
+  text-wrap: balance;
+}
+
+html[lang='he'] .chapter__title {
+  letter-spacing: -0.005em;
+}
+
+.chapter__body {
+  color: var(--ink-3);
+  font-size: var(--text-lg);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* The stage: a quiet plinth the real UI sits on. */
+.chapter__stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 420px;
+  padding: clamp(24px, 5vw, 56px);
+  border-radius: var(--r-xl);
+  background: linear-gradient(180deg, #ececea, #e6e6e3);
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.showcase__more {
+  display: grid;
+  gap: var(--s-8);
+  padding-block-start: var(--s-8);
+  border-block-start: 1px solid var(--line);
+}
+
+.showcase__more-title {
+  font-size: var(--text-15);
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.showcase__more ul {
+  display: grid;
+  gap: var(--s-8);
+}
+
+@media (min-width: 900px) {
+  .showcase__more ul {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--s-12);
+  }
+}
+
+.showcase__more h4 {
+  font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+
+.showcase__more p {
+  margin-block-start: 6px;
+  color: var(--ink-3);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* Scroll-linked entrance; content is simply visible where unsupported. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .mk-rise {
+      animation: mkRise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 55%;
+    }
+    .chapter__stage.mk-rise {
+      animation-range: entry 5% entry 70%;
+    }
+  }
+}
+
+@keyframes mkRise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0);
+  }
+}
+
+/* Booking phone */
+.vig-phone {
+  width: min(300px, 100%);
+  padding: 14px 16px 12px;
+  border-radius: 34px;
+  background: var(--surface);
+  box-shadow: 0 0 0 7px #1c1c1e, 0 0 0 8px #3a3a3c, 0 30px 60px -20px rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.vig-phone__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 6px 12px;
+}
+
+.vig-phone__mark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--white);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.vig-phone__biz {
+  font-weight: 650;
+  font-size: 13px;
+}
+
+.vig-phone__progress {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.vig-phone__progress i {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--track);
+}
+
+.vig-phone__progress b {
+  display: block;
+  width: 60%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.vig-phone__title {
+  margin-block: 14px 10px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.vig-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.vig-day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding-block: 6px;
+  border-radius: 10px;
+}
+
+.vig-day small {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+.vig-day b {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.vig-day[data-on] {
+  background: var(--accent);
+  color: var(--white);
+}
+
+.vig-day[data-on] small {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.vig-day[data-off] b {
+  color: var(--ink-4);
+}
+
+.vig-phone__day {
+  margin-block: 12px 2px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.vig-phone__label {
+  margin-block: 8px 6px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.vig-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.vig-slots span {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+}
+
+.vig-slots [data-taken] {
+  color: var(--ink-4);
+  text-decoration: line-through;
+  box-shadow: none;
+  background: var(--fill);
+}
+
+.vig-slots [data-on] {
+  background: var(--accent);
+  color: var(--white);
+  box-shadow: none;
+}
+
+.vig-phone__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 16px -16px -12px;
+  padding: 12px 16px 16px;
+  border-block-start: 1px solid var(--line);
+}
+
+.vig-phone__foot span:first-child {
+  display: grid;
+}
+
+.vig-phone__foot small {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.vig-phone__cta {
+  padding: 9px 16px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--white);
+  font-weight: 600;
+}
+
+/* Calendar day */
+.vig-cal {
+  width: min(560px, 100%);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-3), var(--edge);
+  overflow: hidden;
+  font-size: 11px;
+}
+
+.vig-cal__top {
+  padding: 12px 14px 4px;
+  font-size: 13px;
+}
+
+.vig-cal__heads,
+.vig-cal__body {
+  display: grid;
+  grid-template-columns: 44px repeat(3, 1fr);
+}
+
+.vig-cal__heads {
+  border-block-end: 1px solid var(--line);
+}
+
+.vig-cal__heads span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.vig-cal__heads i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+.vig-cal__body {
+  position: relative;
+  height: 300px;
+}
+
+.vig-cal__gutter {
+  position: relative;
+}
+
+.vig-cal__gutter span {
+  position: absolute;
+  inset-inline-end: 8px;
+  transform: translateY(-50%);
+  color: var(--ink-4);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+}
+
+.vig-cal__gutter span:first-child {
+  transform: none;
+  margin-block-start: 2px;
+}
+
+.vig-cal__col {
+  position: relative;
+  border-inline-start: 1px solid var(--line);
+  background-image: repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px 60px);
+}
+
+.vig-b {
+  position: absolute;
+  inset-inline: 3px;
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  padding: 4px 6px 3px 9px;
+  padding-inline: 9px 6px;
+  border-radius: 5px;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+.vig-b--appt {
+  background: color-mix(in srgb, var(--tone) 15%, var(--white));
+}
+
+.vig-b--appt::before {
+  content: '';
+  position: absolute;
+  inset-block: 3px;
+  inset-inline-start: 3px;
+  width: 2.5px;
+  border-radius: 2px;
+  background: var(--tone);
+}
+
+.vig-b small {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--tone) 62%, var(--ink));
+}
+
+.vig-b b {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vig-b em {
+  font-style: normal;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vig-b[data-status='completed'] {
+  background: color-mix(in srgb, var(--tone) 8%, var(--white));
+  color: var(--ink-3);
+}
+
+.vig-b[data-status='completed']::before {
+  background: color-mix(in srgb, var(--tone) 45%, var(--white));
+}
+
+.vig-b[data-status='arrived'] {
+  background: color-mix(in srgb, var(--tone) 30%, var(--white));
+}
+
+.vig-b[data-status='pending'] {
+  background: var(--white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 55%, transparent);
+}
+
+.vig-b--break,
+.vig-b--off {
+  inset-inline: 0;
+  border-radius: 0;
+  background: #f3f3f1;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.vig-b--off {
+  height: auto !important;
+  bottom: 0;
+}
+
+.vig-b--blocked {
+  background: rgba(28, 28, 30, 0.07);
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.vig-cal__now {
+  position: absolute;
+  inset-inline: 44px 0;
+  height: 1.5px;
+  background: #e0443a;
+}
+
+.vig-cal__now::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -4px;
+  top: -3.25px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e0443a;
+}
+
+/* Customer */
+.vig-person {
+  display: grid;
+  gap: 14px;
+  width: min(380px, 100%);
+  padding: 20px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-3), var(--edge);
+  font-size: 13px;
+}
+
+.vig-person__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vig-person__head div {
+  display: grid;
+}
+
+.vig-person__head b {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+
+.vig-person__head small,
+.vig-person__next small,
+.vig-person__label {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.vig-person__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-radius: 12px;
+  background: var(--surface-sunken);
+}
+
+.vig-person__stats div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+}
+
+.vig-person__stats div + div {
+  border-inline-start: 1px solid var(--line);
+}
+
+.vig-person__stats dt {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.vig-person__stats dd {
+  font-size: 15px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.vig-person__next {
+  display: grid;
+  gap: 2px;
+}
+
+.vig-person__next b {
+  font-weight: 600;
+}
+
+.vig-person__note {
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--warning-tint);
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+
+.vig-person__history li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding-block: 9px;
+  border-block-start: 1px solid var(--line);
+}
+
+.vig-person__history small {
+  color: var(--ink-3);
+}
+
+@media (max-width: 600px) {
+  .chapter__stage {
+    min-height: 0;
+    margin-inline: calc(-1 * var(--gutter, 20px));
+    border-radius: 0;
+    padding: 40px 20px;
+  }
+  .vig-cal__body {
+    height: 260px;
+  }
+}
+
+.mk-demo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4) var(--s-8);
+  margin-block-start: var(--s-8);
+}
+
+.mk-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block-start: var(--s-8);
+}
+
+.mk-types li {
+  padding: 10px 18px;
+  border-radius: var(--r-pill);
+  background: var(--white);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: var(--text-md);
+}
+
+.mk-honest {
+  display: grid;
+  gap: var(--s-4);
+  max-width: 720px;
+  padding: var(--s-10);
+  border-radius: var(--r-lg);
+  background: var(--white);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.mk-honest p:last-child {
+  color: var(--ink-2);
+  line-height: 1.65;
+}
+
+@media (max-width: 600px) {
+  .mk-honest {
+    padding: var(--s-6);
+  }
+}
