@@ -72,6 +72,20 @@ export function MarketingLayout() {
                   <Link to="/sign-in">{t('marketing.footer.workspace')}</Link>
                 </li>
               </ul>
+              <ul>
+                <li>
+                  <Link to="/help">{t('legal.help')}</Link>
+                </li>
+                <li>
+                  <Link to="/privacy">{t('legal.privacy')}</Link>
+                </li>
+                <li>
+                  <Link to="/terms">{t('legal.terms')}</Link>
+                </li>
+                <li>
+                  <Link to="/accessibility">{t('legal.accessibility')}</Link>
+                </li>
+              </ul>
             </div>
           </div>
           <div className="site-footer__bottom muted">

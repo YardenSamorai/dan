@@ -33,6 +33,7 @@ export const ChevronDown = icon(<path d="m4 6 4 4 4-4" />);
 export const CheckIcon = icon(<path d="m3.5 8.5 3 3 6-7" />);
 export const CloseIcon = icon(<path d="m4 4 8 8M12 4l-8 8" />);
 export const PlusIcon = icon(<path d="M8 3.5v9M3.5 8h9" />);
+export const MinusIcon = icon(<path d="M3.5 8h9" />);
 export const SearchIcon = icon(
   <>
     <circle cx="7" cy="7" r="4.5" />
@@ -138,7 +139,54 @@ export const SidebarIcon = icon(
   </>,
   { directional: true },
 );
+export const BrushIcon = icon(<path d="M13.5 2.5 7.8 8.2M9.4 9.8 6.2 6.6M6.2 9.6c-1.4 0-2.2 1-2.2 2.1 0 .9-.6 1.5-1.5 1.8 3.2.9 5.9-.2 5.9-2.2 0-1-.9-1.7-2.2-1.7Z" />);
+export const EyeIcon = icon(
+  <>
+    <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" />
+    <circle cx="8" cy="8" r="2" />
+  </>,
+);
+export const EyeOffIcon = icon(<path d="M6.6 3.7A6.6 6.6 0 0 1 8 3.5c4 0 6.5 4.5 6.5 4.5a12 12 0 0 1-1.8 2.3M4.3 4.9A11.6 11.6 0 0 0 1.5 8S4 12.5 8 12.5c1.3 0 2.5-.5 3.5-1.1M6.6 6.6a2 2 0 0 0 2.8 2.8M2.5 2.5l11 11" />);
+export const ImageIcon = icon(
+  <>
+    <rect x="2" y="2.5" width="12" height="11" rx="2" />
+    <circle cx="5.75" cy="6.25" r="1.25" />
+    <path d="m2.5 12 3.5-3.5 2.5 2.5 2-2 3.5 3.5" />
+  </>,
+);
+export const GripIcon = icon(
+  <path d="M6 3.5h.01M10 3.5h.01M6 8h.01M10 8h.01M6 12.5h.01M10 12.5h.01" strokeWidth={2.2} />,
+);
+export const DesktopIcon = icon(
+  <>
+    <rect x="1.5" y="2.5" width="13" height="8.5" rx="1.5" />
+    <path d="M5.5 13.5h5M8 11v2.5" />
+  </>,
+);
+export const MobileIcon = icon(
+  <>
+    <rect x="4.5" y="1.5" width="7" height="13" rx="1.75" />
+    <path d="M7.25 12.25h1.5" />
+  </>,
+);
+export const TrashIcon = icon(<path d="M2.5 4.5h11M6.5 4.5V3a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1.5M4 4.5l.6 8.1a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-8.1" />);
+export const ArrowUpIcon = icon(<path d="M8 13V3M4 7l4-4 4 4" />);
+export const ArrowDownIcon = icon(<path d="M8 3v10M4 9l4 4 4-4" />);
+/** Physical directions: these never mirror. */
+export const ArrowLeftIcon = icon(<path d="M13 8H3m4-4L3 8l4 4" />);
+export const ArrowRightIcon = icon(<path d="M3 8h10M9 4l4 4-4 4" />);
+export const QuestionIcon = icon(
+  <>
+    <circle cx="8" cy="8" r="6.5" />
+    <path d="M6.2 6.2a1.9 1.9 0 0 1 3.7.5c0 1.3-1.9 1.6-1.9 2.8M8 11.5h.01" />
+  </>,
+);
+export const UploadIcon = icon(<path d="M8 10.5v-8M4.5 6 8 2.5 11.5 6M2.5 10.5v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2" />);
+export const DownloadIcon = icon(<path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M2.5 10.5v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2" />);
+export const PlayIcon = icon(<path d="M5 3.2v9.6a.4.4 0 0 0 .6.3l7.4-4.8a.4.4 0 0 0 0-.6L5.6 2.9a.4.4 0 0 0-.6.3Z" />);
 export const LinkIcon = icon(<path d="M7 9a3 3 0 0 0 4.2 0l2-2A3 3 0 0 0 9 2.8l-.8.8M9 7a3 3 0 0 0-4.2 0l-2 2A3 3 0 0 0 7 13.2l.8-.8" />);
+export const ChartIcon = icon(<path d="M2.5 13.5h11M4.5 11V8.5M7.5 11V4.5M10.5 11V7M13 11V2.5" />);
+export const StarIcon = icon(<path d="m8 2.3 1.7 3.5 3.8.5-2.8 2.7.7 3.8L8 11l-3.4 1.8.7-3.8-2.8-2.7 3.8-.5z" />);
 
 /**
  * Placeholder product mark: a neutral rounded tile. Replaced together with

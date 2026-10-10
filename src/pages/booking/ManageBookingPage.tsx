@@ -27,6 +27,7 @@ export default function ManageBookingPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  if (booking === null) return <section className="container" style={{ minHeight: '60vh' }} aria-busy="true" />;
   if (!booking) return <NotFoundPage />;
   const { business } = tenant;
   const tz = business.timezone;
@@ -46,7 +47,8 @@ export default function ManageBookingPage() {
       setMode('view');
       setPick({});
     } catch (e) {
-      setError(e instanceof ApiError && e.code === 'slot_taken' ? t('conflict.slot_taken') : t('common.unknownError'));
+      const code = e instanceof ApiError ? e.code : null;
+      setError(code === 'slot_taken' ? t('conflict.slot_taken') : code === 'blocked' ? t('booking.blocked') : t('common.unknownError'));
     } finally {
       setBusy(false);
     }

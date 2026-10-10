@@ -1,13 +1,15 @@
 import { Link } from 'react-router-dom';
-import type { ReactNode } from 'react';
-import { AlertIcon, BanIcon, CalendarIcon, CheckIcon, ChevronRight, ClockIcon, MessageIcon, PhoneIcon, PlusIcon, TagIcon, UserIcon } from '../../components/ui/Icons';
+import { useMemo, type ReactNode } from 'react';
+import { AlertIcon, BanIcon, CalendarIcon, ChartIcon, CheckIcon, ChevronRight, ClockIcon, MessageIcon, PhoneIcon, PlusIcon, TagIcon, UserIcon } from '../../components/ui/Icons';
 import { StaffAvatar, StatusBadge } from '../../components/ui/bits';
+import { periodSpans, quickTotals } from '../../domain/insights';
 import { businessNow, freeRanges, occupiesTime, staffDay } from '../../domain/scheduling';
 import { addDays } from '../../domain/time';
 import type { Appointment, ISODate, Minutes } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
 import { telHref, whatsappHref } from '../../lib/phone';
 import { useAppUI } from '../AppUI';
+import { SetupChecklist } from '../SetupChecklist';
 import { useLookup } from '../lookup';
 import { PageHeader } from '../shared';
 import { useWorkspace } from '../workspace';
@@ -85,6 +87,8 @@ export default function Dashboard() {
         </div>
       )}
 
+      <SetupChecklist />
+
       <div className="dash">
         <div className="dash__col">
           <UpNext a={next} inProgress={!!current} nowMin={nowMin} onOpen={openAppointment} />
@@ -113,6 +117,8 @@ export default function Dashboard() {
         </div>
 
         <div className="dash__col">
+          {can('insights.view') && <InsightsTeaser />}
+
           <section className="sec" aria-labelledby="dash-attention">
             <div className="sec__head">
               <h2 className="sec__title" id="dash-attention">
@@ -217,6 +223,26 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+function InsightsTeaser() {
+  const { state } = useLookup();
+  const { t, fmt } = useI18n();
+  const { booked, revenue } = useMemo(() => quickTotals(state, periodSpans('30d', businessNow(state).date).current), [state]);
+  if (!booked) return null;
+  return (
+    <Link to="/app/insights" className="panel dash-insights">
+      <span className="dash-insights__text">
+        <span className="dash-insights__label">{t('insights.teaser.title')}</span>
+        <span className="dash-insights__value tabular">{fmt.money(revenue)}</span>
+        <span className="dash-insights__sub">{t('units.appointments', { count: booked })}</span>
+      </span>
+      <span className="dash-insights__open">
+        <ChartIcon size={15} /> {t('insights.teaser.open')}
+        <ChevronRight size={13} />
+      </span>
+    </Link>
   );
 }
 

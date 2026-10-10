@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { PlusIcon, SearchIcon } from '../../components/ui/Icons';
+import { Link } from 'react-router-dom';
+import { PlusIcon, SearchIcon, UploadIcon } from '../../components/ui/Icons';
 import { Avatar } from '../../components/ui/bits';
 import { localeMeta } from '../../i18n/config';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -43,9 +44,14 @@ export default function CustomersPage() {
         <span className="toolbar__spacer" />
         <span className="toolbar__count">{t('customers.count', { count: rows.length })}</span>
         {can('customers.edit') && (
-          <button type="button" className="btn btn--ghost btn--sm" onClick={newCustomer}>
-            <PlusIcon /> {t('customers.add')}
-          </button>
+          <>
+            <Link to="/app/customers/import" className="btn btn--ghost btn--sm">
+              <UploadIcon /> {t('customers.import.button')}
+            </Link>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={newCustomer}>
+              <PlusIcon /> {t('customers.add')}
+            </button>
+          </>
         )}
       </div>
 
@@ -83,6 +89,7 @@ export default function CustomersPage() {
                             {c.name}
                           </button>
                           <span className="badge badge--plain">{localeMeta[c.locale].short}</span>
+                          {c.blocked && <span className="badge badge--danger">{t('customers.block.badge')}</span>}
                         </span>
                       </td>
                       <td>
@@ -105,7 +112,9 @@ export default function CustomersPage() {
                 <button key={c.id} type="button" className="list__row" onClick={() => openCustomer(c.id)}>
                   <Avatar name={c.name} size="sm" />
                   <div className="list__main">
-                    <span className="list__title">{c.name}</span>
+                    <span className="list__title">
+                      {c.name} {c.blocked && <span className="badge badge--danger">{t('customers.block.badge')}</span>}
+                    </span>
                     <span className="list__sub">
                       <span className="ltr">{c.phone}</span> · {t('units.visits', { count: s.visits })}
                     </span>

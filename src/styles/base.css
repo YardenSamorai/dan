@@ -124,6 +124,11 @@ button,
   border-radius: 6px;
 }
 
+/* Headings and regions that receive focus from script (after navigation) are not controls. */
+[tabindex='-1']:focus-visible {
+  box-shadow: none;
+}
+
 ::selection {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }

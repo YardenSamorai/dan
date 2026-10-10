@@ -65,9 +65,56 @@ export type AccentKey = 'fig' | 'rose' | 'clay' | 'sage' | 'ocean' | 'plum' | 'i
 
 export interface Branding {
   accent: AccentKey;
+  /** Any colour the owner picked; shown darkened if needed so white text on it stays readable. Overrides `accent`. */
+  customAccent?: string;
   /** Small square logo. Mock adapter stores a data URL; a real backend stores an upload URL. */
   logoUrl?: string;
+  /** Leaves the logo (or monogram) off the public pages; the name alone stands in. */
+  hideLogo?: boolean;
   coverUrl?: string;
+}
+
+// ── Booking page layout ──────────────────────────────────────────────
+
+/** Whole-page looks: typeface, shapes and surface treatment. Colour is chosen separately. */
+export type ThemeKey = 'clean' | 'soft' | 'editorial' | 'night';
+export type SectionKind = 'hero' | 'services' | 'gallery' | 'about' | 'team' | 'reviews' | 'faq' | 'info';
+export type HeroLayout = 'centered' | 'split' | 'cover';
+export type ServicesLayout = 'list' | 'cards' | 'tiles' | 'menu' | 'feature' | 'carousel';
+/** `strip` scrolls by hand; `marquee` runs on its own in `flow` direction. */
+export type GalleryLayout = 'grid' | 'masonry' | 'strip' | 'marquee';
+export type GalleryFlow = 'left' | 'right';
+
+/** A review (title = who, body = what they said) or a question (title = question, body = answer). */
+export interface PageItem {
+  id: string;
+  title: LText;
+  body: LText;
+}
+
+export interface PageSection {
+  id: string;
+  kind: SectionKind;
+  visible: boolean;
+  /** Replaces the default heading when set. */
+  title?: LText;
+  layout?: HeroLayout | ServicesLayout | GalleryLayout;
+  /** About text. */
+  body?: LText;
+  /** About picture. */
+  imageUrl?: string;
+  /** Gallery pictures, in order. */
+  images?: string[];
+  /** Which way a marquee gallery runs. */
+  flow?: GalleryFlow;
+  /** Reviews or questions. */
+  items?: PageItem[];
+}
+
+export interface PageConfig {
+  theme: ThemeKey;
+  /** Rendered top to bottom. The hero always stays first. */
+  sections: PageSection[];
 }
 
 export interface SocialLinks {
@@ -106,10 +153,25 @@ export interface Business {
   email: string;
   social: SocialLinks;
   branding: Branding;
+  /** Booking page layout. Missing until the owner first edits it; see `pageOf`. */
+  page?: PageConfig;
   hours: WeeklySchedule;
   policies: BookingPolicies;
   notifications: NotificationSettings;
   subscription: SubscriptionRef;
+  /** Secret calendar subscription links (ICS). Staff see only their own. */
+  calendarFeeds?: CalendarFeed[];
+  /** Getting-started checklist: steps the owner ticked by hand, and whether it's hidden. */
+  setup?: { done: SetupStep[]; dismissed?: boolean };
+}
+
+export type SetupStep = 'page' | 'photos' | 'team' | 'publish' | 'calendar' | 'share' | 'firstBooking';
+
+export interface CalendarFeed {
+  /** Unguessable; part of the feed URL. Replacing it revokes the old link. */
+  key: string;
+  /** null = everyone's appointments. */
+  staffId: string | null;
 }
 
 // ── Catalogue ────────────────────────────────────────────────────────
@@ -117,6 +179,11 @@ export interface Business {
 export interface ServiceCategory extends Owned {
   id: string;
   name: LText;
+}
+
+export interface StaffTerms {
+  duration?: Minutes;
+  price?: number;
 }
 
 export interface Service extends Owned {
@@ -132,8 +199,12 @@ export interface Service extends Owned {
   bufferAfter: Minutes;
   /** Staff who perform it. */
   staffIds: string[];
+  /** Per-person duration and price, keyed by staff id. Missing fields fall back to the service's own. */
+  staffTerms?: Record<string, StaffTerms>;
   active: boolean;
   onlineBookable: boolean;
+  /** Takes the whole place (e.g. one shared room): while booked, nobody else can be booked, and it needs everyone free. */
+  blocksAll?: boolean;
   imageUrl?: string;
 }
 
@@ -209,6 +280,8 @@ export interface Customer extends Owned {
   locale: Locale;
   note?: string;
   createdAt: string;
+  /** Can't book or reschedule online (matched by phone or email). Staff can still book them by hand. */
+  blocked?: boolean;
 }
 
 // ── Appointments ─────────────────────────────────────────────────────

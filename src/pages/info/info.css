@@ -1,0 +1,111 @@
+/* Help centre and legal pages: one readable column. */
+.info.container {
+  max-width: calc(720px + var(--gutter) * 2);
+  padding-block: calc(var(--header-h, 64px) + var(--s-8)) var(--s-12, 96px);
+}
+
+.info__head {
+  margin-block-end: var(--s-8);
+}
+
+.info__title {
+  font-size: clamp(30px, 5vw, 42px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+.info__lede {
+  margin-block-start: var(--s-3);
+  color: var(--ink-3);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.info__section {
+  margin-block-start: var(--s-8);
+}
+
+.info__section h2 {
+  margin-block-end: var(--s-3);
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.info__section p {
+  margin-block-end: var(--s-3);
+  color: var(--ink-2);
+  line-height: 1.7;
+}
+
+.info a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.info__contact {
+  margin-block-start: var(--s-10, 64px);
+  padding: var(--s-5);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.info__contact p {
+  margin: 0;
+}
+
+.info__related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-5);
+  margin-block-start: var(--s-10, 64px);
+  padding-block-start: var(--s-5);
+  border-block-start: 1px solid var(--line);
+  font-size: var(--text-sm);
+}
+
+.faq {
+  display: grid;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--edge, 0 0 0 1px var(--line));
+}
+
+.faq__item + .faq__item {
+  border-block-start: 1px solid var(--line);
+}
+
+.faq__item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  font-weight: 550;
+  cursor: pointer;
+  list-style: none;
+}
+
+.faq__item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq__chev {
+  flex: none;
+  color: var(--ink-3);
+  transition: transform var(--t-fast);
+}
+
+.faq__item[open] .faq__chev {
+  transform: rotate(180deg);
+}
+
+.faq__answer {
+  padding: 0 var(--s-5) var(--s-4);
+}
+
+.faq__answer .btn {
+  text-decoration: none;
+}

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Link, Navigate, NavLink, useParams } from 'react-router-dom';
-import { ACCENT_KEYS, ACCENTS } from '../../components/ui/accents';
+import { Link, Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
+import { accentStyle } from '../../components/ui/accents';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { AlertIcon, BusinessMark, ExternalIcon } from '../../components/ui/Icons';
 import { Switch } from '../../components/ui/bits';
@@ -12,21 +12,23 @@ import { messageVars, renderTemplate, TEMPLATE_VARS } from '../../domain/notific
 import type { Permission } from '../../domain/permissions';
 import { businessNow, isUpcoming } from '../../domain/scheduling';
 import { isValidTimeZone } from '../../domain/time';
-import type { BookingPolicies, Branding, Business, Channel, NotificationSettings, TemplateKind } from '../../domain/types';
+import type { BookingPolicies, Business, Channel, NotificationSettings, TemplateKind } from '../../domain/types';
 import { localeMeta, locales, type Locale } from '../../i18n/config';
 import { useI18n } from '../../i18n/I18nProvider';
 import type { MessageKey } from '../../i18n/messages';
 import { PageHeader } from '../shared';
 import { useWorkspace } from '../workspace';
 
-type Section = 'business' | 'booking' | 'branding' | 'notifications' | 'team' | 'billing' | 'data';
+type Section = 'business' | 'booking' | 'branding' | 'notifications' | 'calendar' | 'team' | 'billing' | 'account' | 'data';
 const SECTIONS: { id: Section; needs: Permission; previewOnly?: boolean }[] = [
   { id: 'business', needs: 'business.settings' },
   { id: 'booking', needs: 'business.settings' },
   { id: 'branding', needs: 'business.settings' },
   { id: 'notifications', needs: 'business.settings' },
+  { id: 'calendar', needs: 'calendar.all' },
   { id: 'team', needs: 'staff.manage' },
   { id: 'billing', needs: 'billing.manage' },
+  { id: 'account', needs: 'billing.manage' },
   { id: 'data', needs: 'demo.reset', previewOnly: true },
 ];
 const KINDS: TemplateKind[] = ['confirmation', 'reminder', 'reschedule', 'cancellation'];
@@ -58,8 +60,10 @@ export default function SettingsPage() {
         {current.id === 'booking' && <BookingSection />}
         {current.id === 'branding' && <BrandingSection />}
         {current.id === 'notifications' && <NotificationsSection />}
+        {current.id === 'calendar' && <CalendarSection />}
         {current.id === 'team' && <TeamSection />}
         {current.id === 'billing' && <BillingSection />}
+        {current.id === 'account' && <AccountSection />}
         {current.id === 'data' && <DataSection />}
       </div>
     </div>
@@ -142,6 +146,7 @@ function BusinessSection() {
   });
   const d = useDraft(pick(b));
   const v = d.value;
+  directory.useSlugChecks();
   const slugOk = v.slug === b.slug || (SLUG_PATTERN.test(v.slug) && directory.isSlugAvailable(v.slug));
   const zones = useMemo(() => [...new Set([v.timezone, ...ZONES])].filter(isValidTimeZone), [v.timezone]);
   const both = (k: 'name' | 'tagline' | 'description' | 'address', lEn: MessageKey, lHe: MessageKey, area = false) => (
@@ -345,73 +350,21 @@ function BookingSection() {
 
 // ── Branding ─────────────────────────────────────────────────────────
 
-const MAX_LOGO_BYTES = 300_000;
-
 function BrandingSection() {
-  const { tenant, api } = useWorkspace();
+  const { tenant } = useWorkspace();
   const { t, tx } = useI18n();
-  const toast = useToast();
-  const d = useDraft<Branding>(tenant.business.branding);
-  const v = d.value;
+  const { branding } = tenant.business;
   const name = tx(tenant.business.name);
-
-  const onFile = (file: File | undefined) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/') || file.size > MAX_LOGO_BYTES) return toast(t('settings.branding.logoHint'));
-    const r = new FileReader();
-    r.onload = () => d.set({ ...v, logoUrl: String(r.result) });
-    r.readAsDataURL(file);
-  };
-
   return (
-    <>
-      <p className="page__lede">{t('settings.branding.lede')}</p>
-      <div className="settings__split">
-        <section className="panel panel__body form-grid">
-          <fieldset className="field">
-            <legend className="field__label">{t('settings.branding.accent')}</legend>
-            <div className="color-swatches">
-              {ACCENT_KEYS.map((k) => (
-                <button key={k} type="button" className="color-swatch" aria-pressed={v.accent === k} aria-label={k} style={{ background: ACCENTS[k] }} onClick={() => d.set({ ...v, accent: k })} />
-              ))}
-            </div>
-          </fieldset>
-          <div className="field">
-            <span className="field__label">{t('settings.branding.logo')}</span>
-            <div className="settings__logo" data-accent={v.accent}>
-              <BusinessMark name={name} logoUrl={v.logoUrl} className="biz-mark--xl" />
-              <label className="btn btn--ghost btn--sm">
-                {t('settings.branding.upload')}
-                <input type="file" accept="image/*" className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} />
-              </label>
-              {v.logoUrl && (
-                <button type="button" className="btn btn--quiet btn--sm" onClick={() => d.set({ ...v, logoUrl: undefined })}>
-                  {t('settings.branding.removeLogo')}
-                </button>
-              )}
-            </div>
-            <p className="field__hint">{t('settings.branding.logoHint')}</p>
-          </div>
-          <Field id="brand-cover" label={t('settings.branding.cover')}>
-            <input id="brand-cover" className="field__input ltr" dir="ltr" type="url" value={v.coverUrl ?? ''} onChange={(e) => d.set({ ...v, coverUrl: e.target.value || undefined })} />
-          </Field>
-        </section>
-        <section className="panel brand-preview" data-accent={v.accent} aria-label={t('settings.branding.preview')}>
-          <p className="brand-preview__eyebrow">{t('settings.branding.preview')}</p>
-          {v.coverUrl && <img className="brand-preview__cover" src={v.coverUrl} alt="" />}
-          <BusinessMark name={name} logoUrl={v.logoUrl} className="biz-mark--xl" />
-          <p className="display brand-preview__name">{name}</p>
-          <p className="muted">{tx(tenant.business.tagline)}</p>
-          <span className="btn btn--primary btn--sm" aria-hidden>
-            {t('common.book')}
-          </span>
-          <span className="chip" aria-pressed="true" aria-hidden>
-            10:30
-          </span>
-        </section>
-      </div>
-      <SaveBar dirty={d.dirty} onReset={d.reset} onSave={() => api.updateBusiness({ branding: v })} />
-    </>
+    <section className="panel brand-preview" data-accent={branding.accent} style={accentStyle(branding)}>
+      {branding.coverUrl && <img className="brand-preview__cover" src={branding.coverUrl} alt="" />}
+      <BusinessMark name={name} logoUrl={branding.logoUrl} className="biz-mark--xl" />
+      <h2 className="display brand-preview__name">{t('settings.branding.title')}</h2>
+      <p className="muted">{t('settings.branding.body')}</p>
+      <Link to="/app/page" className="btn btn--primary">
+        {t('settings.branding.open')}
+      </Link>
+    </section>
   );
 }
 
@@ -537,6 +490,121 @@ function TeamSection() {
   );
 }
 
+// ── Calendar subscription links ──────────────────────────────────────
+
+const feedUrl = (slug: string, key: string) => `${location.origin}/api/ics/${slug}/${key}.ics`;
+
+function CalendarSection() {
+  const { tenant } = useWorkspace();
+  const { t, tx } = useI18n();
+  const local = /^(localhost|127\.|\[::1\])/.test(location.hostname);
+  const rows: { staffId: string | null; label: string }[] = [
+    { staffId: null, label: t('settings.calendar.everyone') },
+    ...tenant.staff.filter((s) => s.active).map((s) => ({ staffId: s.id, label: tx(s.name) })),
+  ];
+  return (
+    <>
+      <p className="page__lede">{t('settings.calendar.lede')}</p>
+      {!CAPABILITIES.backend && (
+        <p className="inline-alert inline-alert--warn">
+          <AlertIcon size={14} /> {t('settings.calendar.needsServer')}
+        </p>
+      )}
+      {CAPABILITIES.backend && local && <p className="inline-alert">{t('settings.calendar.localhost')}</p>}
+      <section className="panel">
+        <div className="list">
+          {rows.map((r) => (
+            <FeedRow key={r.staffId ?? 'all'} staffId={r.staffId} label={r.label} />
+          ))}
+        </div>
+      </section>
+      <section className="panel panel__body">
+        <h3 className="settings__sub">{t('settings.calendar.howTitle')}</h3>
+        <ol className="settings__steps">
+          <li>{t('settings.calendar.howGoogle')}</li>
+          <li>{t('settings.calendar.howOutlook')}</li>
+          <li>{t('settings.calendar.howApple')}</li>
+        </ol>
+        <p className="muted">{t('settings.calendar.oneWay')}</p>
+      </section>
+    </>
+  );
+}
+
+function FeedRow({ staffId, label }: { staffId: string | null; label: string }) {
+  const { tenant, api } = useWorkspace();
+  const { t } = useI18n();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const feed = tenant.business.calendarFeeds?.find((f) => f.staffId === staffId);
+  const url = feed && feedUrl(tenant.business.slug, feed.key);
+
+  const run = async (rotate: boolean) => {
+    setBusy(true);
+    try {
+      await api.calendarFeed(staffId, rotate);
+      if (rotate) toast(t('settings.calendar.rotated'));
+    } catch {
+      toast(t('common.unknownError'));
+    } finally {
+      setBusy(false);
+      setConfirm(false);
+    }
+  };
+  const copy = async () => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast(t('settings.calendar.copied'));
+    } catch {
+      toast(t('common.unknownError'));
+    }
+  };
+
+  return (
+    <div className="list__row feed-row">
+      <div className="list__main">
+        <span className="list__title">{label}</span>
+        {url ? (
+          <input className="field__input field__input--sm ltr feed-row__url" dir="ltr" readOnly value={url} aria-label={t('settings.calendar.link', { name: label })} onFocus={(e) => e.currentTarget.select()} />
+        ) : (
+          <span className="list__sub">{t('settings.calendar.none')}</span>
+        )}
+      </div>
+      <div className="feed-row__actions">
+        {url ? (
+          <>
+            <button type="button" className="btn btn--tinted btn--sm" onClick={copy}>
+              {t('common.copy')}
+            </button>
+            <a className="btn btn--ghost btn--sm" href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(url.replace(/^https?:/, 'webcal:'))}`} target="_blank" rel="noreferrer">
+              {t('settings.calendar.google')} <ExternalIcon size={12} />
+            </a>
+            <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => setConfirm(true)}>
+              {t('settings.calendar.rotate')}
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn btn--tinted btn--sm" disabled={busy || !CAPABILITIES.backend} onClick={() => run(false)}>
+            {t('settings.calendar.create')}
+          </button>
+        )}
+      </div>
+      <ConfirmDialog
+        open={confirm}
+        title={t('settings.calendar.rotate')}
+        body={t('settings.calendar.rotateConfirm')}
+        confirmLabel={t('settings.calendar.rotate')}
+        cancelLabel={t('common.cancel')}
+        danger
+        onConfirm={() => run(true)}
+        onCancel={() => setConfirm(false)}
+      />
+    </div>
+  );
+}
+
 // ── Billing (placeholder) ────────────────────────────────────────────
 
 function BillingSection() {
@@ -569,6 +637,104 @@ function BillingSection() {
           </div>
         </dl>
       </section>
+    </>
+  );
+}
+
+// ── Account & data: export and delete ────────────────────────────────
+
+function download(name: string, type: string, content: string) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const csvCell = (v: unknown) => {
+  const s = v == null ? '' : String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+function AccountSection() {
+  const { tenant, api } = useWorkspace();
+  const { t } = useI18n();
+  const toast = useToast();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const slug = tenant.business.slug;
+  const stamp = businessNow(tenant).date;
+
+  const exportJson = () => download(`${slug}-${stamp}.json`, 'application/json', JSON.stringify({ exportedAt: new Date().toISOString(), ...tenant }, null, 2));
+  const exportCustomers = () => {
+    const visits = new Map<string, { count: number; last: string }>();
+    for (const a of tenant.appointments) {
+      if (a.status === 'cancelled') continue;
+      const v = visits.get(a.customerId) ?? { count: 0, last: '' };
+      visits.set(a.customerId, { count: v.count + 1, last: a.date > v.last ? a.date : v.last });
+    }
+    const head = (['name', 'phone', 'email', 'note', 'visits', 'last', 'since'] as const).map((k) => t(`settings.account.csv.${k}`));
+    const rows = tenant.customers.map((c) => [c.name, c.phone, c.email, c.note, visits.get(c.id)?.count ?? 0, visits.get(c.id)?.last ?? '', c.createdAt.slice(0, 10)]);
+    // BOM so Excel opens Hebrew correctly.
+    download(`${slug}-customers-${stamp}.csv`, 'text/csv;charset=utf-8', '\uFEFF' + [head, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n'));
+  };
+
+  return (
+    <>
+      <p className="page__lede">{t('settings.account.lede')}</p>
+      <section className="panel panel__body form-grid">
+        <h3 className="settings__sub">{t('settings.account.exportTitle')}</h3>
+        <p className="muted">{t('settings.account.exportBody')}</p>
+        <div className="settings__actions">
+          <button type="button" className="btn btn--tinted btn--sm" onClick={exportCustomers}>
+            {t('settings.account.exportCustomers')}
+          </button>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={exportJson}>
+            {t('settings.account.exportAll')}
+          </button>
+        </div>
+      </section>
+      <section className="panel panel__body form-grid">
+        <h3 className="settings__sub">{t('settings.account.deleteTitle')}</h3>
+        <p className="muted">{t('settings.account.deleteBody')}</p>
+        <button type="button" className="btn btn--ghost btn--danger btn--sm" style={{ justifySelf: 'start' }} onClick={() => setOpen(true)}>
+          {t('settings.account.delete')}
+        </button>
+      </section>
+      <ConfirmDialog
+        open={open}
+        title={t('settings.account.deleteConfirmTitle')}
+        body={
+          <div className="form-grid">
+            <p>{t('settings.account.deleteConfirmBody')}</p>
+            <label className="field__label" htmlFor="delete-slug">
+              {t('settings.account.typeSlug', { slug })}
+            </label>
+            <input id="delete-slug" className="field__input ltr" dir="ltr" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value.trim())} />
+          </div>
+        }
+        confirmLabel={t('settings.account.deleteForever')}
+        cancelLabel={t('common.cancel')}
+        danger
+        busy={busy}
+        confirmDisabled={typed !== slug}
+        onConfirm={async () => {
+          setBusy(true);
+          try {
+            await api.deleteBusiness(typed);
+            toast(t('settings.account.deleted'));
+            navigate('/app', { replace: true });
+          } catch (e) {
+            toast(e instanceof ApiError && e.code === 'forbidden' ? t('settings.account.demoProtected') : t('common.unknownError'));
+            setBusy(false);
+          }
+        }}
+        onCancel={() => {
+          setOpen(false);
+          setTyped('');
+        }}
+      />
     </>
   );
 }

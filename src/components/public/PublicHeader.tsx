@@ -41,7 +41,9 @@ export function PublicHeader({
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  useEffect(() => setOpen(false), [location.pathname, location.hash]);
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname, location.hash]);
 
   useEffect(() => {
     const d = sheetRef.current;

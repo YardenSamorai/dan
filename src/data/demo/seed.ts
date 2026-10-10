@@ -1,6 +1,6 @@
 import { DEFAULT_POLICIES, dayHours, defaultNotifications, range, weekly, weeklyFrom } from '../../domain/defaults';
 import type { BusinessMember, User } from '../../domain/platform';
-import { checkSlot } from '../../domain/scheduling';
+import { checkSlot, termsFor } from '../../domain/scheduling';
 import { addDays, parseHHMM, weekdayOf, zonedInstant, zonedNow } from '../../domain/time';
 import type { Appointment, Business, Customer, Service, Staff, TenantData } from '../../domain/types';
 import type { Locale } from '../../i18n/config';
@@ -12,7 +12,7 @@ import type { Locale } from '../../i18n/config';
  * Nothing outside the mock adapters imports this file.
  */
 
-export const SEED_VERSION = 5;
+export const SEED_VERSION = 7;
 export const DEMO_BUSINESS_IDS = ['biz_demo_studio', 'biz_lash_room'];
 const TZ = 'Asia/Jerusalem';
 
@@ -90,6 +90,8 @@ function tenStudio(today: string, createdAt: string): TenantData {
       price: 180,
       bufferAfter: 10,
       staffIds: ALL,
+      // Noa is the senior artist; Dana is newer and takes a little longer for less.
+      staffTerms: { noa: { price: 200 }, dana: { duration: 75, price: 150 } },
     }),
     svc({
       id: 'gel-refill',
@@ -100,6 +102,7 @@ function tenStudio(today: string, createdAt: string): TenantData {
       price: 210,
       bufferAfter: 10,
       staffIds: ALL,
+      staffTerms: { dana: { duration: 90, price: 180 } },
     }),
     svc({
       id: 'french-gel',
@@ -131,6 +134,7 @@ function tenStudio(today: string, createdAt: string): TenantData {
       price: 220,
       bufferAfter: 10,
       staffIds: ['maya', 'dana'],
+      staffTerms: { dana: { price: 190 } },
     }),
     svc({
       id: 'removal',
@@ -325,6 +329,9 @@ function fill(t: TenantData, prefix: string, names: [string, Locale][], seed: nu
   const at = (date: string, min: number) => zonedInstant(date, min, tz).toISOString();
   const manual = t.business.policies.confirmationMode === 'manual';
 
+  // Most customers are regulars from before the history starts; the rest join over the last two months.
+  const regulars = Math.ceil(names.length * 0.55);
+  const joinedOn = names.map((_, i) => (i < regulars ? -88 + i * 2 : -56 + Math.round(((i - regulars) * 54) / Math.max(1, names.length - regulars - 1))));
   t.customers = names.map(([name, locale], i): Customer => ({
     businessId: B,
     id: `${prefix}-c${i + 1}`,
@@ -333,11 +340,12 @@ function fill(t: TenantData, prefix: string, names: [string, Locale][], seed: nu
     phone: `05${pick([0, 2, 3, 4, 8])}-${String(100 + Math.floor(rand() * 900))}-${String(1000 + Math.floor(rand() * 9000))}`,
     email: locale === 'en' ? `${name.split(' ')[0].toLowerCase()}@example.com` : undefined,
     note: i === 2 ? 'Prefers a short almond shape.' : i === 6 ? 'Sensitive skin. Patch test first.' : undefined,
-    createdAt: at(addDays(today, -60 + i), 600),
+    createdAt: at(addDays(today, joinedOn[i]), 600),
   }));
 
   const services = t.services;
-  for (let offset = -28; offset <= 21; offset++) {
+  for (let offset = -63; offset <= 21; offset++) {
+    const joined = t.customers.filter((_, i) => joinedOn[i] <= offset);
     const date = addDays(today, offset);
     if (t.business.hours[weekdayOf(date)].ranges.length === 0) continue;
     const density = offset < 0 ? 0.74 : offset === 0 ? 0.7 : offset < 4 ? 0.58 : 0.34;
@@ -355,7 +363,8 @@ function fill(t: TenantData, prefix: string, names: [string, Locale][], seed: nu
             continue;
           }
           const addOnIds = t.addOns.length && rand() < 0.2 ? [pick(t.addOns).id] : [];
-          const duration = service.duration + addOnIds.reduce((x, id) => x + t.addOns.find((a) => a.id === id)!.duration, 0);
+          const own = termsFor(service, s.id);
+          const duration = own.duration + addOnIds.reduce((x, id) => x + t.addOns.find((a) => a.id === id)!.duration, 0);
           const start = m + service.bufferBefore;
           if (checkSlot(t, { staffId: s.id, date, start, duration, serviceId: service.id })) {
             m += 15;
@@ -376,14 +385,14 @@ function fill(t: TenantData, prefix: string, names: [string, Locale][], seed: nu
             businessId: B,
             id: `${prefix}-a${t.appointments.length + 1}`,
             code: makeCode(rand),
-            customerId: pick(t.customers).id,
+            customerId: pick(joined).id,
             staffId: s.id,
             serviceId: service.id,
             addOnIds,
             date,
             start,
             duration,
-            price: service.price + addOnIds.reduce((x, id) => x + t.addOns.find((a) => a.id === id)!.price, 0),
+            price: own.price + addOnIds.reduce((x, id) => x + t.addOns.find((a) => a.id === id)!.price, 0),
             status,
             source: online ? 'online' : 'studio',
             anyStaff: t.staff.length > 1 && rand() < 0.2,

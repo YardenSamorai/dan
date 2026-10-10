@@ -52,57 +52,62 @@ function rebase(db: MockDatabase): MockDatabase {
   return { ...db, seededOn: today, tenants };
 }
 
-function fresh(): MockDatabase {
+export function freshDatabase(): MockDatabase {
   return { version: SEED_VERSION, seededOn: todayISO(), ...buildDemoDatabase() };
 }
 
-function load(): MockDatabase {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as MockDatabase;
-      if (parsed.version === SEED_VERSION) return rebase(parsed);
-    }
-  } catch {
-    /* corrupted or unavailable storage — fall through to a fresh seed */
-  }
-  return fresh();
+/** Slide a stored database's demo tenants to today, or reseed when the seed format changed. */
+export function reviveDatabase(parsed: MockDatabase | null): MockDatabase {
+  return parsed?.version === SEED_VERSION ? rebase(parsed) : freshDatabase();
 }
 
-let db: MockDatabase = load();
-
-function persist() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(db));
-  } catch {
-    /* storage full / private mode: keep working in memory */
-  }
+/**
+ * Where the adapters read and write. The browser driver keeps everything in
+ * localStorage (demo mode); the server installs one that is scoped to a
+ * single request and backed by the real database.
+ */
+export interface DbDriver {
+  getDb(): MockDatabase;
+  /** Commit a new database value; returns false when it can't be stored (nothing changes then). */
+  setDb(next: MockDatabase, opts?: { mustFit?: boolean }): boolean;
+  getSession(): Session | null;
+  setSession(next: Session | null): void;
+  /** Imitate network delay (browser demo only). */
+  simulateLatency: boolean;
 }
-persist();
 
 const emit = () => listeners.forEach((l) => l());
 
-// ── Session (mock: a user id in localStorage, no credentials) ─────────
+function browserDriver(): DbDriver {
+  const read = (): MockDatabase | null => {
+    try {
+      const raw = localStorage.getItem(KEY);
+      return raw ? (JSON.parse(raw) as MockDatabase) : null;
+    } catch {
+      return null;
+    }
+  };
+  let db = reviveDatabase(read());
+  const write = (next: MockDatabase) => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(next));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  write(db);
 
-function readSession(): Session | null {
-  try {
-    const s = JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null') as Session | null;
-    return s && db.users.some((u) => u.id === s.userId) ? s : null;
-  } catch {
-    return null;
-  }
-}
+  const readSession = (): Session | null => {
+    try {
+      const s = JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null') as Session | null;
+      return s && db.users.some((u) => u.id === s.userId) ? s : null;
+    } catch {
+      return null;
+    }
+  };
+  let session = readSession();
 
-let session: Session | null = readSession();
-
-export function setSession(next: Session | null) {
-  session = next;
-  if (next) localStorage.setItem(SESSION_KEY, JSON.stringify(next));
-  else localStorage.removeItem(SESSION_KEY);
-  emit();
-}
-
-if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
     try {
       if (e.key === KEY && e.newValue) db = JSON.parse(e.newValue) as MockDatabase;
@@ -113,15 +118,41 @@ if (typeof window !== 'undefined') {
       /* ignore */
     }
   });
+
+  return {
+    getDb: () => db,
+    setDb(next, opts) {
+      // Storage full / private mode: keep working in memory unless the caller needs it saved.
+      if (!write(next) && opts?.mustFit) return false;
+      db = next;
+      emit();
+      return true;
+    },
+    getSession: () => session,
+    setSession(next) {
+      session = next;
+      if (next) localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+      else localStorage.removeItem(SESSION_KEY);
+      emit();
+    },
+    simulateLatency: true,
+  };
 }
 
-export const getDb = () => db;
-export const getSession = () => session;
+let driver: DbDriver | null = null;
+const current = () => (driver ??= browserDriver());
+
+/** Server only: route all adapter reads and writes through `next`. */
+export function installDbDriver(next: DbDriver) {
+  driver = next;
+}
+
+export const getDb = () => current().getDb();
+export const getSession = () => current().getSession();
+export const setSession = (next: Session | null) => current().setSession(next);
 
 export function mutateDb(update: (d: MockDatabase) => MockDatabase) {
-  db = update(db);
-  persist();
-  emit();
+  current().setDb(update(getDb()));
 }
 
 /** Replace one tenant's data. Tenant scoping is enforced by the callers (the mock adapters). */
@@ -133,19 +164,26 @@ export function mutateTenant(businessId: BusinessId, update: (t: TenantData) => 
   });
 }
 
-/** Restore the demo tenants and accounts. Businesses created in this browser are kept. */
+/** Like mutateTenant, but only commits if the result can be stored. Returns false (and changes nothing) otherwise. */
+export function mutateTenantIfStored(businessId: BusinessId, update: (t: TenantData) => TenantData): boolean {
+  const db = getDb();
+  const t = db.tenants[businessId];
+  if (!t) throw new Error('tenant_not_found');
+  return current().setDb({ ...db, tenants: { ...db.tenants, [businessId]: update(t) } }, { mustFit: true });
+}
+
+/** Restore the demo tenants and accounts. Businesses created by people are kept. */
 export function resetDemoData() {
-  const seed = fresh();
+  const db = getDb();
+  const seed = freshDatabase();
   const own = Object.fromEntries(Object.entries(db.tenants).filter(([id]) => !DEMO_BUSINESS_IDS.includes(id)));
   const demoUserIds = new Set(seed.users.map((u) => u.id));
-  db = {
+  current().setDb({
     ...seed,
     users: [...seed.users, ...db.users.filter((u) => !demoUserIds.has(u.id))],
     members: [...seed.members, ...db.members.filter((m) => !DEMO_BUSINESS_IDS.includes(m.businessId))],
     tenants: { ...seed.tenants, ...own },
-  };
-  persist();
-  emit();
+  });
 }
 
 function subscribe(l: () => void) {
@@ -161,5 +199,5 @@ export function useMockSession(): Session | null {
   return useSyncExternalStore(subscribe, getSession, getSession);
 }
 
-export const latency = (ms = 300) => new Promise((r) => setTimeout(r, ms));
-export const uid = (p: string) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+export const latency = (ms = 300) => (current().simulateLatency ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
+export const uid = (p: string) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10).padEnd(8, '0')}`;

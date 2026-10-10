@@ -6,6 +6,7 @@ import { StaffAvatar, Switch } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
 import { workspace } from '../../data';
 import { STAFF_COLORS, WEEKDAYS } from '../../domain/defaults';
+import { termsFor } from '../../domain/scheduling';
 import type { Staff, WeeklySchedule } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useLookup } from '../lookup';
@@ -111,7 +112,7 @@ export default function StaffAdmin() {
 
 function StaffForm({ initial, onSaved }: { initial: Staff; onSaved: () => void }) {
   const L = useLookup();
-  const { t, tx } = useI18n();
+  const { t, tx, fmt } = useI18n();
   const { api } = useWorkspace();
   const [s, setS] = useState(initial);
   const [serviceIds, setServiceIds] = useState(() => L.state.services.filter((x) => x.staffIds.includes(initial.id)).map((x) => x.id));
@@ -170,14 +171,22 @@ function StaffForm({ initial, onSaved }: { initial: Staff; onSaved: () => void }
       {L.state.services.length > 0 && (
         <fieldset className="field">
           <legend className="field__label">{t('staffAdmin.fields.services')}</legend>
-          <div className="checks">
-            {L.state.services.map((svc) => (
-              <label className="check" key={svc.id}>
-                <input type="checkbox" checked={serviceIds.includes(svc.id)} onChange={(e) => setServiceIds((ids) => (e.target.checked ? [...ids, svc.id] : ids.filter((x) => x !== svc.id)))} />
-                <span>{tx(svc.name)}</span>
-              </label>
-            ))}
+          <div className="checks checks--stack">
+            {L.state.services.map((svc) => {
+              const own = termsFor(svc, s.id);
+              const custom = !!svc.staffTerms?.[s.id];
+              return (
+                <label className="check" key={svc.id}>
+                  <input type="checkbox" checked={serviceIds.includes(svc.id)} onChange={(e) => setServiceIds((ids) => (e.target.checked ? [...ids, svc.id] : ids.filter((x) => x !== svc.id)))} />
+                  <span className="check__text">{tx(svc.name)}</span>
+                  <span className="check__meta tabular" data-custom={custom || undefined}>
+                    {fmt.duration(own.duration)} · {fmt.money(own.price)}
+                  </span>
+                </label>
+              );
+            })}
           </div>
+          <p className="field__hint">{t('staffAdmin.termsHint')}</p>
         </fieldset>
       )}
       <Switch checked={s.active} onChange={(v) => set('active', v)} label={t('staffAdmin.fields.active')} />

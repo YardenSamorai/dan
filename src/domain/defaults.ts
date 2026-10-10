@@ -150,3 +150,40 @@ export function slugify(s: string) {
 }
 
 export const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
+
+const HEBREW = /[\u05d0-\u05ea]/;
+const HE_LATIN: Record<string, string> = {
+  א: 'a', ב: 'v', ג: 'g', ד: 'd', ה: 'h', ו: 'o', ז: 'z', ח: 'ch', ט: 't', י: 'i', כ: 'ch', ך: 'ch', ל: 'l',
+  מ: 'm', ם: 'm', נ: 'n', ן: 'n', ס: 's', ע: 'a', פ: 'f', ף: 'f', צ: 'tz', ץ: 'tz', ק: 'k', ר: 'r', ש: 'sh', ת: 't',
+};
+const HE_FIRST: Record<string, string> = { ב: 'b', ו: 'v', י: 'y', כ: 'k', פ: 'p' };
+const HE_GERESH: Record<string, string> = { ג: 'j', ז: 'zh', צ: 'ch' };
+
+/**
+ * A readable Latin slug for any name, so Hebrew names get a link without the
+ * owner having to invent one: "הסטודיו של נועה" → "hastodio-shl-noa".
+ * Rough phonetics, not a transliteration standard; the owner can always edit it.
+ */
+export function latinSlug(name: string) {
+  const chars = [...name.replace(/[\u0591-\u05c7]/g, '')];
+  let out = '';
+  chars.forEach((c, i) => {
+    if (c === '׳' || c === "'") return;
+    const latin = HE_LATIN[c];
+    if (!latin) {
+      out += c;
+      return;
+    }
+    const first = !HEBREW.test(chars[i - 1] ?? '');
+    const last = !HEBREW.test(chars[i + 1] ?? '');
+    const geresh = chars[i + 1] === '׳' || chars[i + 1] === "'";
+    if (geresh && HE_GERESH[c]) out += HE_GERESH[c];
+    else if (first && HE_FIRST[c]) out += HE_FIRST[c];
+    else if (c === 'ה' && first && !last) out += 'ha';
+    else if (c === 'ה' && last) out += 'a';
+    else if (c === 'ו' && chars[i + 1] === 'ו') out += 'v';
+    else if (c === 'ו' && chars[i - 1] === 'ו') return;
+    else out += latin;
+  });
+  return slugify(out).replace(/([aeiou])\1+/g, '$1');
+}

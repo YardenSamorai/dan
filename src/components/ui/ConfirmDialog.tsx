@@ -8,11 +8,13 @@ interface Props {
   cancelLabel: string;
   danger?: boolean;
   busy?: boolean;
+  /** e.g. until the person types a confirmation word. */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export function ConfirmDialog({ open, title, body, confirmLabel, cancelLabel, danger, busy, onConfirm, onCancel }: Props) {
+export function ConfirmDialog({ open, title, body, confirmLabel, cancelLabel, danger, busy, confirmDisabled, onConfirm, onCancel }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current;
@@ -42,7 +44,7 @@ export function ConfirmDialog({ open, title, body, confirmLabel, cancelLabel, da
             <button type="button" className="btn btn--ghost btn--sm" onClick={onCancel} autoFocus>
               {cancelLabel}
             </button>
-            <button type="button" className={`btn btn--sm ${danger ? 'btn--danger' : 'btn--ink'}`} onClick={onConfirm} disabled={busy}>
+            <button type="button" className={`btn btn--sm ${danger ? 'btn--danger' : 'btn--ink'}`} onClick={onConfirm} disabled={busy || confirmDisabled}>
               {busy && <span className="spinner" aria-hidden />}
               {confirmLabel}
             </button>

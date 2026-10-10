@@ -2,16 +2,19 @@ import type { Locale, LText } from '../i18n/config';
 import type { BusinessMember, Role, User } from '../domain/platform';
 import type { Conflict, Slot } from '../domain/scheduling';
 import type {
+  AccentKey,
   AddOn,
   Appointment,
   AppointmentStatus,
   Block,
   BookingPolicies,
+  Branding,
   Business,
   BusinessType,
   Customer,
   ISODate,
   Minutes,
+  PageConfig,
   ScheduleException,
   Service,
   ServiceCategory,
@@ -38,7 +41,20 @@ import type {
  *    (here: the appointment id; in production a signed, expiring token).
  */
 
-export type ApiErrorCode = 'slot_taken' | 'not_found' | 'policy' | 'invalid' | 'forbidden' | 'unauthenticated' | 'slug_taken';
+export type ApiErrorCode =
+  | 'slot_taken'
+  | 'not_found'
+  | 'policy'
+  | 'blocked'
+  | 'invalid'
+  | 'forbidden'
+  | 'unauthenticated'
+  | 'slug_taken'
+  | 'too_large'
+  | 'rate_limited'
+  | 'exists'
+  | 'network'
+  | 'server';
 
 export class ApiError extends Error {
   constructor(
@@ -63,10 +79,25 @@ export interface SessionInfo {
 }
 
 export interface AuthService {
+  /** Resolves once the stored session is known; render after it so signed-in people aren't bounced to sign-in. */
+  ready(): Promise<void>;
   useSession(): SessionInfo | null;
-  /** Mock: sign in by email only. A real adapter uses a password / magic link / OAuth. */
+  /**
+   * How people sign in. `email`: type an address and you're in (demo and local
+   * development only). `password`: email + password (plus Google, if enabled).
+   */
+  readonly method: 'email' | 'password';
+  readonly providers: { google: boolean };
+  /** `email` method only. */
   signIn(email: string): Promise<SessionInfo>;
+  /** `email` method only. */
   signUp(input: { name: string; email: string; locale: Locale }): Promise<SessionInfo>;
+  /** `password` method. Throws `invalid` for a wrong email/password pair, `rate_limited` after too many tries. */
+  signInWithPassword(input: { email: string; password: string }): Promise<SessionInfo>;
+  /** `password` method. The account is ready at once (no confirmation email). Throws `exists` for a taken email, `invalid` for a weak password. */
+  signUpWithPassword(input: { name: string; email: string; password: string; locale: Locale }): Promise<SessionInfo>;
+  /** `password` method with Google enabled: leaves the page for Google and comes back to `next`. */
+  signInWithGoogle(next: string): Promise<void>;
   signOut(): Promise<void>;
   switchBusiness(businessId: string): Promise<void>;
   /** Demo accounts available for one-click sign-in (mock only; empty with a real backend). */
@@ -88,11 +119,14 @@ export interface NewBusinessInput {
   /** Extra team members (names only); the owner is always bookable unless they opt out later. */
   team: string[];
   policies: Pick<BookingPolicies, 'leadTimeMinutes' | 'cancelWindowHours' | 'confirmationMode'>;
+  accent?: AccentKey;
   publish: boolean;
 }
 
 export interface BusinessDirectory {
+  /** May answer from cache; call `useSlugChecks()` in the component so it re-renders when the real answer arrives. */
   isSlugAvailable(slug: string): boolean;
+  useSlugChecks(): void;
   createBusiness(input: NewBusinessInput): Promise<{ businessId: string; slug: string }>;
 }
 
@@ -100,7 +134,7 @@ export interface BusinessDirectory {
 
 export type PublicService = Pick<
   Service,
-  'id' | 'categoryId' | 'name' | 'description' | 'duration' | 'price' | 'bufferBefore' | 'bufferAfter' | 'staffIds' | 'imageUrl'
+  'id' | 'categoryId' | 'name' | 'description' | 'duration' | 'price' | 'bufferBefore' | 'bufferAfter' | 'staffIds' | 'staffTerms' | 'imageUrl'
 >;
 export type PublicStaff = Pick<Staff, 'id' | 'name' | 'role' | 'bio' | 'color' | 'avatarUrl'> & { workingDays: Weekday[] };
 export type PublicPolicies = Pick<
@@ -133,6 +167,8 @@ export interface PublicBusiness {
   email: string;
   social: Business['social'];
   branding: Business['branding'];
+  /** Always resolved: the saved layout or the default one. */
+  page: PageConfig;
   hours: WeeklySchedule;
   /** Upcoming business-wide closures and special hours. */
   specialDays: Pick<ScheduleException, 'date' | 'closed' | 'ranges' | 'label'>[];
@@ -180,14 +216,15 @@ export interface PublicBookingInput {
 }
 
 export interface PublicBookingApi {
-  /** undefined = not found or not visible. `preview` = unpublished, shown only to its members. */
-  useBusiness(slug: string): { business: PublicBusiness; preview: boolean } | undefined;
+  /** null = still loading; undefined = not found or not visible. `preview` = unpublished, shown only to its members. */
+  useBusiness(slug: string): { business: PublicBusiness; preview: boolean } | null | undefined;
   slots(slug: string, q: AvailabilityQuery & { date: ISODate }): Slot[];
   firstAvailable(slug: string, q: AvailabilityQuery, from: ISODate): ISODate | null;
   /** "Today" in the business's timezone. */
   today(slug: string): ISODate;
   createBooking(slug: string, input: PublicBookingInput): Promise<PublicBooking>;
-  useBooking(slug: string, token: string): PublicBooking | undefined;
+  /** null = still loading; undefined = no such booking. */
+  useBooking(slug: string, token: string): PublicBooking | null | undefined;
   findBooking(slug: string, code: string, phone: string): Promise<PublicBooking | null>;
   cancelBooking(slug: string, token: string): Promise<PublicBooking>;
   rescheduleBooking(slug: string, token: string, to: { date: ISODate; start: Minutes }): Promise<PublicBooking>;
@@ -211,6 +248,14 @@ export interface CustomerInput {
   locale: Locale;
 }
 
+export interface CustomerImportResult {
+  added: number;
+  updated: number;
+  unchanged: number;
+  /** Rows the server refused (no name, no usable phone). */
+  invalid: number;
+}
+
 export interface StudioBookingInput {
   serviceId: string;
   addOnIds: string[];
@@ -230,6 +275,17 @@ export interface RescheduleInput {
   force?: boolean;
 }
 
+/** Everything the page editor saves, in one go. */
+export interface PageSaveInput {
+  page: PageConfig;
+  branding: Branding;
+  tagline: LText;
+  description: LText;
+  /** Changed photos by id; null removes the photo. */
+  servicePhotos: Record<string, string | null>;
+  staffPhotos: Record<string, string | null>;
+}
+
 /** Commands for one tenant. Implementations must authorize every call against ctx. */
 export interface WorkspaceApi {
   readonly ctx: TenantContext;
@@ -240,6 +296,11 @@ export interface WorkspaceApi {
   updateAppointmentNotes(id: string, internalNote: string): Promise<Appointment>;
   createCustomer(input: CustomerInput): Promise<Customer>;
   saveCustomer(c: Customer): Promise<Customer>;
+  /**
+   * Adds many customers at once (a spreadsheet import), up to IMPORT_LIMIT.
+   * Someone already on file (same phone) keeps their name; missing email and new notes are added.
+   */
+  importCustomers(rows: CustomerInput[]): Promise<CustomerImportResult>;
   saveService(s: Service): Promise<Service>;
   saveAddOn(a: AddOn): Promise<AddOn>;
   saveCategory(c: ServiceCategory): Promise<ServiceCategory>;
@@ -252,6 +313,15 @@ export interface WorkspaceApi {
   removeException(id: string): Promise<void>;
   updateBusiness(patch: Partial<Omit<Business, 'id' | 'subscription' | 'createdAt'>>): Promise<Business>;
   setPublished(published: boolean): Promise<Business>;
+  /** Throws `too_large` when the photos don't fit in storage; nothing is saved then. */
+  savePage(input: PageSaveInput): Promise<Business>;
+  /**
+   * The secret key of a calendar subscription link; created on first use.
+   * `rotate` replaces it, so the old link stops working. Staff may only ask for their own.
+   */
+  calendarFeed(staffId: string | null, rotate?: boolean): Promise<string>;
+  /** Owner only. Permanently removes the business, its data and everyone's access. `confirmSlug` must match. */
+  deleteBusiness(confirmSlug: string): Promise<void>;
   resetDemo(): Promise<void>;
 }
 

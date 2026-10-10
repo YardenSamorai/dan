@@ -223,10 +223,17 @@ html[lang='he'] .site-footer__h {
 
 .site-footer__bottom {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--s-4);
   padding-block-start: var(--s-6);
   border-block-start: 1px solid var(--line);
+}
+
+.site-footer__powered {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
 }
 
 @media (max-width: 899px) {

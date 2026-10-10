@@ -1,26 +1,46 @@
-import { Suspense, useEffect } from 'react';
-import { Link, Outlet, useParams } from 'react-router-dom';
+import { Suspense, useEffect, useMemo, type MouseEvent } from 'react';
+import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { PublicHeader } from '../../components/public/PublicHeader';
+import { accentStyle, loadThemeFont } from '../../components/ui/accents';
+import { BrushIcon } from '../../components/ui/Icons';
 import { BusinessWordmark, LocaleSwitch, PreviewNote } from '../../components/ui/bits';
 import { PRODUCT } from '../../config/product';
 import { auth, publicBooking, workspace } from '../../data';
+import { can } from '../../domain/permissions';
+import type { SectionKind } from '../../domain/types';
 import { FormatScope, useI18n } from '../../i18n/I18nProvider';
+import { applyDraft, PreviewEditingProvider, useEditorPreview, usePreviewEditing } from './pageBridge';
 import { PublicTenantProvider, usePublicTenant } from './TenantContext';
 import '../../styles/public.css';
 import './tenant.css';
+import './page.css';
 
 /** Resolves :businessSlug, applies the tenant's branding and formatting, and provides it to children. */
 export function TenantScope() {
   const { businessSlug = '' } = useParams();
   const found = publicBooking.useBusiness(businessSlug);
-  if (!found) return <TenantUnavailable />;
+  const { editing, draft } = useEditorPreview();
+  const value = useMemo(() => (found && draft ? { ...found, business: applyDraft(found.business, draft) } : found), [found, draft]);
+  const theme = value?.business.page.theme ?? 'clean';
+  useEffect(() => {
+    loadThemeFont(theme);
+  }, [theme]);
+  if (value === null) return <div style={{ minHeight: '100vh' }} aria-busy="true" />;
+  if (!value) return <TenantUnavailable />;
+  const { branding } = value.business;
+  // In the editor's preview, clicks select sections instead of leaving the page.
+  const stayPut = (e: MouseEvent) => {
+    if ((e.target as Element).closest('a, button[type="submit"]')) e.preventDefault();
+  };
   return (
-    <PublicTenantProvider slug={businessSlug} value={found}>
-      <FormatScope currency={found.business.currency} timeZone={found.business.timezone}>
-        <div className="tenant" data-accent={found.business.branding.accent}>
-          <TenantTitle />
-          <Outlet />
-        </div>
+    <PublicTenantProvider slug={businessSlug} value={value}>
+      <FormatScope currency={value.business.currency} timeZone={value.business.timezone}>
+        <PreviewEditingProvider value={editing}>
+          <div className="tenant" data-accent={branding.accent} data-theme={theme} style={accentStyle(branding)} data-editing={editing ? '' : undefined} onClickCapture={editing ? stayPut : undefined}>
+            <TenantTitle />
+            <Outlet />
+          </div>
+        </PreviewEditingProvider>
       </FormatScope>
     </PublicTenantProvider>
   );
@@ -50,20 +70,41 @@ function TenantUnavailable() {
   );
 }
 
-/** Draft pages are visible to the business's own members only, with a banner saying so. */
-function DraftBanner() {
+/**
+ * Shown only to the business's own members: a way back into the workspace, and
+ * for drafts, a reminder that nobody else can see the page yet.
+ */
+function OwnerBar() {
   const { t } = useI18n();
   const { business, preview } = usePublicTenant();
   const session = auth.useSession();
+  const editing = usePreviewEditing();
+  const navigate = useNavigate();
+  const { hash } = useLocation();
   const member = session?.memberships.find((m) => m.businessId === business.id);
-  if (!preview || !member) return null;
+  if (!session || !member || editing) return null;
+  const canEdit = can(member.role, 'business.settings');
+  const section = hash.slice(1);
+  const open = async (to: string) => {
+    if (session.active?.businessId !== business.id) await auth.switchBusiness(business.id);
+    navigate(to);
+  };
   const publish = async () => {
-    await workspace.api({ businessId: business.id, userId: session!.user.id, role: member.role, staffId: member.staffId }).setPublished(true);
+    await workspace.api({ businessId: business.id, userId: session.user.id, role: member.role, staffId: member.staffId }).setPublished(true);
   };
   return (
-    <div className="tenant-draft" role="status">
-      <span>{t('tenant.preview')}</span>
-      {member.role !== 'staff' && (
+    <div className="tenant-draft" role={preview ? 'status' : undefined}>
+      <span>{preview ? t('tenant.preview') : t('tenant.owner.live')}</span>
+      {canEdit ? (
+        <button type="button" className="btn btn--light btn--sm" onClick={() => open(section ? `/app/page?section=${encodeURIComponent(section)}` : '/app/page')}>
+          <BrushIcon size={14} /> {t('tenant.owner.edit')}
+        </button>
+      ) : (
+        <button type="button" className="btn btn--light btn--sm" onClick={() => open('/app')}>
+          {t('tenant.owner.dashboard')}
+        </button>
+      )}
+      {preview && canEdit && (
         <button type="button" className="btn btn--light btn--sm" onClick={publish}>
           {t('tenant.previewPublish')}
         </button>
@@ -72,25 +113,34 @@ function DraftBanner() {
   );
 }
 
+/** Sections worth a header link, in the order they appear on the page. */
+const NAV_KINDS: Partial<Record<SectionKind, 'services' | 'gallery' | 'about' | 'team' | 'info'>> = {
+  services: 'services',
+  gallery: 'gallery',
+  about: 'about',
+  team: 'team',
+  info: 'info',
+};
+
 export function TenantChrome() {
   const { t, tx } = useI18n();
-  const { business, base } = usePublicTenant();
+  const { business, base, solo } = usePublicTenant();
   const name = tx(business.name);
+  const { page } = business;
+  const hero = page.sections[0];
+  const nav = page.sections
+    .filter((s) => s.visible && NAV_KINDS[s.kind] && !(s.kind === 'team' && solo) && !(s.kind === 'gallery' && !s.images?.length))
+    .map((s) => ({ to: `${base}#${s.kind}`, label: t(`tenant.nav.${NAV_KINDS[s.kind]!}`) }));
   return (
-    <>
+    <div className="tenant-site" data-theme={page.theme} data-hero={hero.layout}>
       <a href="#main" className="skip-link">
         {t('common.skipToContent')}
       </a>
-      <DraftBanner />
+      <OwnerBar />
       <PublicHeader
         home={base}
-        brand={<BusinessWordmark name={name} logoUrl={business.branding.logoUrl} />}
-        nav={[
-          { to: `${base}#services`, label: t('tenant.nav.services') },
-          ...(business.staff.length > 1 ? [{ to: `${base}#team`, label: t('tenant.nav.team') }] : []),
-          { to: `${base}#info`, label: t('tenant.nav.info') },
-          { to: `${base}/bookings`, label: t('tenant.nav.myBookings') },
-        ]}
+        brand={<BusinessWordmark name={name} logoUrl={business.branding.logoUrl} hideMark={business.branding.hideLogo} />}
+        nav={[...nav, { to: `${base}/bookings`, label: t('tenant.nav.myBookings') }]}
         action={
           <Link to={`${base}/new`} className="btn btn--primary btn--sm">
             {t('common.bookShort')}
@@ -111,20 +161,22 @@ export function TenantChrome() {
         <div className="container">
           <div className="site-footer__top">
             <div className="site-footer__brand">
-              <BusinessWordmark name={name} logoUrl={business.branding.logoUrl} />
+              <BusinessWordmark name={name} logoUrl={business.branding.logoUrl} hideMark={business.branding.hideLogo} />
               {tx(business.tagline) && <p className="muted">{tx(business.tagline)}</p>}
               <LocaleSwitch />
             </div>
           </div>
           <div className="site-footer__bottom muted">
-            <span>{t('tenant.footer.rights', { year: new Date().getFullYear(), business: name })}</span>
+            <span>{t('tenant.footer.rights', { year: String(new Date().getFullYear()), business: name })}</span>
             <span className="site-footer__powered">
+              <Link to="/accessibility">{t('legal.accessibility')}</Link>
+              <Link to="/privacy">{t('legal.privacy')}</Link>
               <Link to="/">{t('meta.poweredBy', { product: PRODUCT.name })}</Link>
             </span>
           </div>
           <PreviewNote compact />
         </div>
       </footer>
-    </>
+    </div>
   );
 }

@@ -6,7 +6,7 @@ import { Avatar, StaffAvatar, StatusBadge } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
 import { CAPABILITIES } from '../../config/product';
 import { ApiError } from '../../data';
-import { checkSlot, eligibleStaff } from '../../domain/scheduling';
+import { checkSlot, eligibleStaff, termsIfMoved } from '../../domain/scheduling';
 import type { Appointment, AppointmentStatus } from '../../domain/types';
 import { localeMeta } from '../../i18n/config';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -39,7 +39,7 @@ export function AppointmentDrawer({ id, onClose }: { id: string | null; onClose:
   const { t } = useI18n();
   const a = id ? L.state.appointments.find((x) => x.id === id) : undefined;
   return (
-    <Drawer open={!!a} onClose={onClose} title={t('appt.details')} headerExtra={a && <span className="badge badge--plain ltr">{a.code}</span>}>
+    <Drawer open={!!a} onClose={onClose} title={t('appt.details')}>
       {a && <Body key={a.id} a={a} L={L} onClose={onClose} />}
     </Drawer>
   );
@@ -274,7 +274,9 @@ function Reschedule({ a, L, onDone }: { a: Appointment; L: Lookup; onDone: () =>
   const [staffId, setStaffId] = useState(a.staffId);
   const [busy, setBusy] = useState(false);
   const staffList = useMemo(() => eligibleStaff(L.state, a.serviceId), [L.state, a.serviceId]);
-  const conflict = checkSlot(L.state, { staffId, date, start, duration: a.duration, serviceId: a.serviceId, excludeAppointmentId: a.id });
+  const terms = termsIfMoved(L.state, a, staffId);
+  const conflict = checkSlot(L.state, { staffId, date, start, duration: terms.duration, serviceId: a.serviceId, excludeAppointmentId: a.id });
+  const termsChange = terms.duration !== a.duration || terms.price !== a.price;
   const unchanged = date === a.date && start === a.start && staffId === a.staffId;
 
   const apply = async () => {
@@ -313,6 +315,11 @@ function Reschedule({ a, L, onDone }: { a: Appointment; L: Lookup; onDone: () =>
             ))}
           </select>
         </label>
+      )}
+      {termsChange && (
+        <p className="field__hint">
+          {t('appt.reschedule.newTerms', { staff: tx(L.staff.get(staffId)?.name), duration: fmt.duration(terms.duration), price: fmt.money(terms.price) })}
+        </p>
       )}
       {!unchanged && <SlotStatus conflict={conflict} staff={L.staff.get(staffId)} okLabel={t('appt.reschedule.ok')} />}
       <div className="detail__actions">

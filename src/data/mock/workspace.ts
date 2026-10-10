@@ -1,15 +1,19 @@
 import { useMemo } from 'react';
+import { IMPORT_LIMIT, LIMITS, mergeNotes } from '../../domain/customerImport';
 import { renderMessage } from '../../domain/notifications';
+import { locales } from '../../i18n/config';
+import { callingCode, cleanPhone, phoneKey } from '../../lib/phone';
 import { can, type Permission } from '../../domain/permissions';
-import { appointmentStart, availableSlots, bookingDuration, bookingPrice, checkSlot, pickStaff } from '../../domain/scheduling';
-import type { Actor, Appointment, AppointmentEvent, Customer, OutboxMessage, TemplateKind, TenantData } from '../../domain/types';
+import { appointmentStart, availableSlots, bookingDuration, bookingPrice, checkSlot, pickStaff, termsIfMoved } from '../../domain/scheduling';
+import type { Actor, Appointment, AppointmentEvent, Customer, OutboxMessage, Service, TemplateKind, TenantData } from '../../domain/types';
 import { ApiError, type CustomerInput, type MemberInfo, type TenantContext, type WorkspaceApi, type WorkspaceData } from '../contracts';
-import { makeCode } from '../demo/seed';
-import { getDb, latency, mutateTenant, resetDemoData, uid, useMockDb } from './db';
+import { DEMO_BUSINESS_IDS, makeCode } from '../demo/seed';
+import { getDb, latency, mutateDb, mutateTenant, mutateTenantIfStored, resetDemoData, uid, useMockDb, type MockDatabase } from './db';
 
 const nowISO = () => new Date().toISOString();
 const event = (type: AppointmentEvent['type'], by: Actor, detail?: string): AppointmentEvent => ({ at: nowISO(), type, by, detail });
 export const normalizePhone = (p: string) => p.replace(/\D/g, '');
+const feedKey = () => Array.from(crypto.getRandomValues(new Uint8Array(18)), (n) => n.toString(16).padStart(2, '0')).join('');
 
 // ── Shared tenant mutations (also used by the public adapter) ────────
 
@@ -84,8 +88,8 @@ export function newAppointment(t: TenantData, fields: Pick<Appointment, 'custome
     id: uid('a'),
     code: makeCode(),
     ...fields,
-    duration: bookingDuration(t, fields.serviceId, fields.addOnIds),
-    price: bookingPrice(t, fields.serviceId, fields.addOnIds),
+    duration: bookingDuration(t, fields.serviceId, fields.addOnIds, fields.staffId),
+    price: bookingPrice(t, fields.serviceId, fields.addOnIds, fields.staffId),
     createdAt: nowISO(),
     updatedAt: nowISO(),
     history: [event('created', by)],
@@ -121,6 +125,18 @@ function authorizeAppointment(ctx: TenantContext, id: string) {
   return { t, a };
 }
 
+/** Keep only real overrides, for people who still perform the service. */
+function cleanTerms(s: Service): Service['staffTerms'] {
+  const out: NonNullable<Service['staffTerms']> = {};
+  for (const id of s.staffIds) {
+    const own = s.staffTerms?.[id];
+    const duration = own?.duration && own.duration > 0 && own.duration !== s.duration ? own.duration : undefined;
+    const price = own?.price !== undefined && own.price >= 0 && own.price !== s.price ? own.price : undefined;
+    if (duration !== undefined || price !== undefined) out[id] = { ...(duration !== undefined && { duration }), ...(price !== undefined && { price }) };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 const upsert = <T extends { id: string }>(list: T[], item: T) => (list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item]);
 
 function createApi(ctx: TenantContext): WorkspaceApi {
@@ -137,7 +153,7 @@ function createApi(ctx: TenantContext): WorkspaceApi {
       if (!staffChoice) throw new ApiError('forbidden');
       const slot = availableSlots(t, { ...input, staffId: staffChoice }).find((x) => x.start === input.start);
       const staffId = staffChoice === 'any' ? pickStaff(t, input.date, slot?.staffIds ?? t.staff.filter((s) => s.active).map((s) => s.id)) : staffChoice;
-      const duration = bookingDuration(t, input.serviceId, input.addOnIds);
+      const duration = bookingDuration(t, input.serviceId, input.addOnIds, staffId);
       const conflict = checkSlot(t, { staffId, date: input.date, start: input.start, duration, serviceId: input.serviceId });
       if (conflict && !(input.force && conflict.kind === 'outside_shift')) throw new ApiError('slot_taken', conflict);
       let created!: Appointment;
@@ -159,10 +175,11 @@ function createApi(ctx: TenantContext): WorkspaceApi {
       const { t, a } = authorizeAppointment(ctx, id);
       const staffId = input.staffId ?? a.staffId;
       if (staffId !== a.staffId && !can(ctx.role, 'calendar.all')) throw new ApiError('forbidden');
-      const conflict = checkSlot(t, { staffId, date: input.date, start: input.start, duration: a.duration, serviceId: a.serviceId, excludeAppointmentId: a.id });
+      const terms = termsIfMoved(t, a, staffId);
+      const conflict = checkSlot(t, { staffId, date: input.date, start: input.start, duration: terms.duration, serviceId: a.serviceId, excludeAppointmentId: a.id });
       if (conflict && !(input.force && conflict.kind === 'outside_shift')) throw new ApiError('slot_taken', conflict);
       const detail = `${a.date} ${a.start} ${a.staffId} → ${input.date} ${input.start} ${staffId}`;
-      return patchAppointmentIn(B, id, (x) => ({ ...x, date: input.date, start: input.start, staffId, history: [...x.history, event('rescheduled', 'staff', detail)] }), ['reschedule', 'reminder']);
+      return patchAppointmentIn(B, id, (x) => ({ ...x, ...terms, date: input.date, start: input.start, staffId, history: [...x.history, event('rescheduled', 'staff', detail)] }), ['reschedule', 'reminder']);
     },
 
     async cancelAppointment(id, reason) {
@@ -210,10 +227,48 @@ function createApi(ctx: TenantContext): WorkspaceApi {
       return scoped;
     },
 
+    async importCustomers(rows) {
+      await latency(300);
+      const t = authorize(ctx, 'customers.edit');
+      if (!Array.isArray(rows) || rows.length > IMPORT_LIMIT) throw new ApiError('invalid');
+      const code = callingCode(t.business.timezone);
+      const out = { added: 0, updated: 0, unchanged: 0, invalid: 0 };
+      write((cur) => {
+        const customers = [...cur.customers];
+        const at = new Map(customers.map((c, i) => [phoneKey(c.phone, code), i]));
+        const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+        for (const r of rows) {
+          const name = text(r?.name, LIMITS.name);
+          const phone = cleanPhone(text(r?.phone, 40), code);
+          if (!name || !phone) {
+            out.invalid++;
+            continue;
+          }
+          const email = text(r.email, LIMITS.email) || undefined;
+          const note = text(r.note, LIMITS.note) || undefined;
+          const locale = (locales as readonly string[]).includes(r.locale) ? r.locale : cur.business.defaultLocale;
+          const key = phoneKey(phone, code);
+          const i = at.get(key);
+          if (i === undefined) {
+            at.set(key, customers.length);
+            customers.push({ businessId: B, id: uid('c'), name, phone, email, note, locale, createdAt: nowISO() });
+            out.added++;
+            continue;
+          }
+          const old = customers[i];
+          const merged = { ...old, email: old.email || email, note: mergeNotes(old.note, note)?.slice(0, LIMITS.note) };
+          if (merged.email === old.email && merged.note === old.note) out.unchanged++;
+          else (customers[i] = merged), out.updated++;
+        }
+        return { ...cur, customers };
+      });
+      return out;
+    },
+
     async saveService(s) {
       await latency(120);
       authorize(ctx, 'services.manage');
-      const scoped = { ...s, businessId: B };
+      const scoped = { ...s, businessId: B, staffTerms: cleanTerms(s) };
       write((t) => ({ ...t, services: upsert(t.services, scoped) }));
       return scoped;
     },
@@ -295,9 +350,28 @@ function createApi(ctx: TenantContext): WorkspaceApi {
       if (patch.slug && patch.slug !== t.business.slug && Object.values(getDb().tenants).some((x) => x.business.slug === patch.slug)) throw new ApiError('slug_taken');
       let out!: TenantData['business'];
       write((cur) => {
-        out = { ...cur.business, ...patch, id: B };
+        out = { ...cur.business, ...patch, id: B, calendarFeeds: cur.business.calendarFeeds };
         return { ...cur, business: out };
       });
+      return out;
+    },
+
+    async savePage(input) {
+      await latency(250);
+      authorize(ctx, 'business.settings');
+      const photo = <T extends { id: string }>(xs: T[], photos: Record<string, string | null>, key: 'imageUrl' | 'avatarUrl') =>
+        xs.map((x) => (x.id in photos ? { ...x, [key]: photos[x.id] ?? undefined } : x));
+      let out!: TenantData['business'];
+      const stored = mutateTenantIfStored(B, (cur) => {
+        out = { ...cur.business, page: input.page, branding: input.branding, tagline: input.tagline, description: input.description };
+        return {
+          ...cur,
+          business: out,
+          services: photo(cur.services, input.servicePhotos, 'imageUrl'),
+          staff: photo(cur.staff, input.staffPhotos, 'avatarUrl'),
+        };
+      });
+      if (!stored) throw new ApiError('too_large');
       return out;
     },
 
@@ -312,6 +386,33 @@ function createApi(ctx: TenantContext): WorkspaceApi {
       return out;
     },
 
+    async calendarFeed(staffId, rotate = false) {
+      await latency(100);
+      if (!(can(ctx.role, 'calendar.all') || (staffId !== null && staffId === ctx.staffId))) throw new ApiError('forbidden');
+      const t = getDb().tenants[B];
+      if (!t) throw new ApiError('not_found');
+      if (staffId !== null && !t.staff.some((s) => s.id === staffId)) throw new ApiError('not_found');
+      const existing = t.business.calendarFeeds?.find((f) => f.staffId === staffId);
+      if (existing && !rotate) return existing.key;
+      const key = feedKey();
+      write((cur) => {
+        const feeds = (cur.business.calendarFeeds ?? []).filter((f) => f.staffId !== staffId);
+        return { ...cur, business: { ...cur.business, calendarFeeds: [...feeds, { key, staffId }] } };
+      });
+      return key;
+    },
+
+    async deleteBusiness(confirmSlug) {
+      await latency(300);
+      const t = authorize(ctx, 'billing.manage');
+      if (confirmSlug !== t.business.slug) throw new ApiError('invalid');
+      if (DEMO_BUSINESS_IDS.includes(B)) throw new ApiError('forbidden');
+      mutateDb((db) => {
+        const { [B]: _gone, ...tenants } = db.tenants;
+        return { ...db, tenants, members: db.members.filter((m) => m.businessId !== B) };
+      });
+    },
+
     async resetDemo() {
       await latency(200);
       authorize(ctx, 'demo.reset');
@@ -324,18 +425,30 @@ function createApi(ctx: TenantContext): WorkspaceApi {
  * Role-scoped read model. A staff-role member gets their own appointments and
  * the customers attached to them — the same filtering a server would apply.
  */
-function scopeForRole(t: TenantData, ctx: TenantContext): TenantData {
+export function scopeForRole(t: TenantData, ctx: TenantContext): TenantData {
   if (can(ctx.role, 'calendar.all')) return t;
   const appointments = t.appointments.filter((a) => a.staffId === ctx.staffId);
   const customerIds = new Set(appointments.map((a) => a.customerId));
   return {
     ...t,
+    business: { ...t.business, calendarFeeds: t.business.calendarFeeds?.filter((f) => f.staffId !== null && f.staffId === ctx.staffId) },
     appointments,
     customers: t.customers.filter((c) => customerIds.has(c.id)),
     timeOff: t.timeOff.filter((x) => x.staffId === ctx.staffId),
     blocks: t.blocks.filter((b) => b.staffId === null || b.staffId === ctx.staffId),
     outbox: t.outbox.filter((m) => appointments.some((a) => a.id === m.appointmentId)),
   };
+}
+
+export function membersOf(db: MockDatabase, ctx: TenantContext): MemberInfo[] {
+  const isMember = db.members.some((m) => m.businessId === ctx.businessId && m.userId === ctx.userId);
+  if (!isMember || !can(ctx.role, 'staff.manage')) return [];
+  return db.members
+    .filter((m) => m.businessId === ctx.businessId)
+    .flatMap((m) => {
+      const u = db.users.find((x) => x.id === m.userId);
+      return u ? [{ id: m.id, role: m.role, staffId: m.staffId, user: { id: u.id, name: u.name, email: u.email } }] : [];
+    });
 }
 
 export const mockWorkspace: WorkspaceData = {
@@ -347,16 +460,7 @@ export const mockWorkspace: WorkspaceData = {
   },
   useMembers(ctx) {
     const db = useMockDb();
-    return useMemo<MemberInfo[]>(() => {
-      const isMember = db.members.some((m) => m.businessId === ctx.businessId && m.userId === ctx.userId);
-      if (!isMember || !can(ctx.role, 'staff.manage')) return [];
-      return db.members
-        .filter((m) => m.businessId === ctx.businessId)
-        .flatMap((m) => {
-          const u = db.users.find((x) => x.id === m.userId);
-          return u ? [{ id: m.id, role: m.role, staffId: m.staffId, user: { id: u.id, name: u.name, email: u.email } }] : [];
-        });
-    }, [db.members, db.users, ctx]);
+    return useMemo(() => membersOf(db, ctx), [db.members, db.users, ctx]);
   },
   api: createApi,
 };

@@ -10,17 +10,17 @@ export function initials(name: string) {
   return (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '');
 }
 
-export function Avatar({ name, color, size }: { name: string; color?: string; size?: 'sm' | 'lg' | 'xl' }) {
+export function Avatar({ name, color, size, src }: { name: string; color?: string; size?: 'sm' | 'lg' | 'xl'; src?: string }) {
   return (
     <span className={`avatar${size ? ` avatar--${size}` : ''}`} style={color ? ({ '--tone': color } as CSSProperties) : undefined} aria-hidden>
-      {initials(name)}
+      {src ? <img className="avatar__img" src={src} alt="" /> : initials(name)}
     </span>
   );
 }
 
-export function StaffAvatar({ staff, size }: { staff: Pick<Staff, 'name' | 'color'>; size?: 'sm' | 'lg' | 'xl' }) {
+export function StaffAvatar({ staff, size }: { staff: Pick<Staff, 'name' | 'color' | 'avatarUrl'>; size?: 'sm' | 'lg' | 'xl' }) {
   const { tx } = useI18n();
-  return <Avatar name={tx(staff.name)} color={staff.color} size={size} />;
+  return <Avatar name={tx(staff.name)} color={staff.color} size={size} src={staff.avatarUrl} />;
 }
 
 export function StatusBadge({ status }: { status: AppointmentStatus }) {
@@ -87,10 +87,10 @@ export function ProductWordmark({ light }: { light?: boolean }) {
 }
 
 /** A tenant's name with its logo or monogram. */
-export function BusinessWordmark({ name, logoUrl }: { name: string; logoUrl?: string }) {
+export function BusinessWordmark({ name, logoUrl, hideMark }: { name: string; logoUrl?: string; hideMark?: boolean }) {
   return (
     <span className="wordmark wordmark--biz">
-      <BusinessMark name={name} logoUrl={logoUrl} />
+      {!hideMark && <BusinessMark name={name} logoUrl={logoUrl} />}
       <span>{name}</span>
     </span>
   );

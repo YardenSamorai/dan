@@ -1,0 +1,533 @@
+/* ── Customer import ────────────────────────────────────────────── */
+.imp {
+  display: grid;
+  gap: var(--s-4);
+}
+
+.imp__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  text-decoration: none;
+}
+
+.imp__back:hover {
+  color: var(--ink);
+}
+
+.imp__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-13);
+  color: var(--ink-4);
+}
+
+.imp__steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.imp__steps li[data-state] {
+  color: var(--ink);
+  font-weight: 550;
+}
+
+.imp__step-dot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--fill-2);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.imp__steps li[data-state='current'] .imp__step-dot {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.imp__steps li[data-state='done'] .imp__step-dot {
+  background: var(--accent);
+  color: #fff;
+}
+
+.imp__error {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--danger) 9%, var(--surface));
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+/* Step 1 */
+.imp__start {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: var(--s-4);
+  align-items: start;
+}
+
+.imp__drop {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--s-2);
+  min-height: 300px;
+  padding: var(--s-8) var(--s-6);
+  border: 1.5px dashed var(--line-strong, var(--ink-4));
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+
+.imp__drop:hover,
+.imp__drop[data-over] {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.imp__drop:focus-within {
+  box-shadow: var(--focus);
+}
+
+.imp__drop[data-busy] {
+  cursor: progress;
+}
+
+.imp__drop-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-block-end: var(--s-1);
+  border-radius: 50%;
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.imp__drop[data-busy] .imp__drop-icon {
+  animation: imp-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes imp-pulse {
+  to {
+    opacity: 0.4;
+  }
+}
+
+.imp__drop-title {
+  font-size: var(--text-lg, 1.125rem);
+  font-weight: 600;
+}
+
+.imp__drop .btn {
+  margin-block: var(--s-1) var(--s-2);
+}
+
+.imp__drop-sub {
+  color: var(--ink-3);
+  font-size: var(--text-13);
+}
+
+.imp__tips {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-5);
+  justify-items: start;
+}
+
+.imp__tips h2 {
+  margin: 0;
+}
+
+.imp__tips ul {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding-inline-start: 1.1em;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/* Step 2 */
+.imp__setup {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-4) 0 0;
+  overflow: hidden;
+}
+
+.imp__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--s-3) var(--s-4);
+  padding-inline: var(--s-5);
+}
+
+.imp__file {
+  flex: 1 1 100%;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.imp__control {
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.imp__control select {
+  width: auto;
+  min-width: 140px;
+}
+
+.imp__hint {
+  margin: 0;
+  padding-inline: var(--s-5);
+  color: var(--ink-3);
+  font-size: var(--text-13);
+}
+
+.imp__grid-wrap {
+  max-height: min(60vh, 560px);
+  overflow: auto;
+  border-block-start: 1px solid var(--line);
+}
+
+.imp__grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 100%;
+  font-size: var(--text-13);
+}
+
+.imp__grid th,
+.imp__grid td {
+  padding: 6px 10px;
+  border-block-end: 1px solid var(--line);
+  border-inline-end: 1px solid var(--line);
+  text-align: start;
+  white-space: nowrap;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.imp__grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 8px;
+  background: var(--surface-2);
+  vertical-align: bottom;
+  min-width: 150px;
+}
+
+.imp__grid tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--surface-2);
+  font-weight: 400;
+  min-width: 56px;
+}
+
+.imp__grid thead .imp__corner {
+  inset-inline-start: 0;
+  z-index: 3;
+  min-width: 56px;
+}
+
+.imp__letter {
+  display: block;
+  margin-block-end: 4px;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.imp__field {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.imp__field:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.imp__grid th[data-skip] .imp__field {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.imp__grid td {
+  text-align: match-parent;
+}
+
+.imp__grid td[data-skip] {
+  color: var(--ink-4);
+}
+
+.imp__grid tbody tr {
+  cursor: pointer;
+}
+
+.imp__grid tbody tr:hover td {
+  background: var(--surface-2);
+}
+
+.imp__grid tr[data-role='before'] td {
+  color: var(--ink-4);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklab, var(--ink-4) 50%, transparent);
+}
+
+.imp__grid tr[data-role='header'] {
+  cursor: default;
+}
+
+.imp__grid tr[data-role='header'] td {
+  background: var(--fill-2);
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.imp__grid tr[data-role='first'] td,
+.imp__grid tr[data-role='first'] th {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.imp__rownum {
+  all: unset;
+  min-width: 2ch;
+  padding: 2px 4px;
+  border-radius: 6px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.imp__rownum:focus-visible {
+  box-shadow: var(--focus);
+}
+
+.imp__tag {
+  margin-inline-start: 4px;
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  background: var(--fill-2);
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.imp__tag--go {
+  background: var(--accent);
+  color: #fff;
+}
+
+.imp__more {
+  margin: 0;
+  padding: var(--s-3) var(--s-5);
+  color: var(--ink-4);
+  font-size: var(--text-13);
+}
+
+.imp__summary {
+  position: sticky;
+  bottom: var(--s-3);
+  z-index: 4;
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  box-shadow: var(--shadow-2, var(--shadow-1));
+}
+
+.imp__facts,
+.imp__needs {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.imp__fact--main {
+  color: var(--ink);
+  font-size: var(--text-md, 1rem);
+  font-weight: 650;
+}
+
+.imp__facts li[data-warn],
+.imp__needs li {
+  color: var(--warning);
+}
+
+.imp__link {
+  all: unset;
+  color: var(--accent);
+  font-weight: 550;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.imp__link:focus-visible {
+  border-radius: 4px;
+  box-shadow: var(--focus);
+}
+
+.imp__skipped {
+  display: grid;
+  gap: 2px;
+  max-height: 220px;
+  margin: 0;
+  padding: var(--s-2);
+  overflow: auto;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  list-style: none;
+  font-size: var(--text-13);
+}
+
+.imp__skipped li {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: var(--s-3);
+  padding: 4px 6px;
+}
+
+.imp__skipped-row {
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.imp__skipped-why {
+  color: var(--warning);
+  font-weight: 550;
+}
+
+.imp__skipped-text {
+  overflow: hidden;
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.imp__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+/* Step 3 */
+.imp__done {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-3);
+  padding: var(--s-10) var(--s-6);
+  text-align: center;
+}
+
+.imp__done h2 {
+  margin: 0;
+  font-size: var(--text-xl, 1.375rem);
+}
+
+.imp__done ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-2);
+}
+
+.imp__done-mark {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}
+
+.imp__done .imp__actions {
+  justify-content: center;
+  margin-block-start: var(--s-2);
+}
+
+@media (max-width: 760px) {
+  .imp__start {
+    grid-template-columns: 1fr;
+  }
+
+  .imp__drop {
+    min-height: 220px;
+  }
+
+  .imp__controls {
+    padding-inline: var(--s-4);
+  }
+
+  .imp__control {
+    flex: 1 1 140px;
+  }
+
+  .imp__control select {
+    width: 100%;
+  }
+
+  .imp__hint {
+    padding-inline: var(--s-4);
+  }
+
+  .imp__summary {
+    position: static;
+  }
+
+  .imp__grid-wrap {
+    max-height: 55vh;
+  }
+
+  .imp__grid thead th {
+    min-width: 128px;
+  }
+
+  .imp__summary .btn {
+    flex: 1 1 auto;
+  }
+}

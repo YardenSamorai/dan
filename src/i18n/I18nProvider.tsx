@@ -11,7 +11,12 @@ export interface I18n {
   t: (key: MessageKey, params?: Params) => string;
   /** Pick the current locale from authored content. */
   tx: (text: LText | undefined) => string;
-  fmt: Formatters & { duration: (minutes: number) => string };
+  fmt: Formatters & {
+    duration: (minutes: number) => string;
+    /** One value when both ends match, otherwise "low–high". */
+    moneyRange: (range: [number, number]) => string;
+    durationRange: (range: [number, number]) => string;
+  };
 }
 
 const Ctx = createContext<I18n | null>(null);
@@ -65,7 +70,14 @@ function withFormatters(locale: Locale, t: I18n['t'], currency: string, timeZone
     if (m === 0) return t('units.hours', { count: h });
     return t('units.hoursMinutes', { h: t('units.hours', { count: h }), m: t('units.minutes', { count: m }) });
   };
-  return { ...base, duration };
+  // Each end is isolated so a currency sign or unit can't reorder the pair in RTL text.
+  const range = (a: string, b: string) => (a === b ? a : t('units.range', { from: `\u2068${a}\u2069`, to: `\u2068${b}\u2069` }));
+  return {
+    ...base,
+    duration,
+    moneyRange: ([a, b]) => range(base.money(a), base.money(b)),
+    durationRange: ([a, b]) => range(duration(a), duration(b)),
+  };
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {

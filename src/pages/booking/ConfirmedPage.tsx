@@ -12,6 +12,7 @@ export default function ConfirmedPage() {
   const { t, tx } = useI18n();
   const tenant = usePublicTenant();
   const booking = publicBooking.useBooking(tenant.slug, id);
+  if (booking === null) return <section className="confirmed container" aria-busy="true" />;
   if (!booking) return <NotFoundPage />;
   const { business } = tenant;
   const name = tx(business.name);

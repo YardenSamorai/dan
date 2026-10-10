@@ -4,7 +4,7 @@ import { SearchIcon } from '../../components/ui/Icons';
 import { Avatar } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
 import { ApiError } from '../../data';
-import { bookingDuration, bookingPrice, businessNow, checkSlot, eligibleStaff, type Conflict } from '../../domain/scheduling';
+import { bookingDuration, bookingPrice, businessNow, checkSlot, eligibleStaff, termsFor, termsRange, type Conflict } from '../../domain/scheduling';
 import { snap } from '../../domain/time';
 import type { BlockKind, Customer, Minutes, TenantData } from '../../domain/types';
 import { localeMeta, locales, type Locale } from '../../i18n/config';
@@ -87,18 +87,18 @@ function AppointmentForm({ L, prefill, onCreated }: { L: Lookup; prefill: NewApp
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const duration = bookingDuration(L.state, serviceId, addOnIds);
-  const price = bookingPrice(L.state, serviceId, addOnIds);
   const staffValid = (staffChoice === 'any' && staffList.length > 1) || staffList.some((s) => s.id === staffChoice);
   const effectiveChoice = staffValid ? staffChoice : staffList.length === 1 ? staffList[0].id : 'any';
 
-  // For "any", show who would take it: the first eligible artist with no conflict.
+  // For "any", show who would take it: the first eligible artist with no conflict, on their own duration.
   const resolved = useMemo((): { staffId: string; conflict: Conflict | null } => {
-    const check = (id: string) => checkSlot(L.state, { staffId: id, date, start, duration, serviceId });
+    const check = (id: string) => checkSlot(L.state, { staffId: id, date, start, duration: bookingDuration(L.state, serviceId, addOnIds, id), serviceId });
     if (effectiveChoice !== 'any') return { staffId: effectiveChoice, conflict: check(effectiveChoice) };
     const results = staffList.map((s) => ({ staffId: s.id, conflict: check(s.id) }));
     return results.find((r) => !r.conflict) ?? results.find((r) => isSoftConflict(r.conflict)) ?? results[0] ?? { staffId: '', conflict: { kind: 'not_working' } };
-  }, [L.state, effectiveChoice, staffList, date, start, duration, serviceId]);
+  }, [L.state, effectiveChoice, staffList, date, start, addOnIds, serviceId]);
+  const duration = bookingDuration(L.state, serviceId, addOnIds, resolved.staffId);
+  const price = bookingPrice(L.state, serviceId, addOnIds, resolved.staffId);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -225,11 +225,14 @@ function AppointmentForm({ L, prefill, onCreated }: { L: Lookup; prefill: NewApp
         <label className="field">
           <span className="field__label">{t('appt.service')}</span>
           <select className="field__input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
-            {bookable.map((s) => (
-              <option key={s.id} value={s.id}>
-                {tx(s.name)} · {fmt.duration(s.duration)} · {fmt.money(s.price)}
-              </option>
-            ))}
+            {bookable.map((s) => {
+              const r = termsRange(s, allCalendar ? s.staffIds : [me!.id]);
+              return (
+                <option key={s.id} value={s.id}>
+                  {tx(s.name)} · {fmt.durationRange(r.duration)} · {fmt.moneyRange(r.price)}
+                </option>
+              );
+            })}
           </select>
         </label>
         {addOns.some((x) => x.active) && (
@@ -258,11 +261,16 @@ function AppointmentForm({ L, prefill, onCreated }: { L: Lookup; prefill: NewApp
             <span className="field__label">{t('appt.staff')}</span>
             <select className="field__input" value={effectiveChoice} onChange={(e) => setStaffChoice(e.target.value)}>
               <option value="any">{t('common.anyAvailable')}</option>
-              {staffList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {tx(s.name)}
-                </option>
-              ))}
+              {staffList.map((s) => {
+                const own = L.services.get(serviceId);
+                const differs = !!own?.staffTerms?.[s.id];
+                return (
+                  <option key={s.id} value={s.id}>
+                    {tx(s.name)}
+                    {differs && own ? ` · ${fmt.duration(termsFor(own, s.id).duration)} · ${fmt.money(termsFor(own, s.id).price)}` : ''}
+                  </option>
+                );
+              })}
             </select>
           </label>
         )}

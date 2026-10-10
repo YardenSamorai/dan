@@ -5,21 +5,30 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && tsc -p tsconfig.server.json && vite build",
+    "test:api": "esbuild qa/api-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/api-test.mjs --log-level=warning && node node_modules/.tmp/api-test.mjs",
+    "test:import": "esbuild qa/import-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/import-test.mjs --log-level=warning && node node_modules/.tmp/import-test.mjs",
+    "test:insights": "esbuild qa/insights-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/insights-test.mjs --log-level=warning && node node_modules/.tmp/insights-test.mjs",
+    "test:supabase": "esbuild qa/supabase-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/supabase-test.mjs --log-level=warning && node node_modules/.tmp/supabase-test.mjs",
+    "db:setup": "esbuild scripts/db-setup.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/db-setup.mjs --log-level=warning && node node_modules/.tmp/db-setup.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
-    "three": "^0.170.0"
+    "three": "^0.170.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/three": "^0.170.0",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "wrangler": "^4.149.0"
   }
 }

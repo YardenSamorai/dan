@@ -13,6 +13,7 @@ export type Permission =
   | 'staff.manage'
   | 'availability.all' // edit anyone's hours / time off (else: own only)
   | 'business.settings'
+  | 'insights.view' // revenue and team performance
   | 'billing.manage'
   | 'demo.reset';
 
@@ -26,6 +27,7 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'staff.manage',
     'availability.all',
     'business.settings',
+    'insights.view',
     'billing.manage',
     'demo.reset',
   ]),
@@ -38,6 +40,7 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'staff.manage',
     'availability.all',
     'business.settings',
+    'insights.view',
   ]),
   staff: new Set<Permission>(['appointments.manage', 'customers.view']),
 };

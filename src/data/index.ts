@@ -2,14 +2,20 @@ import type { AuthService, BusinessDirectory, PublicBookingApi, WorkspaceData } 
 import { mockAuth, mockDirectory } from './mock/auth';
 import { mockPublicBooking } from './mock/public';
 import { mockWorkspace } from './mock/workspace';
+import { remoteAuth, remoteDirectory } from './remote/auth';
+import { remotePublicBooking } from './remote/public';
+import { remoteWorkspace } from './remote/workspace';
 
 /**
- * The single swap point between mock adapters and a real backend. UI code
- * imports from here (and ./contracts), never from ./mock directly.
+ * The single swap point between the in-browser demo and the real backend.
+ * UI code imports from here (and ./contracts), never from ./mock or ./remote.
+ * VITE_BACKEND=mock keeps everything in this browser's localStorage.
  */
-export const auth: AuthService = mockAuth;
-export const directory: BusinessDirectory = mockDirectory;
-export const publicBooking: PublicBookingApi = mockPublicBooking;
-export const workspace: WorkspaceData = mockWorkspace;
+const remote = import.meta.env.VITE_BACKEND !== 'mock';
+
+export const auth: AuthService = remote ? remoteAuth : mockAuth;
+export const directory: BusinessDirectory = remote ? remoteDirectory : mockDirectory;
+export const publicBooking: PublicBookingApi = remote ? remotePublicBooking : mockPublicBooking;
+export const workspace: WorkspaceData = remote ? remoteWorkspace : mockWorkspace;
 
 export * from './contracts';

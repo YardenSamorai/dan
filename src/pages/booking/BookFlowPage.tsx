@@ -6,6 +6,7 @@ import { BusinessWordmark, StaffAvatar } from '../../components/ui/bits';
 import { storageKey } from '../../config/product';
 import { ApiError, publicBooking } from '../../data';
 import { rememberBooking } from '../../data/mine';
+import { termsRange } from '../../domain/scheduling';
 import type { ISODate, Minutes } from '../../domain/types';
 import { useI18n, type I18n } from '../../i18n/I18nProvider';
 import { usePublicTenant, type PublicTenant } from './TenantContext';
@@ -46,13 +47,21 @@ function validate(d: Draft, requireEmail: boolean, t: I18n['t']): Errors {
   return e;
 }
 
+type Span = [number, number];
+
+/** Until a specific person is chosen, duration and price span everyone who could take it. */
 function totals(tenant: PublicTenant, d: Draft) {
   const s = d.serviceId ? tenant.service(d.serviceId) : undefined;
   const extras = d.addOnIds.map((id) => tenant.addOn(id)).filter((a) => !!a);
+  const xd = extras.reduce((m, a) => m + a!.duration, 0);
+  const xp = extras.reduce((m, a) => m + a!.price, 0);
+  const who = d.staffId && d.staffId !== 'any' ? [d.staffId] : s?.staffIds ?? [];
+  const r = s ? termsRange(s, who) : { duration: [0, 0] as Span, price: [0, 0] as Span };
   return {
     service: s,
-    duration: (s?.duration ?? 0) + extras.reduce((m, a) => m + a!.duration, 0),
-    price: (s?.price ?? 0) + extras.reduce((m, a) => m + a!.price, 0),
+    base: r.price,
+    duration: [r.duration[0] + xd, r.duration[1] + xd] as Span,
+    price: [r.price[0] + xp, r.price[1] + xp] as Span,
   };
 }
 
@@ -107,7 +116,9 @@ export default function BookFlowPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => sessionStorage.setItem(draftKey(slug), JSON.stringify(draft)), [draft, slug]);
+  useEffect(() => {
+    sessionStorage.setItem(draftKey(slug), JSON.stringify(draft));
+  }, [draft, slug]);
 
   const requested = Number(params.get('step') ?? 0);
   const step = Math.max(0, Math.min(Number.isFinite(requested) ? requested : 0, maxStep));
@@ -161,7 +172,8 @@ export default function BookFlowPage() {
         update({ start: undefined });
         setNotice(t('conflict.slot_taken'));
         goTo(idx('time'));
-      } else setNotice(t('common.unknownError'));
+      } else if (e instanceof ApiError && e.code === 'blocked') setNotice(t('booking.blocked'));
+      else setNotice(t('common.unknownError'));
     }
   };
 
@@ -197,7 +209,7 @@ export default function BookFlowPage() {
       <header className="booking__bar">
         <div className="booking__bar-inner">
           <Link to={base} className="booking__logo">
-            <BusinessWordmark name={tx(business.name)} logoUrl={business.branding.logoUrl} />
+            <BusinessWordmark name={tx(business.name)} logoUrl={business.branding.logoUrl} hideMark={business.branding.hideLogo} />
           </Link>
           <nav className="progress" aria-label={t('booking.title')}>
             <ol>
@@ -271,9 +283,9 @@ export default function BookFlowPage() {
         <div className="dock__info" aria-live="polite">
           {service ? (
             <>
-              <strong className="tabular">{fmt.money(price)}</strong>
+              <strong className="tabular">{fmt.moneyRange(price)}</strong>
               <span className="tabular">
-                {fmt.duration(duration)}
+                {fmt.durationRange(duration)}
                 {draft.date && draft.start !== undefined && timeOk ? ` · ${fmt.time(draft.start)}` : ''}
               </span>
             </>
@@ -320,6 +332,7 @@ function StepService({ draft, update }: StepProps) {
           {g.name && <legend className="choice-group__legend">{g.name}</legend>}
           {g.items.map((s) => {
             const selected = s.id === draft.serviceId;
+            const r = termsRange(s);
             return (
               <label key={s.id} className="choice" data-selected={selected}>
                 <input type="radio" name="service" className="sr-only" checked={selected} onChange={() => update({ serviceId: s.id, addOnIds: selected ? draft.addOnIds : [], start: undefined })} />
@@ -328,9 +341,9 @@ function StepService({ draft, update }: StepProps) {
                   {tx(s.description) && <span className="choice__desc">{tx(s.description)}</span>}
                 </span>
                 <span className="choice__side">
-                  <span className="choice__price tabular">{fmt.money(s.price)}</span>
+                  <span className="choice__price tabular">{fmt.moneyRange(r.price)}</span>
                   <span className="choice__meta">
-                    <ClockIcon size={12} /> {fmt.duration(s.duration)}
+                    <ClockIcon size={12} /> {fmt.durationRange(r.duration)}
                   </span>
                 </span>
                 <span className="choice__tick" aria-hidden="true">
@@ -393,6 +406,13 @@ function StepStaff({ draft, update, onPick }: StepProps & { onPick: () => void }
     ...(tenant.business.policies.allowAnyStaff ? [{ id: 'any', title: t('booking.staff.anyTitle'), sub: t('booking.staff.anyBody'), staff: null }] : []),
     ...staff.map((s) => ({ id: s.id, title: tx(s.name), sub: tx(s.role), staff: s })),
   ];
+  // Only worth showing when the people differ; otherwise the price was already on the service.
+  const all = service ? termsRange(service) : null;
+  const varies = !!all && (all.price[0] !== all.price[1] || all.duration[0] !== all.duration[1]);
+  const termsOf = (id: string) => {
+    const r = termsRange(service!, id === 'any' ? service!.staffIds : [id]);
+    return `${fmt.moneyRange(r.price)} · ${fmt.durationRange(r.duration)}`;
+  };
 
   return (
     <>
@@ -426,6 +446,7 @@ function StepStaff({ draft, update, onPick }: StepProps & { onPick: () => void }
                 {o.sub && <span className="choice__desc">{o.sub}</span>}
               </span>
               <span className="choice__side">
+                {varies && <span className="choice__price tabular">{termsOf(o.id)}</span>}
                 <span className="choice__meta">{next ? t('booking.staff.nextAvailable', { when: next }) : t('booking.staff.unavailable')}</span>
               </span>
             </label>
@@ -523,7 +544,7 @@ function StepReview({ draft, goTo, staffStep, timeStep, detailsStep }: { draft: 
 function Summary({ draft }: { draft: Draft }) {
   const { t, tx, fmt } = useI18n();
   const tenant = usePublicTenant();
-  const { service, duration, price } = totals(tenant, draft);
+  const { service, base, duration, price } = totals(tenant, draft);
   if (!service) return <p className="summary__empty muted">{t('booking.summary.empty')}</p>;
   const staff = tenant.staff(draft.staffId);
   const addOns = draft.addOnIds.map((id) => tenant.addOn(id)).filter((a) => !!a);
@@ -533,7 +554,7 @@ function Summary({ draft }: { draft: Draft }) {
       <ul className="summary__lines">
         <li>
           <span>{tx(service.name)}</span>
-          <span className="tabular">{fmt.money(service.price)}</span>
+          <span className="tabular">{fmt.moneyRange(base)}</span>
         </li>
         {addOns.map((a) => (
           <li key={a!.id} className="summary__addon">
@@ -553,19 +574,21 @@ function Summary({ draft }: { draft: Draft }) {
           <div>
             <dt>{t('booking.steps.time')}</dt>
             <dd>
-              {fmt.date(draft.date, 'medium')} · <span className="tabular">{fmt.timeRange(draft.start, draft.start + duration)}</span>
+              {fmt.date(draft.date, 'medium')} ·{' '}
+              <span className="tabular">{duration[0] === duration[1] ? fmt.timeRange(draft.start, draft.start + duration[0]) : fmt.time(draft.start)}</span>
             </dd>
           </div>
         )}
         <div>
           <dt>{t('appt.duration')}</dt>
-          <dd>{fmt.duration(duration)}</dd>
+          <dd>{fmt.durationRange(duration)}</dd>
         </div>
       </dl>
       <div className="summary__total">
         <span>{t('booking.summary.total')}</span>
-        <span className="tabular">{fmt.money(price)}</span>
+        <span className="tabular">{fmt.moneyRange(price)}</span>
       </div>
+      {price[0] !== price[1] && <p className="summary__note muted">{t('booking.summary.dependsOnStaff')}</p>}
       <p className="summary__note muted">{t('booking.summary.payAtVisit')}</p>
     </div>
   );

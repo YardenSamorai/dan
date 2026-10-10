@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { canCustomerCancel, canCustomerReschedule } from '../../domain/policy';
-import { availableSlots, businessNow, firstAvailableDate, pickStaff } from '../../domain/scheduling';
+import { availableSlots, businessNow, firstAvailableDate, pickStaff, termsIfMoved } from '../../domain/scheduling';
 import { WEEKDAYS } from '../../domain/defaults';
+import { pageOf } from '../../domain/page';
 import type { Appointment, TenantData } from '../../domain/types';
 import { ApiError, type PublicBooking, type PublicBookingApi, type PublicBusiness } from '../contracts';
 import { getDb, getSession, latency, mutateTenant, useMockDb, useMockSession, type MockDatabase } from './db';
@@ -13,7 +14,7 @@ import { appointmentEvent, cancelledBy, insertAppointment, newAppointment, norma
  * the public projection and slot lists back.
  */
 
-const bySlug = (db: MockDatabase, slug: string): TenantData | undefined => Object.values(db.tenants).find((t) => t.business.slug === slug);
+export const bySlug = (db: MockDatabase, slug: string): TenantData | undefined => Object.values(db.tenants).find((t) => t.business.slug === slug);
 
 function requireTenant(slug: string) {
   const t = bySlug(getDb(), slug);
@@ -21,12 +22,19 @@ function requireTenant(slug: string) {
   return t;
 }
 
-const visible = (db: MockDatabase, t: TenantData, userId?: string) =>
+/** A blocked customer is recognised by either phone or email, so changing one of them isn't enough to get back in. */
+function isBlocked(t: TenantData, who: { phone: string; email?: string }) {
+  const phone = normalizePhone(who.phone);
+  const email = who.email?.trim().toLowerCase();
+  return t.customers.some((c) => c.blocked && (normalizePhone(c.phone) === phone || (!!email && c.email?.trim().toLowerCase() === email)));
+}
+
+export const visible = (db: MockDatabase, t: TenantData, userId?: string) =>
   t.business.status === 'published' || (!!userId && db.members.some((m) => m.businessId === t.business.id && m.userId === userId));
 
 const projections = new WeakMap<TenantData, PublicBusiness>();
 
-function project(t: TenantData): PublicBusiness {
+export function project(t: TenantData): PublicBusiness {
   const cached = projections.get(t);
   if (cached) return cached;
   const b = t.business;
@@ -50,6 +58,7 @@ function project(t: TenantData): PublicBusiness {
     email: b.email,
     social: b.social,
     branding: b.branding,
+    page: pageOf(b.page, staff.length),
     hours: b.hours,
     specialDays: t.exceptions
       .filter((e) => e.staffId === null && e.date >= today)
@@ -72,7 +81,7 @@ function project(t: TenantData): PublicBusiness {
     categories: t.categories.map(({ id, name }) => ({ id, name })),
     services: t.services
       .filter((s) => s.active && s.onlineBookable && s.staffIds.some((id) => staffIds.has(id)))
-      .map(({ id, categoryId, name, description, duration, price, bufferBefore, bufferAfter, staffIds: ids, imageUrl }) => ({
+      .map(({ id, categoryId, name, description, duration, price, bufferBefore, bufferAfter, staffIds: ids, staffTerms, imageUrl }) => ({
         id,
         categoryId,
         name,
@@ -82,6 +91,7 @@ function project(t: TenantData): PublicBusiness {
         bufferBefore,
         bufferAfter,
         staffIds: ids.filter((x) => staffIds.has(x)),
+        staffTerms: staffTerms && Object.fromEntries(Object.entries(staffTerms).filter(([x]) => staffIds.has(x))),
         imageUrl,
       })),
     addOns: t.addOns.filter((a) => a.active).map(({ id, name, duration, price }) => ({ id, name, duration, price })),
@@ -99,7 +109,27 @@ function project(t: TenantData): PublicBusiness {
   return out;
 }
 
-function toPublic(t: TenantData, a: Appointment): PublicBooking {
+/**
+ * What a browser needs to compute open slots itself: schedules and busy time,
+ * without customers, notes, codes or history. The server re-checks every booking.
+ */
+export function availabilityView(t: TenantData): TenantData {
+  const from = businessNow(t).date;
+  return {
+    ...t,
+    business: { ...t.business, subscription: { status: 'not_configured', planId: null }, calendarFeeds: undefined },
+    staff: t.staff.map(({ userId: _userId, ...s }) => s),
+    timeOff: t.timeOff.map(({ note: _note, ...x }) => x),
+    blocks: t.blocks.map((b) => ({ ...b, label: '' })),
+    customers: [],
+    outbox: [],
+    appointments: t.appointments
+      .filter((a) => a.date >= from && a.status !== 'cancelled')
+      .map((a) => ({ ...a, code: '', customerId: '', note: undefined, internalNote: undefined, cancellation: undefined, history: [], price: 0 })),
+  };
+}
+
+export function toPublic(t: TenantData, a: Appointment): PublicBooking {
   const c = t.customers.find((x) => x.id === a.customerId);
   return {
     id: a.id,
@@ -155,6 +185,7 @@ export const mockPublicBooking: PublicBookingApi = {
     if (input.staffId === 'any' && !t.business.policies.allowAnyStaff) throw new ApiError('invalid');
     if (!input.customer.name.trim() || normalizePhone(input.customer.phone).length < 9) throw new ApiError('invalid');
     if (t.business.policies.requireEmail && !input.customer.email) throw new ApiError('invalid');
+    if (isBlocked(t, input.customer)) throw new ApiError('blocked');
     const slot = availableSlots(t, { ...input, online: true }).find((x) => x.start === input.start);
     if (!slot) throw new ApiError('slot_taken');
     const staffId = input.staffId === 'any' ? pickStaff(t, input.date, slot.staffIds) : input.staffId;
@@ -224,6 +255,8 @@ export const mockPublicBooking: PublicBookingApi = {
     const a = t.appointments.find((x) => x.id === token);
     if (!a) throw new ApiError('not_found');
     if (!canCustomerReschedule(a, t.business.policies, t.business.timezone).allowed) throw new ApiError('policy');
+    const customer = t.customers.find((c) => c.id === a.customerId);
+    if (customer && isBlocked(t, customer)) throw new ApiError('blocked');
     const slot = availableSlots(t, {
       serviceId: a.serviceId,
       addOnIds: a.addOnIds,
@@ -238,7 +271,7 @@ export const mockPublicBooking: PublicBookingApi = {
     const out = patchAppointmentIn(
       t.business.id,
       a.id,
-      (x) => ({ ...x, date: to.date, start: to.start, staffId, history: [...x.history, appointmentEvent('rescheduled', 'customer', detail)] }),
+      (x) => ({ ...x, ...termsIfMoved(t, a, staffId), date: to.date, start: to.start, staffId, history: [...x.history, appointmentEvent('rescheduled', 'customer', detail)] }),
       ['reschedule', 'reminder'],
     );
     return toPublic(getDb().tenants[t.business.id], out);

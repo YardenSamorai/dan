@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Drawer } from '../../components/ui/Drawer';
-import { MessageIcon, PhoneIcon, PlusIcon } from '../../components/ui/Icons';
+import { BanIcon, MessageIcon, PhoneIcon, PlusIcon } from '../../components/ui/Icons';
 import { Avatar, StatusBadge } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
 import { appointmentStart, isUpcoming } from '../../domain/scheduling';
@@ -131,10 +132,24 @@ function Body({ c, L, onClose }: { c: Customer; L: Lookup; onClose: () => void }
   const { api, can, solo } = useWorkspace();
   const [draft, setDraft] = useState(c);
   const [busy, setBusy] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
   const stats = customerStats(L.state, c.id);
   const editable = can('customers.edit');
   const dirty = JSON.stringify(draft) !== JSON.stringify(c);
   const wa = whatsappHref(c.phone, L.state.business.timezone);
+
+  const setBlocked = async (blocked: boolean) => {
+    setBusy(true);
+    try {
+      await api.saveCustomer({ ...c, blocked: blocked || undefined });
+      setDraft((d) => ({ ...d, blocked: blocked || undefined }));
+      toast(t(blocked ? 'customers.block.done' : 'customers.block.undone'));
+    } catch {
+      toast(t('common.forbidden'));
+    }
+    setBusy(false);
+    setConfirmBlock(false);
+  };
 
   const save = async () => {
     setBusy(true);
@@ -164,10 +179,23 @@ function Body({ c, L, onClose }: { c: Customer; L: Lookup; onClose: () => void }
       <div className="detail__person">
         <Avatar name={c.name} size="lg" />
         <div className="list__main">
-          <p className="detail__when">{c.name}</p>
+          <p className="detail__when">
+            {c.name} {c.blocked && <span className="badge badge--danger">{t('customers.block.badge')}</span>}
+          </p>
           <p className="muted">{t('customers.since', { date: fmt.date(c.createdAt.slice(0, 10), 'dayMonth') })}</p>
         </div>
       </div>
+
+      {c.blocked && (
+        <div className="detail__alert" role="status">
+          <p>{t('customers.block.banner')}</p>
+          {editable && (
+            <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => setBlocked(false)}>
+              {t('customers.block.unblock')}
+            </button>
+          )}
+        </div>
+      )}
 
       <dl className="stats">
         <div>
@@ -235,6 +263,25 @@ function Body({ c, L, onClose }: { c: Customer; L: Lookup; onClose: () => void }
         <h3 className="section-title">{t('customers.history')}</h3>
         {stats.past.length ? <div className="panel list">{stats.past.map(row)}</div> : <p className="muted">{t('customers.noHistory')}</p>}
       </section>
+
+      {editable && !c.blocked && (
+        <div className="detail__foot">
+          <button type="button" className="btn btn--danger btn--sm" disabled={busy} onClick={() => setConfirmBlock(true)}>
+            <BanIcon size={14} /> {t('customers.block.action')}
+          </button>
+        </div>
+      )}
+      <ConfirmDialog
+        open={confirmBlock}
+        danger
+        busy={busy}
+        title={t('customers.block.confirmTitle', { name: c.name })}
+        body={<p>{t('customers.block.confirmBody')}</p>}
+        confirmLabel={t('customers.block.confirm')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={() => setBlocked(true)}
+        onCancel={() => setConfirmBlock(false)}
+      />
     </div>
   );
 }

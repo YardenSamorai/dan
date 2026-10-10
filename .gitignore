@@ -1,5 +1,12 @@
 node_modules
 dist
+.data
+.env
+.env.local
+.env*.local
+.dev.vars
+.dev.vars.*
+.wrangler/
 qa/shots
 *.log
 *.tsbuildinfo

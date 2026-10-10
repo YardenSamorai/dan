@@ -12,7 +12,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, PlusIcon } from '../../components/ui/Icons';
 import { Segmented, StaffAvatar, StatusBadge, Switch } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
-import { businessHours, businessNow, checkSlot, exceptionOn, occupiesTime, staffDay, type Conflict } from '../../domain/scheduling';
+import { businessHours, businessNow, checkSlot, exceptionOn, heldRange, occupiesTime, sharedAppointments, staffDay, termsIfMoved, type Conflict } from '../../domain/scheduling';
 import { addDays, snap, startOfWeek, weekdayOf } from '../../domain/time';
 import type { Appointment, Block, ISODate, Minutes, Staff, TenantData, TimeOff, TimeRange } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -33,6 +33,8 @@ interface Column {
   shift: TimeRange[];
   breaks: TimeRange[];
   blocks: Block[];
+  /** Time taken by someone else's appointment for a service that blocks everyone. */
+  held: (TimeRange & { id: string; label: string })[];
   timeOff: TimeOff | null;
   /** Week view, whole team: who's away that day. */
   away: TimeOff[];
@@ -47,6 +49,8 @@ interface Preview {
   id: string;
   col: number;
   start: Minutes;
+  /** With the target person's own terms, which may differ from the booked duration. */
+  duration: Minutes;
   conflict: Conflict | null;
 }
 
@@ -146,6 +150,7 @@ export default function CalendarPage() {
         shift: sd.shift,
         breaks: sd.breaks,
         blocks: sd.blocks,
+        held: sharedAppointments(state, st.id, d).map((a) => ({ id: a.id, ...heldRange(state, a), label: tx(L.services.get(a.serviceId)?.name) })),
         timeOff: sd.timeOff,
         away: [],
         staffLanes: null,
@@ -167,6 +172,7 @@ export default function CalendarPage() {
         shift: businessHours(state, d),
         breaks: [],
         blocks: state.blocks.filter((b) => b.date === d && (b.staffId === null || ids.has(b.staffId))),
+        held: [],
         timeOff: null,
         away: state.timeOff.filter((x) => ids.has(x.staffId) && x.from <= d && d <= x.to),
         staffLanes: shown.filter((s) => staffDay(state, s.id, d).shift.length > 0 || appointments.some((a) => a.staffId === s.id)).map((s) => s.id),
@@ -177,7 +183,7 @@ export default function CalendarPage() {
         appointments,
       };
     });
-  }, [state, view, shown, date, weekStart, showCancelled, t]);
+  }, [state, view, shown, date, weekStart, showCancelled, t, tx, L.services]);
 
   // Visible hours: opening hours of the visible days, plus anything booked outside them, with an hour of air.
   const [lo, hi] = useMemo(() => {
@@ -219,10 +225,11 @@ export default function CalendarPage() {
     const c = columns[col];
     const rect = el.getBoundingClientRect();
     const raw = lo + (clientY - rect.top) / ppm - drag.current.grab;
-    const start = Math.min(Math.max(snap(raw, step), lo), hi - a.duration);
     const staffId = c.staff && view === 'day' ? c.staff.id : a.staffId;
-    const conflict = checkSlot(state, { staffId, date: c.date, start, duration: a.duration, serviceId: a.serviceId, excludeAppointmentId: a.id });
-    return { id: a.id, col, start, conflict };
+    const { duration } = termsIfMoved(state, a, staffId);
+    const start = Math.min(Math.max(snap(raw, step), lo), hi - duration);
+    const conflict = checkSlot(state, { staffId, date: c.date, start, duration, serviceId: a.serviceId, excludeAppointmentId: a.id });
+    return { id: a.id, col, start, duration, conflict };
   };
 
   const onCardDown = (e: RPointerEvent, a: Appointment) => {
@@ -452,6 +459,11 @@ export default function CalendarPage() {
                     <span>{b.label}</span>
                   </div>
                 ))}
+                {c.held.map((h) => (
+                  <div key={h.id} className="cal-block" data-kind="shared" style={{ top: y(h.start), height: (h.end - h.start) * ppm }} title={h.label}>
+                    <span>{h.label}</span>
+                  </div>
+                ))}
                 {(c.timeOff || (c.closed && view === 'day')) && (
                   <div className="cal-away">
                     <span>{c.timeOff ? t(`timeOffKind.${c.timeOff.kind}`) : t('calendar.closed')}</span>
@@ -529,10 +541,10 @@ export default function CalendarPage() {
                     <div
                       className="cal-ghost"
                       data-tone={tone}
-                      style={{ top: y(preview.start), height: a.duration * ppm, '--tone': L.staff.get(a.staffId)?.color } as CSSProperties}
+                      style={{ top: y(preview.start), height: preview.duration * ppm, '--tone': L.staff.get(a.staffId)?.color } as CSSProperties}
                       aria-hidden
                     >
-                      <span className="ltr">{fmt.timeRange(preview.start, preview.start + a.duration)}</span>
+                      <span className="ltr">{fmt.timeRange(preview.start, preview.start + preview.duration)}</span>
                       {preview.conflict && <span className="cal-ghost__why">{conflictText(preview.conflict, c.staff ?? L.staff.get(a.staffId))}</span>}
                     </div>
                   );

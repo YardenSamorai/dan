@@ -4,6 +4,7 @@ import { ArrowIcon } from '../../components/ui/Icons';
 import { auth } from '../../data';
 import { useI18n } from '../../i18n/I18nProvider';
 import { AuthLayout } from './AuthLayout';
+import { PasswordForm } from './PasswordForm';
 
 export default function SignInPage() {
   const { t, tx } = useI18n();
@@ -31,8 +32,19 @@ export default function SignInPage() {
     if (email.trim()) void go(email);
   };
 
+  if (auth.method === 'password')
+    return (
+      <AuthLayout variant="signIn" title={t('auth.signIn.title')} lede={t('auth.signIn.lede')}>
+        <PasswordForm create={false} />
+        <p className="auth__switch">
+          {t('auth.signIn.noAccount')} <Link to="/sign-up">{t('auth.signIn.create')}</Link>
+        </p>
+      </AuthLayout>
+    );
+
   return (
     <AuthLayout
+      variant="signIn"
       title={t('auth.signIn.title')}
       lede={t('auth.signIn.lede')}
       aside={

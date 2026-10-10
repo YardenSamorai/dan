@@ -17,53 +17,6 @@
   font-size: var(--text-sm);
 }
 
-.tenant-hero {
-  position: relative;
-  display: grid;
-  justify-items: start;
-  padding-block: calc(var(--header-h) + 64px) 32px;
-  animation: tenantIn 640ms var(--ease-out) both;
-}
-
-.tenant-hero__cover {
-  width: 100%;
-  max-height: 320px;
-  margin-block-end: var(--s-8);
-  border-radius: var(--r-lg);
-  object-fit: cover;
-}
-
-.tenant-hero__title {
-  margin-block-start: var(--s-6);
-  font-size: var(--display-lg);
-}
-
-.tenant-hero__tagline {
-  margin-block-start: var(--s-3);
-  font-size: var(--text-xl);
-  color: var(--ink-2);
-}
-
-.tenant-hero__desc {
-  margin-block-start: var(--s-4);
-  max-width: 34em;
-  color: var(--ink-3);
-  line-height: 1.6;
-  text-wrap: pretty;
-}
-
-.tenant-hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-4) var(--s-6);
-  margin-block-start: var(--s-8);
-}
-
-.tenant-hero__actions .hero__opening {
-  margin: 0;
-}
-
 /* The pill styles live with the marketing hero; the tenant page reuses them. */
 .hero__opening {
   display: inline-flex;
@@ -95,7 +48,7 @@
   border-block-start: 1px solid var(--line);
 }
 
-.tenant-section > .display {
+.tenant-section__title {
   margin-block-end: var(--s-8);
 }
 

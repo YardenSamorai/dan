@@ -2,8 +2,10 @@ import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState, type C
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Drawer } from '../components/ui/Drawer';
 import {
+  BrushIcon,
   BusinessMark,
   CalendarIcon,
+  ChartIcon,
   CheckIcon,
   ChevronDown,
   ChevronRight,
@@ -15,6 +17,7 @@ import {
   ListIcon,
   LogOutIcon,
   PlusIcon,
+  QuestionIcon,
   SidebarIcon,
   TagIcon,
   UserIcon,
@@ -33,13 +36,16 @@ import { useWorkspace, WorkspaceProvider } from './workspace';
 import './app.css';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const InsightsPage = lazy(() => import('./pages/InsightsPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const AppointmentsPage = lazy(() => import('./pages/AppointmentsPage'));
 const CustomersPage = lazy(() => import('./pages/CustomersPage'));
+const CustomersImport = lazy(() => import('./pages/CustomersImport'));
 const ServicesAdmin = lazy(() => import('./pages/ServicesAdmin'));
 const StaffAdmin = lazy(() => import('./pages/StaffAdmin'));
 const AvailabilityPage = lazy(() => import('./pages/AvailabilityPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const PageEditor = lazy(() => import('./pages/PageEditor'));
 
 interface NavItem {
   to: string;
@@ -47,6 +53,8 @@ interface NavItem {
   icon: ComponentType<{ size?: number }>;
   /** Day-to-day work: phone tab bar, and the "New appointment" action in the top bar. */
   primary?: boolean;
+  /** Day-to-day, but the phone tab bar has no room: it sits at the top of More instead. */
+  noTab?: boolean;
   needs?: Permission;
 }
 
@@ -55,9 +63,11 @@ const NAV: NavItem[] = [
   { to: '/app/calendar', key: 'app.nav.calendar', icon: CalendarIcon, primary: true },
   { to: '/app/appointments', key: 'app.nav.appointments', icon: ListIcon, primary: true },
   { to: '/app/customers', key: 'app.nav.customers', icon: UsersIcon, primary: true, needs: 'customers.view' },
+  { to: '/app/insights', key: 'app.nav.insights', icon: ChartIcon, primary: true, noTab: true, needs: 'insights.view' },
   { to: '/app/services', key: 'app.nav.services', icon: TagIcon, needs: 'services.manage' },
   { to: '/app/staff', key: 'app.nav.staff', icon: UserIcon, needs: 'staff.manage' },
   { to: '/app/availability', key: 'app.nav.availability', icon: ClockIcon, needs: 'availability.all' },
+  { to: '/app/page', key: 'app.nav.page', icon: BrushIcon, needs: 'business.settings' },
   { to: '/app/settings', key: 'app.nav.settings', icon: GearIcon, needs: 'business.settings' },
 ];
 
@@ -78,7 +88,9 @@ function usePopover() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
-  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
   useEffect(() => {
     if (!open) return;
     const close = (e: Event) => {
@@ -194,6 +206,9 @@ function AccountMenu() {
           <Link to={`/book/${tenant.business.slug}`} target="_blank" className="menu-row menu-row--plain">
             <ExternalIcon size={15} /> <span className="menu-row__title">{t('app.viewPage')}</span>
           </Link>
+          <Link to="/help" target="_blank" className="menu-row menu-row--plain">
+            <QuestionIcon size={15} /> <span className="menu-row__title">{t('legal.help')}</span>
+          </Link>
           <div className="popover__sep" />
           <button
             type="button"
@@ -288,6 +303,8 @@ function Shell() {
   const page = `/book/${business.slug}`;
   const primary = items.filter((n) => n.primary);
   const secondary = items.filter((n) => !n.primary);
+  const tabs = primary.filter((n) => !n.noTab);
+  const moreItems = items.filter((n) => !tabs.includes(n));
   const fullBleed = FULL_BLEED.has(current.to);
   const pinnedTitle = fullBleed;
 
@@ -377,7 +394,9 @@ function Shell() {
               <Route index element={<Dashboard />} />
               <Route path="calendar" element={<CalendarPage />} />
               <Route path="appointments" element={<AppointmentsPage />} />
+              <Route path="insights" element={guard(byPath('/app/insights'), <InsightsPage />)} />
               <Route path="customers" element={guard(byPath('/app/customers'), <CustomersPage />)} />
+              <Route path="customers/import" element={guard(byPath('/app/customers'), <CustomersImport />)} />
               <Route path="services" element={guard(byPath('/app/services'), <ServicesAdmin />)} />
               <Route path="staff" element={guard(byPath('/app/staff'), <StaffAdmin />)} />
               <Route path="availability" element={guard(byPath('/app/availability'), <AvailabilityPage />)} />
@@ -389,14 +408,14 @@ function Shell() {
         </main>
       </div>
 
-      <nav className="tabbar" aria-label={t('common.menu')} style={{ gridTemplateColumns: `repeat(${primary.length + 1}, 1fr)` }}>
-        {primary.map((n) => (
+      <nav className="tabbar" aria-label={t('common.menu')} style={{ gridTemplateColumns: `repeat(${tabs.length + 1}, 1fr)` }}>
+        {tabs.map((n) => (
           <NavLink key={n.to} to={n.to} end={n.to === '/app'} className="tabbar__item">
             <n.icon size={22} />
             <span>{t(n.key)}</span>
           </NavLink>
         ))}
-        <button type="button" className="tabbar__item" aria-expanded={more} aria-haspopup="dialog" onClick={() => setMore(true)} data-active={!current.primary || undefined}>
+        <button type="button" className="tabbar__item" aria-expanded={more} aria-haspopup="dialog" onClick={() => setMore(true)} data-active={!tabs.includes(current) || undefined}>
           <DotsIcon size={22} />
           <span>{t('common.more')}</span>
         </button>
@@ -404,9 +423,9 @@ function Shell() {
 
       <Drawer open={more} onClose={() => setMore(false)} title={t('common.more')}>
         <div className="more">
-          {secondary.length > 0 && (
+          {moreItems.length > 0 && (
             <SheetGroup>
-              {secondary.map((n) => (
+              {moreItems.map((n) => (
                 <NavLink key={n.to} to={n.to} className="sheet-row">
                   <n.icon size={19} />
                   <span className="sheet-row__text">{t(n.key)}</span>
@@ -500,10 +519,25 @@ export default function BusinessApp() {
   if (!session) return <Navigate to="/sign-in" replace state={{ from: location.pathname }} />;
   if (!session.active) return <NoBusiness session={session} />;
   return (
-    <WorkspaceProvider key={session.active.businessId} session={session} membership={session.active} fallback={<Navigate to="/onboarding" replace />}>
-      <AppUIProvider>
-        <Shell />
-      </AppUIProvider>
+    <WorkspaceProvider key={session.active.businessId} session={session} membership={session.active} fallback={<div className="app__loading" />}>
+      <Routes>
+        <Route
+          path="page"
+          element={
+            <Suspense fallback={<div className="app__loading" />}>
+              <PageEditor />
+            </Suspense>
+          }
+        />
+        <Route
+          path="*"
+          element={
+            <AppUIProvider>
+              <Shell />
+            </AppUIProvider>
+          }
+        />
+      </Routes>
     </WorkspaceProvider>
   );
 }

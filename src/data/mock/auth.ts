@@ -12,7 +12,7 @@ import { getDb, getSession, latency, mutateDb, setSession, uid, useMockDb, useMo
  * any account. It exists so the product can be explored.
  */
 
-function sessionInfo(db: MockDatabase, userId: string, activeBusinessId: string | null): SessionInfo | null {
+export function sessionInfo(db: MockDatabase, userId: string, activeBusinessId: string | null): SessionInfo | null {
   const user = db.users.find((u) => u.id === userId);
   if (!user) return null;
   const memberships: Membership[] = db.members
@@ -31,6 +31,13 @@ const current = () => {
 };
 
 export const mockAuth: AuthService = {
+  ready: () => Promise.resolve(),
+  method: 'email',
+  providers: { google: false },
+  signInWithPassword: () => Promise.reject(new ApiError('invalid')),
+  signUpWithPassword: () => Promise.reject(new ApiError('invalid')),
+  signInWithGoogle: () => Promise.reject(new ApiError('invalid')),
+
   useSession() {
     const db = useMockDb();
     const s = useMockSession();
@@ -86,6 +93,8 @@ export const mockAuth: AuthService = {
 };
 
 export const mockDirectory: BusinessDirectory = {
+  useSlugChecks() {},
+
   isSlugAvailable(slug) {
     return SLUG_PATTERN.test(slug) && !Object.values(getDb().tenants).some((t) => t.business.slug === slug);
   },
@@ -118,7 +127,7 @@ export const mockDirectory: BusinessDirectory = {
       phone: input.phone.trim(),
       email: user.email,
       social: {},
-      branding: { accent: 'fig' },
+      branding: { accent: input.accent ?? 'fig' },
       hours: input.hours,
       policies: { ...DEFAULT_POLICIES, ...input.policies, allowAnyStaff: !input.solo },
       notifications: defaultNotifications(),

@@ -1,5 +1,5 @@
 import { addDays, atMinutes, diffDays, intersectRanges, mergeRanges, overlaps, subtractRanges, weekdayOf, zonedInstant, zonedNow } from './time';
-import type { Appointment, Block, ISODate, Minutes, ScheduleException, Staff, TenantData, TimeOff, TimeRange } from './types';
+import type { Appointment, Block, ISODate, Minutes, ScheduleException, Service, Staff, TenantData, TimeOff, TimeRange } from './types';
 
 /**
  * The availability engine. Pure functions over ONE tenant's data — the same
@@ -79,11 +79,25 @@ export function heldRange(state: TenantData, a: Appointment): TimeRange {
   return { start: a.start - b.before, end: a.start + a.duration + b.after };
 }
 
-function busyRanges(state: TenantData, d: StaffDay, excludeAppointmentId?: string): TimeRange[] {
+export const blocksAll = (state: TenantData, serviceId?: string) => !!(serviceId && serviceOf(state, serviceId)?.blocksAll);
+
+/**
+ * Other people's appointments that hold this person too: those for a service
+ * that blocks everyone, or all of them when the service being booked does.
+ */
+export function sharedAppointments(state: TenantData, staffId: string, date: ISODate, serviceId?: string, excludeAppointmentId?: string): Appointment[] {
+  const all = blocksAll(state, serviceId);
+  return state.appointments.filter(
+    (a) => a.date === date && a.staffId !== staffId && a.id !== excludeAppointmentId && occupiesTime(a) && (all || blocksAll(state, a.serviceId)),
+  );
+}
+
+function busyRanges(state: TenantData, d: StaffDay, excludeAppointmentId?: string, serviceId?: string): TimeRange[] {
   return [
     ...d.breaks,
     ...d.blocks,
     ...d.appointments.filter((a) => a.id !== excludeAppointmentId && occupiesTime(a)).map((a) => heldRange(state, a)),
+    ...sharedAppointments(state, d.staff.id, d.date, serviceId, excludeAppointmentId).map((a) => heldRange(state, a)),
   ];
 }
 
@@ -92,7 +106,7 @@ export function freeRanges(state: TenantData, staffId: string, date: ISODate, ex
   return subtractRanges(d.shift, busyRanges(state, d, excludeAppointmentId));
 }
 
-export type ConflictKind = 'closed' | 'not_working' | 'time_off' | 'outside_shift' | 'break' | 'block' | 'overlap' | 'not_qualified';
+export type ConflictKind = 'closed' | 'not_working' | 'time_off' | 'outside_shift' | 'break' | 'block' | 'overlap' | 'shared' | 'not_qualified';
 
 export interface Conflict {
   kind: ConflictKind;
@@ -132,19 +146,51 @@ export function checkSlot(state: TenantData, q: SlotCheck): Conflict | null {
   if (bl) return { kind: 'block', refId: bl.id };
   const clash = d.appointments.find((a) => a.id !== q.excludeAppointmentId && occupiesTime(a) && overlaps(heldRange(state, a), held));
   if (clash) return { kind: 'overlap', refId: clash.id };
+  const shared = sharedAppointments(state, q.staffId, q.date, q.serviceId, q.excludeAppointmentId).find((a) => overlaps(heldRange(state, a), held));
+  if (shared) return { kind: 'shared', refId: shared.id };
   return null;
 }
 
-export function bookingDuration(state: TenantData, serviceId: string, addOnIds: string[] = []): Minutes {
-  const s = serviceOf(state, serviceId);
-  const extra = addOnIds.reduce((sum, id) => sum + (state.addOns.find((a) => a.id === id)?.duration ?? 0), 0);
-  return (s?.duration ?? 0) + extra;
+type Priced = Pick<Service, 'duration' | 'price' | 'staffTerms'>;
+
+/** What a service takes and costs with one person. Without a person (or own terms) it's the service's own. */
+export function termsFor(service: Priced, staffId?: string | null): { duration: Minutes; price: number } {
+  const own = staffId ? service.staffTerms?.[staffId] : undefined;
+  return { duration: own?.duration ?? service.duration, price: own?.price ?? service.price };
 }
 
-export function bookingPrice(state: TenantData, serviceId: string, addOnIds: string[] = []): number {
+export interface TermsRange {
+  duration: [Minutes, Minutes];
+  price: [number, number];
+}
+
+/** Shortest–longest and cheapest–dearest across the given people (default: everyone who performs it). */
+export function termsRange(service: Priced & Pick<Service, 'staffIds'>, staffIds: string[] = service.staffIds): TermsRange {
+  const all = (staffIds.length ? staffIds : [null]).map((id) => termsFor(service, id));
+  const d = all.map((x) => x.duration);
+  const p = all.map((x) => x.price);
+  return { duration: [Math.min(...d), Math.max(...d)], price: [Math.min(...p), Math.max(...p)] };
+}
+
+export function bookingDuration(state: TenantData, serviceId: string, addOnIds: string[] = [], staffId?: string | null): Minutes {
+  const s = serviceOf(state, serviceId);
+  const extra = addOnIds.reduce((sum, id) => sum + (state.addOns.find((a) => a.id === id)?.duration ?? 0), 0);
+  return (s ? termsFor(s, staffId).duration : 0) + extra;
+}
+
+export function bookingPrice(state: TenantData, serviceId: string, addOnIds: string[] = [], staffId?: string | null): number {
   const s = serviceOf(state, serviceId);
   const extra = addOnIds.reduce((sum, id) => sum + (state.addOns.find((a) => a.id === id)?.price ?? 0), 0);
-  return (s?.price ?? 0) + extra;
+  return (s ? termsFor(s, staffId).price : 0) + extra;
+}
+
+/**
+ * Duration and price of an existing appointment if it moves to `staffId`.
+ * Staying with the same person keeps what was booked; a new person brings their own terms.
+ */
+export function termsIfMoved(state: TenantData, a: Appointment, staffId: string): { duration: Minutes; price: number } {
+  if (staffId === a.staffId) return { duration: a.duration, price: a.price };
+  return { duration: bookingDuration(state, a.serviceId, a.addOnIds, staffId), price: bookingPrice(state, a.serviceId, a.addOnIds, staffId) };
 }
 
 export function eligibleStaff(state: TenantData, serviceId: string, online = false): Staff[] {
@@ -179,7 +225,6 @@ export function availableSlots(state: TenantData, q: SlotQuery): Slot[] {
   if (q.date < here.date) return [];
   if (q.online && diffDays(q.date, here.date) > policies.maxAdvanceDays) return [];
 
-  const duration = bookingDuration(state, q.serviceId, q.addOnIds);
   const step = policies.slotInterval;
   // Minutes into q.date before which nothing may start (lead time can spill past midnight).
   const lead = q.online ? policies.leadTimeMinutes : 0;
@@ -193,7 +238,8 @@ export function availableSlots(state: TenantData, q: SlotQuery): Slot[] {
   for (const staffId of pool) {
     const d = staffDay(state, staffId, q.date);
     if (!d.shift.length) continue;
-    const busy = busyRanges(state, d, q.excludeAppointmentId);
+    const duration = bookingDuration(state, q.serviceId, q.addOnIds, staffId);
+    const busy = busyRanges(state, d, q.excludeAppointmentId, q.serviceId);
     for (const r of d.shift) {
       for (let t = Math.ceil(r.start / step) * step; t + duration <= r.end; t += step) {
         if (t < earliest) continue;

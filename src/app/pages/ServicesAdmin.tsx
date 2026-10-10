@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Drawer } from '../../components/ui/Drawer';
-import { PlusIcon } from '../../components/ui/Icons';
+import { CheckIcon, PlusIcon } from '../../components/ui/Icons';
 import { StaffAvatar, Switch } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
-import type { AddOn, Service } from '../../domain/types';
+import { termsFor, termsRange } from '../../domain/scheduling';
+import type { AddOn, Service, StaffTerms } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useLookup } from '../lookup';
 import { newId, PageHeader } from '../shared';
 import { useWorkspace } from '../workspace';
+
+const VIEWS = ['list', 'team'] as const;
+type View = (typeof VIEWS)[number];
 
 export default function ServicesAdmin() {
   const L = useLookup();
@@ -50,6 +54,7 @@ export default function ServicesAdmin() {
       items: state.services.filter((s) => !s.categoryId || !state.categories.some((c) => c.id === s.categoryId)),
     },
   ].filter((g) => g.items.length);
+  const view: View = !solo && params.get('view') === 'team' ? 'team' : 'list';
 
   return (
     <div className="page">
@@ -63,13 +68,25 @@ export default function ServicesAdmin() {
         }
       />
 
-      {groups.length === 0 && (
+      {!solo && (
+        <div className="tabs" role="tablist">
+          {VIEWS.map((v) => (
+            <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setParams(v === 'list' ? {} : { view: v }, { replace: true })}>
+              {t(`servicesAdmin.views.${v}`)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {view === 'team' && <WhoDoesWhat groups={groups} onEdit={setEditing} />}
+
+      {view === 'list' && groups.length === 0 && (
         <section className="panel">
           <p className="empty">{t('servicesAdmin.empty')}</p>
         </section>
       )}
 
-      {groups.map((g) => (
+      {view === 'list' && groups.map((g) => (
         <section className="panel" key={g.id}>
           {g.name && (
             <header className="panel__head">
@@ -77,16 +94,19 @@ export default function ServicesAdmin() {
             </header>
           )}
           <div className="list">
-            {g.items.map((s) => (
+            {g.items.map((s) => {
+              const r = termsRange(s);
+              return (
               <button key={s.id} type="button" className="list__row" onClick={() => setEditing(s)}>
                 <div className="list__main">
                   <span className="list__title">
                     {tx(s.name)}{' '}
                     {!s.active && <span className="badge badge--plain">{t('servicesAdmin.inactive')}</span>}{' '}
-                    {s.active && !s.onlineBookable && <span className="badge badge--plain">{t('servicesAdmin.hiddenOnline')}</span>}
+                    {s.active && !s.onlineBookable && <span className="badge badge--plain">{t('servicesAdmin.hiddenOnline')}</span>}{' '}
+                    {s.blocksAll && <span className="badge badge--plain">{t('servicesAdmin.blocksAllBadge')}</span>}
                   </span>
                   <span className="list__sub">
-                    {fmt.duration(s.duration)}
+                    {fmt.durationRange(r.duration)}
                     {s.bufferBefore + s.bufferAfter > 0 && ` · ${t('servicesAdmin.bufferNote', { min: s.bufferBefore + s.bufferAfter })}`}
                   </span>
                 </div>
@@ -98,13 +118,15 @@ export default function ServicesAdmin() {
                     })}
                   </span>
                 )}
-                <strong className="tabular list__price">{fmt.money(s.price)}</strong>
+                <strong className="tabular list__price">{fmt.moneyRange(r.price)}</strong>
               </button>
-            ))}
+              );
+            })}
           </div>
         </section>
       ))}
 
+      {view === 'list' && (
       <section className="panel">
         <header className="panel__head">
           <h2 className="panel__title">{t('servicesAdmin.addOns')}</h2>
@@ -137,6 +159,7 @@ export default function ServicesAdmin() {
           ))}
         </div>
       </section>
+      )}
 
       <Drawer open={!!editing} onClose={() => setEditing(null)} title={editing && !state.services.some((s) => s.id === editing.id) ? t('servicesAdmin.newService') : t('servicesAdmin.edit')}>
         {editing && (
@@ -247,21 +270,7 @@ function ServiceForm({ initial, onSaved }: { initial: Service; onSaved: () => vo
       <p id="svc-buffer-hint" className="field__hint">
         {t('servicesAdmin.fields.bufferHint')}
       </p>
-      {!solo && (
-        <fieldset className="field">
-          <legend className="field__label">{t('servicesAdmin.fields.staff')}</legend>
-          <div className="staff-pick">
-            {L.state.staff.map((st) => {
-              const on = s.staffIds.includes(st.id);
-              return (
-                <button key={st.id} type="button" aria-pressed={on} onClick={() => set('staffIds', on ? s.staffIds.filter((x) => x !== st.id) : [...s.staffIds, st.id])}>
-                  <StaffAvatar staff={st} size="sm" /> {tx(st.name)}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
-      )}
+      {!solo && <StaffTermsField service={s} onChange={setS} />}
       <label className="field">
         <span className="field__label">
           {t('servicesAdmin.fields.image')} <span className="muted">({t('common.optional')})</span>
@@ -270,12 +279,195 @@ function ServiceForm({ initial, onSaved }: { initial: Service; onSaved: () => vo
       </label>
       <Switch checked={s.active} onChange={(v) => set('active', v)} label={t('servicesAdmin.fields.active')} />
       <Switch checked={s.onlineBookable} onChange={(v) => set('onlineBookable', v)} label={t('servicesAdmin.fields.online')} />
+      <div>
+        <Switch checked={!!s.blocksAll} onChange={(v) => set('blocksAll', v || undefined)} label={t('servicesAdmin.fields.blocksAll')} />
+        <p className="field__hint">{t('servicesAdmin.fields.blocksAllHint')}</p>
+      </div>
       <div className="save-bar">
         <button type="submit" className="btn btn--ink" disabled={!valid || busy}>
           {busy ? t('common.saving') : t('common.save')}
         </button>
       </div>
     </form>
+  );
+}
+
+/** Who performs the service, and where someone's duration or price differs from the service's own. */
+function StaffTermsField({ service: s, onChange }: { service: Service; onChange: (s: Service) => void }) {
+  const L = useLookup();
+  const { t, tx, fmt } = useI18n();
+  const people = L.state.staff.filter((st) => st.active || s.staffIds.includes(st.id));
+  const toggle = (id: string, on: boolean) => onChange({ ...s, staffIds: on ? [...s.staffIds, id] : s.staffIds.filter((x) => x !== id) });
+  const setTerm = (id: string, key: keyof StaffTerms, raw: string) => {
+    const n = raw === '' ? undefined : Math.max(0, Number(raw) || 0);
+    onChange({ ...s, staffTerms: { ...s.staffTerms, [id]: { ...s.staffTerms?.[id], [key]: n } } });
+  };
+
+  return (
+    <fieldset className="field">
+      <legend className="field__label">{t('servicesAdmin.fields.staff')}</legend>
+      <p className="field__hint" id="svc-terms-hint">
+        {t('servicesAdmin.terms.hint', { duration: fmt.duration(s.duration), price: fmt.money(s.price) })}
+      </p>
+      <div className="terms" role="group" aria-describedby="svc-terms-hint">
+        <div className="terms__head" aria-hidden="true">
+          <span />
+          <span>{t('servicesAdmin.terms.duration')}</span>
+          <span>{t('servicesAdmin.terms.price')}</span>
+        </div>
+        {people.map((st) => {
+          const on = s.staffIds.includes(st.id);
+          const own = s.staffTerms?.[st.id];
+          const name = tx(st.name);
+          return (
+            <div key={st.id} className="terms__row" data-on={on}>
+              <label className="terms__who">
+                <input type="checkbox" checked={on} onChange={(e) => toggle(st.id, e.target.checked)} />
+                <StaffAvatar staff={st} size="sm" />
+                <span className="terms__name">{name}</span>
+              </label>
+              <input
+                className="field__input terms__num"
+                type="number"
+                inputMode="numeric"
+                dir="ltr"
+                min={5}
+                step={5}
+                disabled={!on}
+                placeholder={String(s.duration)}
+                value={on ? own?.duration ?? '' : ''}
+                aria-label={`${t('servicesAdmin.terms.duration')}, ${name}`}
+                onChange={(e) => setTerm(st.id, 'duration', e.target.value)}
+              />
+              <input
+                className="field__input terms__num"
+                type="number"
+                inputMode="decimal"
+                dir="ltr"
+                min={0}
+                disabled={!on}
+                placeholder={String(s.price)}
+                value={on ? own?.price ?? '' : ''}
+                aria-label={`${t('servicesAdmin.terms.price')}, ${name}`}
+                onChange={(e) => setTerm(st.id, 'price', e.target.value)}
+              />
+            </div>
+          );
+        })}
+      </div>
+      {s.staffIds.length === 0 && <p className="field__error">{t('servicesAdmin.terms.none')}</p>}
+    </fieldset>
+  );
+}
+
+/** Services × team in one grid: tap a cell to assign or unassign. */
+function WhoDoesWhat({ groups, onEdit }: { groups: { id: string; name: string; items: Service[] }[]; onEdit: (s: Service) => void }) {
+  const L = useLookup();
+  const { t, tx, fmt } = useI18n();
+  const toast = useToast();
+  const { api } = useWorkspace();
+  const [pending, setPending] = useState<string | null>(null);
+  const staff = L.state.staff.filter((s) => s.active);
+
+  const toggle = async (svc: Service, staffId: string) => {
+    const on = svc.staffIds.includes(staffId);
+    if (on && svc.staffIds.length === 1) {
+      toast(t('servicesAdmin.matrix.lastOne'));
+      return;
+    }
+    const key = `${svc.id}:${staffId}`;
+    setPending(key);
+    try {
+      await api.saveService({ ...svc, staffIds: on ? svc.staffIds.filter((x) => x !== staffId) : [...svc.staffIds, staffId] });
+      toast(t(on ? 'servicesAdmin.matrix.removed' : 'servicesAdmin.matrix.added', { service: tx(svc.name), staff: tx(L.staff.get(staffId)?.name) }));
+    } catch {
+      toast(t('common.unknownError'));
+    } finally {
+      setPending((p) => (p === key ? null : p));
+    }
+  };
+
+  if (!groups.length) {
+    return (
+      <section className="panel">
+        <p className="empty">{t('servicesAdmin.empty')}</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="panel matrix-panel">
+      <div className="matrix-scroll">
+        <table className="table matrix">
+          <thead>
+            <tr>
+              <th scope="col">{t('servicesAdmin.matrix.service')}</th>
+              {staff.map((st) => (
+                <th key={st.id} scope="col" className="matrix__staff">
+                  <StaffAvatar staff={st} size="sm" />
+                  <span>{tx(st.name).split(' ')[0]}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          {groups.map((g) => (
+            <tbody key={g.id}>
+              {g.name && (
+                <tr className="matrix__group">
+                  <th scope="rowgroup" colSpan={staff.length + 1}>
+                    {g.name}
+                  </th>
+                </tr>
+              )}
+              {g.items.map((svc) => (
+                <tr key={svc.id} data-inactive={!svc.active || undefined}>
+                  <th scope="row">
+                    <div className="matrix__service">
+                      <button type="button" className="row-btn table__primary" onClick={() => onEdit(svc)}>
+                        {tx(svc.name)}
+                      </button>
+                      <span className="table__sub">
+                        {fmt.duration(svc.duration)} · {fmt.money(svc.price)}
+                      </span>
+                    </div>
+                  </th>
+                  {staff.map((st) => {
+                    const on = svc.staffIds.includes(st.id);
+                    const own = on && svc.staffTerms?.[st.id] ? termsFor(svc, st.id) : null;
+                    const busy = pending === `${svc.id}:${st.id}`;
+                    return (
+                      <td key={st.id} className="matrix__cell">
+                        <button
+                          type="button"
+                          className="matrix__toggle"
+                          aria-pressed={on}
+                          aria-busy={busy || undefined}
+                          disabled={busy}
+                          aria-label={`${tx(svc.name)}, ${tx(st.name)}`}
+                          onClick={() => toggle(svc, st.id)}
+                        >
+                          <span className="matrix__dot" aria-hidden="true">
+                            {on && <CheckIcon size={12} />}
+                          </span>
+                          {own && (
+                            <span className="matrix__terms tabular">
+                              {fmt.money(own.price)}
+                              <br />
+                              {fmt.duration(own.duration)}
+                            </span>
+                          )}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          ))}
+        </table>
+      </div>
+      <p className="matrix__foot">{t('servicesAdmin.matrix.hint')}</p>
+    </section>
   );
 }
 
