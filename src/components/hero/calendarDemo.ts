@@ -44,10 +44,10 @@ export const APPTS: DemoAppt[] = [
 
 export const TOTAL = APPTS.length;
 
-/** How many appointments are booked at scroll progress p (0..1). */
-export function bookedAt(p: number) {
-  const rest = TOTAL - PREBOOKED;
-  let n = PREBOOKED;
-  for (let i = 0; i < rest; i++) if (p >= 0.06 + (i * 0.8) / (rest - 1)) n++;
+/** How many of `total` appointments are booked at scroll progress p (0..1), `pre` of them from the start. */
+export function bookedAt(p: number, total = TOTAL, pre = PREBOOKED) {
+  const rest = total - pre;
+  let n = pre;
+  for (let i = 0; i < rest; i++) if (p >= 0.06 + (i * 0.8) / Math.max(1, rest - 1)) n++;
   return n;
 }

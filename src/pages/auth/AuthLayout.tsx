@@ -18,7 +18,6 @@ export function AuthLayout({ title, lede, children, aside, variant }: { title: s
       </header>
       <div className="auth__stage" aria-hidden>
         <AuthScene variant={variant} />
-        <p className="auth__stage-caption">{t(variant === 'signUp' ? 'auth.scene.captionUp' : 'auth.scene.captionIn')}</p>
       </div>
       <main className="auth__main" id="main">
         <section className="auth__card">

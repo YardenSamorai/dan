@@ -1,7 +1,6 @@
 /**
- * Product-level identity. The SaaS brand is not decided yet: everything that
- * names the product reads from here, so choosing the final name is a one-line
- * change (or a VITE_APP_NAME env var) rather than a refactor.
+ * Product-level identity. Everything that names the product reads from here,
+ * so a rename is a one-line change (or a VITE_APP_NAME env var) rather than a refactor.
  *
  * Storage keys use a brand-neutral prefix so a rename never loses local data.
  */
@@ -9,7 +8,7 @@
 const env: Partial<ImportMetaEnv> = import.meta.env ?? {};
 
 export const PRODUCT = {
-  name: env.VITE_APP_NAME?.trim() || 'APP_NAME',
+  name: env.VITE_APP_NAME?.trim() || 'תורנו',
   storagePrefix: 'saas',
 } as const;
 

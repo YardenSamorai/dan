@@ -589,19 +589,213 @@ html[lang='he'] .chapter__title {
   margin-block-start: var(--s-8);
 }
 
+/* ── Who it's for: pick a field, see its page ─────────────────── */
 .mk-types {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-10);
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .mk-types {
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    gap: clamp(40px, 6vw, 96px);
+  }
+}
+
+.mk-types__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin-block-start: var(--s-8);
 }
 
-.mk-types li {
+.mk-types__chips button {
   padding: 10px 18px;
+  border: 0;
   border-radius: var(--r-pill);
   background: var(--white);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--ink-2);
+  font: inherit;
   font-size: var(--text-md);
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+
+.mk-types__chips button:hover {
+  box-shadow: inset 0 0 0 1px var(--ink-4);
+}
+
+.mk-types__chips button[aria-selected='true'] {
+  background: var(--ink);
+  box-shadow: none;
+  color: var(--white);
+}
+
+.mk-types__chips button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+@media (max-width: 899px) {
+  .mk-types__chips {
+    flex-wrap: nowrap;
+    margin-inline: calc(-1 * var(--gutter));
+    padding-inline: var(--gutter);
+    padding-block: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .mk-types__chips::-webkit-scrollbar {
+    display: none;
+  }
+  .mk-types__chips button {
+    flex: none;
+  }
+}
+
+.mk-types__panel {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  padding: clamp(28px, 4vw, 48px) clamp(20px, 4vw, 40px) 0;
+  border-radius: var(--r-xl);
+  background: linear-gradient(180deg, #ececea, #e6e6e3);
+  overflow: hidden;
+}
+
+.mk-types__page {
+  display: grid;
+  gap: 10px;
+  width: min(300px, 100%);
+  min-height: 440px;
+  align-content: start;
+  padding: 18px 18px 140px;
+  border-radius: 30px 30px 0 0;
+  background: var(--surface);
+  box-shadow: 0 0 0 7px #1c1c1e, 0 0 0 8px #3a3a3c, 0 30px 60px -20px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+  animation: typesIn 420ms var(--ease-out);
+}
+
+.mk-types__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px;
+  border-radius: 16px;
+  background: var(--accent-tint);
+}
+
+.mk-types__head span:last-child {
+  display: grid;
+}
+
+.mk-types__head b {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.mk-types__head small {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.mk-types__mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--accent);
+  color: var(--white);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.mk-types__label {
+  margin-block-start: 6px;
+  font-weight: 650;
+}
+
+.mk-types__svcs li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-block: 11px;
+  border-block-start: 1px solid var(--line);
+}
+
+.mk-types__svcs span {
+  display: grid;
+}
+
+.mk-types__svcs b {
+  font-weight: 600;
+}
+
+.mk-types__svcs small {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.mk-types__svcs em {
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--white);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.mk-types__fit {
+  position: absolute;
+  inset-block-end: 20px;
+  inset-inline: 20px;
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--white) 88%, transparent);
+  box-shadow: var(--shadow-2), var(--edge);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  animation: typesIn 520ms var(--ease-out) 120ms both;
+}
+
+.mk-types__fit small {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.mk-types__fit b {
+  font-size: var(--text-15);
+  font-weight: 650;
+}
+
+.mk-types__fit p {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+@keyframes typesIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-types__page,
+  .mk-types__fit {
+    animation: none;
+  }
 }
 
 .mk-honest {
@@ -614,13 +808,1609 @@ html[lang='he'] .chapter__title {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
-.mk-honest p:last-child {
+.mk-honest ul {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.mk-honest li {
+  position: relative;
+  padding-inline-start: 20px;
   color: var(--ink-2);
-  line-height: 1.65;
+  line-height: 1.6;
+}
+
+.mk-honest li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 2px;
+  top: 0.68em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
+}
+
+/* ── Page designer (live) ─────────────────────────────────────── */
+.chapter__stage[data-interactive] {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+.vig-design {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+  max-width: 600px;
+}
+
+@media (min-width: 640px) {
+  .vig-design {
+    grid-template-columns: 180px minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.vig-design__controls {
+  display: grid;
+  gap: 16px;
+}
+
+.vig-design__controls fieldset {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vig-design__controls legend {
+  margin-block-end: 8px;
+  padding: 0;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.vig-design__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vig-design__chips button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--text-13);
+  font-weight: 550;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+
+.vig-design__chips button:hover {
+  box-shadow: inset 0 0 0 1px var(--ink-4);
+}
+
+.vig-design__chips button[aria-pressed='true'] {
+  background: var(--ink);
+  box-shadow: none;
+  color: var(--white);
+}
+
+.vig-design__swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 28px);
+  gap: 8px;
+}
+
+.vig-design__swatches button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--c);
+  cursor: pointer;
+  transition: box-shadow var(--t-fast), transform var(--t-fast);
+}
+
+.vig-design__swatches button:hover {
+  transform: scale(1.08);
+}
+
+.vig-design__swatches button[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px #e9e9e6, 0 0 0 4px var(--c);
+}
+
+.vig-design__controls button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.vig-design__hint {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+@media (max-width: 639px) {
+  .vig-design__swatches {
+    grid-template-columns: repeat(8, 28px);
+  }
+}
+
+/* The mini booking page. Theme values mirror .tenant[data-theme] in booking/page.css. */
+.vig-site {
+  --s-bg: var(--surface);
+  --s-ink: var(--ink);
+  --s-ink-3: var(--ink-3);
+  --s-line: var(--line);
+  --s-card: var(--surface-2);
+  --s-r: 12px;
+  --s-btn-r: 10px;
+  --s-font: var(--font-sans);
+  --s-weight: 700;
+  display: grid;
+  gap: 14px;
+  padding: 18px 16px 20px;
+  border-radius: 22px;
+  background: var(--s-bg);
+  box-shadow: var(--shadow-3), var(--edge);
+  color: var(--s-ink);
+  font-size: 12px;
+  transition: background var(--t-base), color var(--t-base), border-radius var(--t-base);
+}
+
+.vig-site[data-theme='soft'] {
+  --s-bg: color-mix(in oklab, var(--accent) 6%, #fbfaf8);
+  --s-card: #ffffff;
+  --s-r: 20px;
+  --s-btn-r: 999px;
+  --s-font: 'Varela Round', var(--font-sans);
+  --s-weight: 400;
+}
+
+.vig-site[data-theme='editorial'] {
+  --s-bg: #f6f2ea;
+  --s-card: #fbf9f4;
+  --s-line: rgba(48, 36, 20, 0.12);
+  --s-r: 3px;
+  --s-btn-r: 3px;
+  --s-font: 'Frank Ruhl Libre', Georgia, serif;
+  --s-weight: 700;
+  border-radius: 6px;
+}
+
+.vig-site[data-theme='night'] {
+  --s-bg: #0e0e10;
+  --s-card: #1a1a1d;
+  --s-ink: #f5f5f7;
+  --s-ink-3: #a1a1a6;
+  --s-line: rgba(255, 255, 255, 0.09);
+  --accent-text: color-mix(in oklab, var(--accent) 45%, #fff);
+}
+
+.vig-site[data-theme='night'] .vig-site__hero {
+  background: color-mix(in oklab, var(--accent) 22%, var(--s-card));
+}
+
+.vig-site[data-theme='night'] :is(.vig-site__btn, .vig-site__mark) {
+  background: var(--accent-text);
+  color: #0e0e10;
+}
+
+.vig-site__hero {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 18px 12px 16px;
+  border-radius: var(--s-r);
+  background: color-mix(in oklab, var(--accent) 10%, var(--s-card));
+  text-align: center;
+}
+
+.vig-site__mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-block-end: 4px;
+  border-radius: calc(var(--s-r) * 0.7);
+  background: var(--accent);
+  color: var(--white);
+  font-family: var(--s-font);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.vig-site__name {
+  font-family: var(--s-font);
+  font-size: 19px;
+  font-weight: var(--s-weight);
+  letter-spacing: -0.01em;
+}
+
+.vig-site__tagline {
+  color: var(--s-ink-3);
+}
+
+.vig-site__btn {
+  margin-block-start: 8px;
+  padding: 8px 18px;
+  border-radius: var(--s-btn-r);
+  background: var(--accent);
+  color: var(--white);
+  font-weight: 600;
+}
+
+.vig-site__gallery {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  animation: vigIn var(--t-slow) var(--ease-out);
+}
+
+.vig-site__gallery i {
+  aspect-ratio: 1;
+  border-radius: calc(var(--s-r) * 0.6);
+  background: linear-gradient(
+    calc(135deg + var(--i) * 40deg),
+    color-mix(in oklab, var(--accent) calc(20% + var(--i) * 12%), #f3e9e4),
+    color-mix(in oklab, var(--accent) calc(55% - var(--i) * 8%), #d9c7bd)
+  );
+}
+
+.vig-site__block {
+  display: grid;
+  gap: 2px;
+  animation: vigIn var(--t-slow) var(--ease-out);
+}
+
+.vig-site__h {
+  margin-block-end: 4px;
+  font-family: var(--s-font);
+  font-size: 14px;
+  font-weight: var(--s-weight);
+}
+
+.vig-site__svc {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-block: 8px;
+  border-block-start: 1px solid var(--s-line);
+}
+
+.vig-site__svc span {
+  display: grid;
+}
+
+.vig-site__svc b {
+  font-family: var(--s-font);
+  font-weight: var(--s-weight);
+  font-size: 13px;
+}
+
+.vig-site__svc small {
+  color: var(--s-ink-3);
+  font-size: 11px;
+}
+
+.vig-site__svc em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--accent-text, var(--accent));
+}
+
+.vig-site__review {
+  padding: 12px 14px;
+  border-radius: var(--s-r);
+  background: var(--s-card);
+  box-shadow: inset 0 0 0 1px var(--s-line);
+}
+
+.vig-site__review p {
+  font-family: var(--s-font);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.vig-site__review small {
+  color: var(--s-ink-3);
+}
+
+.vig-site__faq {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-block: 10px 0;
+  border-block-start: 1px solid var(--s-line);
+  font-weight: 600;
+}
+
+.vig-site__faq i {
+  font-style: normal;
+  color: var(--s-ink-3);
+  font-size: 16px;
+}
+
+@keyframes vigIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vig-site__gallery,
+  .vig-site__block {
+    animation: none;
+  }
+}
+
+/* ── Customer's own appointment ───────────────────────────────── */
+.vig-self__card {
+  display: grid;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--accent-tint);
+}
+
+.vig-self__card b {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.vig-self__card small {
+  margin-block-start: 4px;
+  color: var(--ink-3);
+}
+
+.vig-self__card small span {
+  color: var(--ink);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.vig-self__deadline {
+  margin-block: 12px;
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+
+.vig-self__actions {
+  display: grid;
+  gap: 8px;
+  padding-block-end: 6px;
+  text-align: center;
+}
+
+.vig-self__ghost,
+.vig-self__danger {
+  padding: 9px 16px;
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font-weight: 600;
+}
+
+.vig-self__danger {
+  box-shadow: none;
+  color: var(--danger);
+}
+
+/* ── Insights ─────────────────────────────────────────────────── */
+.vig-ins {
+  display: grid;
+  gap: 14px;
+  width: min(400px, 100%);
+  padding: 20px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-3), var(--edge);
+  font-size: 13px;
+}
+
+.vig-ins__period {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.vig-ins__revenue {
+  display: grid;
+  gap: 2px;
+}
+
+.vig-ins__revenue span {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.vig-ins__revenue b {
+  justify-self: start;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.vig-ins__revenue em {
+  font-style: normal;
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vig-ins__chart {
+  display: flex;
+  align-items: end;
+  gap: 4px;
+  height: 88px;
+  padding-block-end: 1px;
+  border-block-end: 1px solid var(--line);
+}
+
+.vig-ins__chart i {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  background: color-mix(in srgb, var(--brand) 22%, var(--white));
+}
+
+.vig-ins__chart i[data-peak] {
+  background: var(--brand);
+}
+
+.vig-ins__kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.vig-ins__kpis div {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-sunken);
+}
+
+.vig-ins__kpis dt,
+.vig-ins__kpis small {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.vig-ins__kpis dd {
+  font-size: 18px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.vig-ins__meter {
+  display: block;
+  height: 4px;
+  margin-block-start: 4px;
+  border-radius: 2px;
+  background: var(--track);
+}
+
+.vig-ins__meter i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--brand);
+}
+
+.vig-ins__lost {
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--danger-tint);
+  color: var(--ink-2);
+}
+
+.vig-ins__busy {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+/* ── How it works: three steps that play in turn ──────────────── */
+.mk-how {
+  display: grid;
+  gap: var(--s-6);
+  margin-block-start: var(--s-12);
+}
+
+@media (min-width: 900px) {
+  .mk-how {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--s-5);
+  }
+}
+
+.mk-how__step {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  align-content: start;
+  gap: var(--s-4);
+  padding: var(--s-5) var(--s-5) var(--s-6);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  transition: background var(--t-base), box-shadow var(--t-base);
+}
+
+.mk-how__step[data-state='active'] {
+  background: var(--white);
+  box-shadow: var(--shadow-2), var(--edge);
+}
+
+.mk-how__head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: var(--s-4) var(--s-3);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.mk-how__head:focus-visible {
+  outline: none;
+  border-radius: var(--r-xs);
+  box-shadow: var(--focus);
+}
+
+.mk-how__bar {
+  grid-column: 1 / -1;
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  overflow: hidden;
+}
+
+.mk-how__bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.mk-how__step[data-state='done'] .mk-how__bar i {
+  width: 100%;
+}
+
+.mk-how__step[data-state='active'] .mk-how__bar i {
+  animation: howBar 5600ms linear both;
+}
+
+@keyframes howBar {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.mk-how__num {
+  color: var(--accent);
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-how__head h3 {
+  font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+
+.mk-how__art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 200px;
+  padding: 16px;
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, #ececea, #e6e6e3);
+  overflow: hidden;
+  font-size: 12px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.mk-how__body {
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+.mk-how__points {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.mk-how__points li {
+  position: relative;
+  padding-inline-start: 22px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.mk-how__points li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 2px;
+  top: 0.45em;
+  width: 10px;
+  height: 6px;
+  border-left: 1.75px solid var(--accent);
+  border-bottom: 1.75px solid var(--accent);
+  transform: rotate(-45deg);
+}
+
+/* Step 1: a service is filled in, the working days light up, and it saves. */
+.how-setup {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  width: min(250px, 100%);
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-2), var(--edge);
+}
+
+.how-setup__label {
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.how-setup__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.how-field {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding-inline: 9px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font-weight: 550;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.how-field--name {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.how-type {
+  display: inline-block;
+  overflow: hidden;
+}
+
+.how-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.how-days span {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--fill);
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.how-days span[data-on] {
+  background: var(--accent);
+  color: var(--white);
+}
+
+.how-saved {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 10px;
+  padding: 2px 8px 2px 18px;
+  border-radius: var(--r-pill);
+  background: var(--success-tint);
+  color: var(--success);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.how-saved::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 6px;
+  width: 6px;
+  height: 3.5px;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.how-setup[data-play] .how-type {
+  animation: howType 900ms steps(12, end) 200ms both;
+}
+
+.how-setup[data-play] .how-field--d {
+  animation: howPop 380ms var(--ease-out) 1300ms both;
+}
+
+.how-setup[data-play] .how-field--p {
+  animation: howPop 380ms var(--ease-out) 1650ms both;
+}
+
+.how-setup[data-play] .how-days span[data-on] {
+  animation: howDay 300ms var(--ease-out) calc(2100ms + var(--i) * 140ms) both;
+}
+
+.how-setup[data-play] .how-saved {
+  animation: howPop 420ms var(--ease-spring) 3300ms both;
+}
+
+@keyframes howType {
+  from {
+    max-width: 0;
+  }
+  to {
+    max-width: 100%;
+  }
+}
+
+@keyframes howPop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes howDay {
+  from {
+    background: var(--fill);
+    color: var(--ink-3);
+    transform: scale(0.9);
+  }
+}
+
+/* Step 2: the link is copied and sent, and a customer writes back. */
+.how-share {
+  display: grid;
+  gap: 10px;
+  width: min(260px, 100%);
+}
+
+.how-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  direction: ltr;
+}
+
+.how-link > span {
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.how-link b {
+  position: relative;
+  display: grid;
+  flex: none;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--success-tint);
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.how-link b::before,
+.how-link b::after {
+  grid-area: 1 / 1;
+  text-align: center;
+}
+
+.how-link b::before {
+  content: attr(data-a);
+  visibility: hidden;
+}
+
+.how-link b::after {
+  content: attr(data-b);
+}
+
+.how-chat {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  background: #e9e3d9;
+}
+
+.how-bubble {
+  max-width: 85%;
+  padding: 6px 9px;
+  border-radius: 10px;
+  line-height: 1.35;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
+}
+
+.how-bubble--out {
+  justify-self: start;
+  display: grid;
+  gap: 5px;
+  background: #d9fdd3;
+}
+
+.how-bubble--in {
+  justify-self: end;
+  background: var(--white);
+}
+
+.how-preview {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.how-preview i {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: #9c3f5a;
+  color: var(--white);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.how-preview span {
+  display: grid;
+}
+
+.how-preview small {
+  color: var(--ink-3);
+  font-size: 10.5px;
+}
+
+.how-share[data-play] .how-link b {
+  animation: howCopy 5600ms step-end both;
+}
+
+.how-share[data-play] .how-link b::before {
+  animation: howShow 5600ms step-end both;
+}
+
+.how-share[data-play] .how-link b::after {
+  animation: howHide 5600ms step-end both;
+}
+
+.how-share[data-play] .how-bubble--out {
+  animation: howBubble 460ms var(--ease-out) 1500ms both;
+}
+
+.how-share[data-play] .how-bubble--in {
+  animation: howBubble 460ms var(--ease-out) 3000ms both;
+}
+
+@keyframes howCopy {
+  0% {
+    background: var(--ink);
+    color: var(--white);
+  }
+  18% {
+    background: var(--success-tint);
+    color: var(--success);
+  }
+}
+
+@keyframes howShow {
+  0% {
+    visibility: visible;
+  }
+  18% {
+    visibility: hidden;
+  }
+}
+
+@keyframes howHide {
+  0% {
+    visibility: hidden;
+  }
+  18% {
+    visibility: visible;
+  }
+}
+
+@keyframes howBubble {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+
+/* Step 3: a booking lands, and another is dragged to a later time. */
+.how-manage {
+  display: grid;
+  gap: 8px;
+  width: min(250px, 100%);
+}
+
+.how-manage__next {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.how-manage__next span {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.how-manage__next b {
+  font-weight: 650;
+}
+
+.how-day {
+  position: relative;
+  height: 118px;
+  margin-inline-start: 36px;
+  border-radius: 8px;
+  background: var(--surface) repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px 25%);
+  box-shadow: var(--shadow-1);
+}
+
+.how-day__hour {
+  position: absolute;
+  inset-inline-start: -36px;
+  margin-block-start: 2px;
+  color: var(--ink-4);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.how-appt {
+  position: absolute;
+  inset-inline: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-block-start: 2px;
+  padding-inline: 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, #c24d6b 15%, var(--white));
+  box-shadow: inset 2.5px 0 0 #c24d6b;
+  font-weight: 600;
+}
+
+html[dir='rtl'] .how-appt {
+  box-shadow: inset -2.5px 0 0 #c24d6b;
+}
+
+.how-appt em {
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: #c24d6b;
+  color: var(--white);
+  font-size: 9.5px;
+  font-style: normal;
+}
+
+.how-appt--new {
+  outline: 1.5px solid #c24d6b;
+}
+
+.how-manage[data-play] .how-appt--new {
+  animation: howLand 560ms var(--ease-out) 600ms both;
+}
+
+.how-manage[data-play] .how-appt--move {
+  animation: howDrag 1500ms var(--ease-in-out) 2100ms both;
+}
+
+@keyframes howLand {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.94);
+  }
+  60% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes howDrag {
+  0% {
+    top: 50%;
+  }
+  20% {
+    top: 50%;
+    transform: scale(1.04);
+    box-shadow: 0 10px 22px -8px rgba(0, 0, 0, 0.35);
+  }
+  80% {
+    top: 75%;
+    transform: scale(1.04);
+    box-shadow: 0 10px 22px -8px rgba(0, 0, 0, 0.35);
+  }
+  100% {
+    top: 75%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-how [data-play] *,
+  .mk-how [data-play] *::before,
+  .mk-how [data-play] *::after {
+    animation: none !important;
+  }
+}
+
+/* ── Switching ────────────────────────────────────────────────── */
+.mk-switch {
+  display: grid;
+  gap: var(--s-6);
+  margin-block-start: var(--s-10);
+}
+
+@media (min-width: 900px) {
+  .mk-switch {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.mk-switch__item {
+  display: grid;
+  align-content: start;
+  gap: var(--s-2);
+  padding: var(--s-6);
+  border-radius: var(--r-lg);
+  background: var(--white);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.mk-switch__item h3 {
+  font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+
+.mk-switch__item p {
+  color: var(--ink-3);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.mk-switch__art {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 84px;
+  margin-block-end: var(--s-2);
+  direction: ltr;
+}
+
+.mk-file {
+  position: relative;
+  display: grid;
+  place-items: end start;
+  width: 50px;
+  height: 62px;
+  padding: 6px;
+  border-radius: 6px 14px 6px 6px;
+  background: #e7f3ec;
+  box-shadow: inset 0 0 0 1px rgba(31, 122, 77, 0.25);
+}
+
+.mk-file b {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--success);
+  color: var(--white);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.mk-file--json {
+  background: var(--info-tint);
+  box-shadow: inset 0 0 0 1px rgba(43, 95, 180, 0.25);
+}
+
+.mk-file--json b {
+  background: var(--info);
+}
+
+.mk-arrow {
+  width: 28px;
+  height: 2px;
+  background: var(--ink-4);
+  position: relative;
+}
+
+.mk-arrow::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-block-start: 2px solid var(--ink-4);
+  border-inline-end: 2px solid var(--ink-4);
+  transform: rotate(45deg);
+}
+
+.mk-rows {
+  display: grid;
+  gap: 6px;
+  width: 78px;
+}
+
+.mk-rows i {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--fill-2);
+}
+
+.mk-rows i:first-child {
+  background: color-mix(in srgb, var(--brand) 25%, var(--white));
+}
+
+.mk-cal {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  width: 58px;
+  height: 62px;
+  padding-block-start: 14px;
+  border-radius: 12px;
+  background: var(--white);
+  box-shadow: inset 0 14px 0 #e0443a, var(--shadow-1);
+}
+
+.mk-cal b {
+  font-size: 24px;
+  font-weight: 650;
+}
+
+.mk-cal--g {
+  box-shadow: inset 0 14px 0 #2b5fb4, var(--shadow-1);
+}
+
+.mk-cal--g i {
+  width: 36px;
+  height: 9px;
+  border-radius: 3px;
+  background: color-mix(in srgb, #c24d6b 30%, var(--white));
+}
+
+.mk-cal--g i + i {
+  background: color-mix(in srgb, #8a63b8 30%, var(--white));
+}
+
+.mk-sync {
+  position: relative;
+  width: 30px;
+  border-block-start: 2px dashed var(--ink-4);
+}
+
+.mk-sync::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  opacity: 0;
 }
 
 @media (max-width: 600px) {
   .mk-honest {
     padding: var(--s-6);
+  }
+}
+
+/* ── Scenes: while on screen, each illustration acts out its idea ──
+ * useLoop sets [data-play] and restarts the scene; every rule here animates *from*
+ * an earlier moment, so the static illustration is always the last frame. */
+
+/* Booking page: pick a day, the times appear, pick a time, continue. */
+.chapter__stage[data-play] .vig-phone__progress b {
+  animation: vigProgress 700ms var(--ease-out) 300ms both;
+}
+
+.chapter__stage[data-play] .vig-day[data-on] {
+  animation: vigPickDay 360ms var(--ease-out) 800ms both;
+}
+
+.chapter__stage[data-play] .vig-day[data-on] small {
+  animation: vigPickSmall 360ms var(--ease-out) 800ms both;
+}
+
+.chapter__stage[data-play] :is(.vig-phone__day, .vig-phone__label) {
+  animation: vigFade 400ms var(--ease-out) 1150ms both;
+}
+
+.chapter__stage[data-play] .vig-slots span {
+  animation: vigRise 360ms var(--ease-out) calc(1300ms + var(--i) * 70ms) both;
+}
+
+.chapter__stage[data-play] .vig-slots [data-on] {
+  animation:
+    vigRise 360ms var(--ease-out) calc(1300ms + var(--i) * 70ms) both,
+    vigPickSlot 360ms var(--ease-out) 2300ms both;
+}
+
+.chapter__stage[data-play] .vig-day[data-on],
+.chapter__stage[data-play] .vig-slots [data-on] {
+  position: relative;
+}
+
+.chapter__stage[data-play] .vig-day[data-on]::after,
+.chapter__stage[data-play] .vig-slots [data-on]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: vigTap 700ms var(--ease-out) 800ms both;
+}
+
+.chapter__stage[data-play] .vig-slots [data-on]::after {
+  animation-delay: 2300ms;
+}
+
+.chapter__stage[data-play] .vig-phone__foot {
+  animation: vigRise 460ms var(--ease-out) 2900ms both;
+}
+
+.chapter__stage[data-play] .vig-phone__foot .vig-phone__cta {
+  animation: vigPulse 900ms var(--ease-out) 3600ms both;
+}
+
+/* Calendar: the day fills in, a new booking lands, time moves on. */
+.chapter__stage[data-play] .vig-b {
+  animation: vigBlock 420ms var(--ease-out) calc(300ms + var(--i) * 110ms) both;
+}
+
+.chapter__stage[data-play] .vig-b[data-status='pending'] {
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+  animation:
+    vigLand 600ms var(--ease-out) 2600ms both,
+    vigFlash 1800ms var(--ease-out) 3000ms both;
+}
+
+.chapter__stage[data-play] .vig-cal__now {
+  animation: vigNow 2600ms var(--ease-in-out) 200ms both;
+}
+
+/* Self-serve: the appointment, the actions it allows, a reschedule. */
+.chapter__stage[data-play] .vig-self__card {
+  animation:
+    vigRise 460ms var(--ease-out) 200ms both,
+    vigCardFlash 1200ms var(--ease-out) 2900ms both;
+}
+
+.chapter__stage[data-play] .vig-self__deadline {
+  animation: vigFade 400ms var(--ease-out) 700ms both;
+}
+
+.chapter__stage[data-play] .vig-self__actions > * {
+  animation: vigRise 380ms var(--ease-out) calc(1000ms + var(--i) * 110ms) both;
+}
+
+.chapter__stage[data-play] .vig-self__actions .vig-phone__cta {
+  animation:
+    vigRise 380ms var(--ease-out) 1000ms both,
+    vigPulse 900ms var(--ease-out) 2400ms both;
+}
+
+/* Customer: the visits add up, then what's next and what happened before. */
+@property --n {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 0;
+}
+
+.chapter__stage[data-play] .vig-person__head {
+  animation: vigFade 400ms var(--ease-out) 100ms both;
+}
+
+.chapter__stage[data-play] .vig-count {
+  counter-reset: n var(--n);
+  animation: vigCount 1300ms var(--ease-out) 400ms both;
+}
+
+.chapter__stage[data-play] .vig-count span {
+  display: none;
+}
+
+.chapter__stage[data-play] .vig-count::before {
+  content: counter(n);
+}
+
+.chapter__stage[data-play] .vig-person__next {
+  animation: vigRise 420ms var(--ease-out) 1500ms both;
+}
+
+.chapter__stage[data-play] .vig-person__note {
+  animation: vigRise 420ms var(--ease-out) 1900ms both;
+}
+
+.chapter__stage[data-play] .vig-person__history li {
+  animation: vigRise 380ms var(--ease-out) calc(2300ms + var(--i) * 140ms) both;
+}
+
+/* Insights: two weeks grow into a chart, then the numbers that matter. */
+.chapter__stage[data-play] .vig-ins__chart i {
+  transform-origin: bottom;
+  animation: vigBar 520ms var(--ease-out) calc(200ms + var(--i) * 45ms) both;
+}
+
+.chapter__stage[data-play] .vig-ins__revenue em {
+  animation: howPop 380ms var(--ease-out) 1100ms both;
+}
+
+.chapter__stage[data-play] .vig-ins__kpis div {
+  animation: vigRise 420ms var(--ease-out) 1000ms both;
+}
+
+.chapter__stage[data-play] .vig-ins__meter i {
+  animation: vigMeter 900ms var(--ease-out) 1300ms both;
+}
+
+.chapter__stage[data-play] .vig-ins__lost {
+  animation: vigRise 420ms var(--ease-out) 2000ms both;
+}
+
+.chapter__stage[data-play] .vig-ins__busy {
+  animation: vigFade 420ms var(--ease-out) 2300ms both;
+}
+
+/* Switching: a spreadsheet becomes rows, calendars sync, the data fans out. */
+.mk-switch[data-play] .mk-file:not(.mk-file--csv, .mk-file--json) {
+  animation: vigNudge 600ms var(--ease-out) 200ms both;
+}
+
+.mk-switch[data-play] .mk-arrow {
+  transform-origin: left;
+  animation: vigGrowX 420ms var(--ease-out) 700ms both;
+}
+
+.mk-switch[data-play] .mk-rows i {
+  transform-origin: left;
+  animation: vigRow 420ms var(--ease-out) calc(1100ms + var(--i) * 160ms) both;
+}
+
+.mk-switch[data-play] .mk-cal:not(.mk-cal--g) {
+  animation: howPop 380ms var(--ease-out) 200ms both;
+}
+
+.mk-switch[data-play] .mk-sync::after {
+  animation: vigSyncDot 1100ms var(--ease-in-out) 700ms 2 both;
+}
+
+.mk-switch[data-play] .mk-cal--g i {
+  transform-origin: left;
+  animation: vigRow 420ms var(--ease-out) calc(1700ms + var(--i) * 260ms) both;
+}
+
+.mk-switch[data-play] .mk-file--csv {
+  position: relative;
+  z-index: 1;
+  animation: howPop 380ms var(--ease-out) 300ms both;
+}
+
+.mk-switch[data-play] .mk-file--json {
+  animation: vigFan 620ms var(--ease-out) 900ms both;
+}
+
+@keyframes vigRise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes vigFade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes vigProgress {
+  from {
+    width: 40%;
+  }
+}
+
+@keyframes vigPickDay {
+  from {
+    background: transparent;
+    color: var(--ink);
+  }
+}
+
+@keyframes vigPickSmall {
+  from {
+    color: var(--ink-3);
+  }
+}
+
+@keyframes vigPickSlot {
+  from {
+    background: transparent;
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+}
+
+@keyframes vigTap {
+  from {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  to {
+    opacity: 0;
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+
+@keyframes vigPulse {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+
+@keyframes vigBlock {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+@keyframes vigLand {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.94);
+  }
+  60% {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes vigFlash {
+  0%,
+  55% {
+    outline-color: var(--tone);
+  }
+}
+
+@keyframes vigNow {
+  from {
+    opacity: 0;
+    transform: translateY(-36px);
+  }
+  15% {
+    opacity: 1;
+  }
+}
+
+@keyframes vigCardFlash {
+  35% {
+    background: color-mix(in srgb, var(--accent) 24%, var(--white));
+  }
+}
+
+@keyframes vigCount {
+  from {
+    --n: 0;
+  }
+}
+
+@keyframes vigBar {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes vigMeter {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes vigNudge {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+@keyframes vigGrowX {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes vigRow {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+
+@keyframes vigSyncDot {
+  0% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(22px);
+  }
+}
+
+@keyframes vigFan {
+  from {
+    opacity: 0;
+    transform: translateX(-64px) rotate(-8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.chapter__stage, .mk-switch)[data-play] *,
+  :is(.chapter__stage, .mk-switch)[data-play] *::before,
+  :is(.chapter__stage, .mk-switch)[data-play] *::after {
+    animation: none !important;
   }
 }

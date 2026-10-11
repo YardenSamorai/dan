@@ -1,23 +1,33 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { Avatar, StatusBadge } from '../../components/ui/bits';
 import { useI18n } from '../../i18n/I18nProvider';
 import type { MessageKey } from '../../i18n/messages';
+import { DesignVignette, InsightsVignette, SelfServeVignette } from './MoreVignettes';
+import { useLoop } from './useLoop';
+
+const DETAILS = ['availability', 'rules', 'staffTerms', 'buffers', 'shared', 'today', 'roles', 'block', 'bilingual'] as const;
+
+type ChapterId = 'bookingPage' | 'design' | 'calendar' | 'selfServe' | 'customers' | 'insights';
 
 /**
- * Editorial product chapters. Each pairs one idea with a faithful, static slice
- * of the real interface (same tokens, same calendar and booking language).
+ * Editorial product chapters. Each pairs one idea with a faithful slice of the
+ * real interface (same tokens, same calendar and booking language). The page
+ * designer is live and demos itself; the rest act out a short scene on a loop.
  */
 export function Showcase() {
   const { t } = useI18n();
   return (
     <div className="showcase">
-      <Chapter id="bookingPage" visual={<BookingVignette />} />
-      <Chapter id="calendar" visual={<CalendarVignette />} flip />
-      <Chapter id="customers" visual={<CustomerVignette />} />
+      <Chapter id="bookingPage" visual={<BookingVignette />} loop={6400} />
+      <Chapter id="design" visual={<DesignVignette />} flip interactive />
+      <Chapter id="calendar" visual={<CalendarVignette />} loop={7000} />
+      <Chapter id="selfServe" visual={<SelfServeVignette />} flip loop={6000} />
+      <Chapter id="customers" visual={<CustomerVignette />} loop={6400} />
+      <Chapter id="insights" visual={<InsightsVignette />} flip loop={6400} />
       <div className="showcase__more">
         <h3 className="showcase__more-title">{t('marketing.showcase.more')}</h3>
         <ul>
-          {(['availability', 'mobile', 'bilingual'] as const).map((k) => (
+          {DETAILS.map((k) => (
             <li key={k}>
               <h4>{t(`marketing.features.${k}.title` as MessageKey)}</h4>
               <p>{t(`marketing.features.${k}.body` as MessageKey)}</p>
@@ -29,16 +39,36 @@ export function Showcase() {
   );
 }
 
-function Chapter({ id, visual, flip }: { id: 'bookingPage' | 'calendar' | 'customers'; visual: ReactNode; flip?: boolean }) {
+function Chapter({
+  id,
+  visual,
+  flip,
+  interactive,
+  loop,
+}: {
+  id: ChapterId;
+  visual: ReactNode;
+  flip?: boolean;
+  interactive?: boolean;
+  /** Length of the illustration's scene in ms; must cover its last animation in marketing.css. */
+  loop?: number;
+}) {
   const { t } = useI18n();
+  const { ref, play, run } = useLoop<HTMLDivElement>(loop);
   return (
     <article className="chapter" data-flip={flip || undefined}>
       <div className="chapter__text mk-rise">
         <h3 className="chapter__title">{t(`marketing.features.${id}.title` as MessageKey)}</h3>
         <p className="chapter__body">{t(`marketing.features.${id}.body` as MessageKey)}</p>
       </div>
-      <div className="chapter__stage mk-rise" aria-hidden>
-        {visual}
+      <div
+        ref={ref}
+        className="chapter__stage mk-rise"
+        aria-hidden={!interactive || undefined}
+        data-interactive={interactive || undefined}
+        data-play={play || undefined}
+      >
+        <Fragment key={play ? run : 'rest'}>{visual}</Fragment>
       </div>
     </article>
   );
@@ -73,15 +103,19 @@ function BookingVignette() {
       <p className="vig-phone__day">{k('day')}</p>
       <p className="vig-phone__label">{k('morning')}</p>
       <div className="vig-slots">
-        <span>08:30</span>
-        <span>09:20</span>
-        <span data-taken>10:10</span>
+        <span style={{ '--i': 0 } as CSSProperties}>08:30</span>
+        <span style={{ '--i': 1 } as CSSProperties}>09:20</span>
+        <span data-taken style={{ '--i': 2 } as CSSProperties}>
+          10:10
+        </span>
       </div>
       <p className="vig-phone__label">{k('afternoon')}</p>
       <div className="vig-slots">
-        <span>16:00</span>
-        <span data-on>16:50</span>
-        <span>17:40</span>
+        <span style={{ '--i': 3 } as CSSProperties}>16:00</span>
+        <span data-on style={{ '--i': 4 } as CSSProperties}>
+          16:50
+        </span>
+        <span style={{ '--i': 5 } as CSSProperties}>17:40</span>
       </div>
       <div className="vig-phone__foot">
         <span>
@@ -113,6 +147,8 @@ const VBLOCKS: VBlock[] = [
 ];
 const VTONES = ['#2e7bb8', '#c8862a', '#7d62c4'];
 const NOW = 11 * 60 + 20;
+/** The day fills in time order. */
+const VORDER = [...VBLOCKS].sort((a, b) => a.start - b.start || a.col - b.col);
 
 function CalendarVignette() {
   const { t } = useI18n();
@@ -148,7 +184,7 @@ function CalendarVignette() {
                 key={i}
                 className={`vig-b vig-b--${b.kind}`}
                 data-status={b.status}
-                style={{ top: pct(b.start), height: `calc(${(b.len / DAY_LEN) * 100}% - 2px)` }}
+                style={{ top: pct(b.start), height: `calc(${(b.len / DAY_LEN) * 100}% - 2px)`, '--i': VORDER.indexOf(b) } as CSSProperties}
               >
                 {b.kind === 'appt' && (
                   <>
@@ -187,7 +223,9 @@ function CustomerVignette() {
       <dl className="vig-person__stats">
         <div>
           <dt>{k('visits')}</dt>
-          <dd>14</dd>
+          <dd className="vig-count" style={{ '--n': 14 } as CSSProperties}>
+            <span>14</span>
+          </dd>
         </div>
         <div>
           <dt>{k('noShows')}</dt>
@@ -209,8 +247,8 @@ function CustomerVignette() {
           ['h1', 'completed'],
           ['h2', 'completed'],
           ['h3', 'cancelled'],
-        ] as const).map(([h, s]) => (
-          <li key={h}>
+        ] as const).map(([h, s], i) => (
+          <li key={h} style={{ '--i': i } as CSSProperties}>
             <span>{k(h)}</span>
             <small>{k(`${h}d`)}</small>
             <StatusBadge status={s} />
