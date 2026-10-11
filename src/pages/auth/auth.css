@@ -42,10 +42,6 @@
   opacity: 1;
 }
 
-.auth__stage-caption {
-  display: none;
-}
-
 .auth__main {
   grid-area: main;
   position: relative;
@@ -66,7 +62,24 @@
   box-shadow:
     0 1px 2px rgba(20, 20, 24, 0.04),
     0 18px 48px -18px rgba(20, 20, 24, 0.22);
-  animation: authIn 620ms var(--ease-out) 120ms both;
+}
+
+/* One entrance for the whole form: its parts arrive in reading order, coming into focus. */
+.auth__card > * {
+  animation: authIn 640ms var(--ease-out) both;
+  animation-delay: calc(60ms + var(--d, 0) * 70ms);
+}
+
+.auth__card > :nth-child(2) {
+  --d: 1;
+}
+
+.auth__card > :nth-child(3) {
+  --d: 2;
+}
+
+.auth__card > :nth-child(n + 4) {
+  --d: 3;
 }
 
 @media (min-width: 560px) {
@@ -92,22 +105,7 @@
   }
 
   .auth__canvas {
-    inset: 0 0 clamp(72px, 12vh, 120px);
-  }
-
-  .auth__stage-caption {
-    display: block;
-    position: absolute;
-    inset-inline: 0;
-    bottom: clamp(24px, 5vh, 48px);
-    padding-inline: var(--s-8);
-    text-align: center;
-    font-family: var(--font-display);
-    font-size: clamp(1.25rem, 0.9rem + 0.9vw, 1.75rem);
-    font-weight: 650;
-    letter-spacing: -0.02em;
-    color: var(--ink);
-    animation: authIn 900ms var(--ease-out) 2.6s both;
+    inset: 0;
   }
 
   .auth__main {
@@ -117,28 +115,40 @@
   }
 
   .auth__card {
-    padding: var(--s-10);
+    width: min(420px, 100%);
+    padding: var(--s-10) 0;
     box-shadow: none;
     background: transparent;
-    animation-delay: 0ms;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth__card,
+  .auth__card > *,
   .auth__demo,
-  .auth__stage-caption {
+  .auth__error,
+  .af-meter__text svg {
     animation: none;
   }
 }
 
 .auth__title {
-  font-size: var(--display-sm);
+  font-size: clamp(2.125rem, 1.6rem + 1.4vw, 2.875rem);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+html[lang='he'] .auth__title {
+  letter-spacing: -0.012em;
 }
 
 .auth__lede {
-  margin-block-start: var(--s-2);
+  max-width: 40ch;
+  margin-block-start: 12px;
   color: var(--ink-3);
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 
 .auth__form {
@@ -148,14 +158,263 @@
 }
 
 .auth__switch {
-  margin-block-start: var(--s-6);
-  font-size: var(--text-sm);
+  margin-block-start: var(--s-8);
+  padding-block-start: var(--s-6);
+  border-block-start: 1px solid var(--line);
+  font-size: var(--text-15);
   color: var(--ink-3);
 }
 
 .auth__switch a {
   color: var(--accent);
-  font-weight: 500;
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.auth__switch a:hover {
+  text-decoration: underline;
+}
+
+/* ── Grouped fields: one panel, hairlines between rows, labels that rise ── */
+.af-group {
+  display: grid;
+  border-radius: 16px;
+  background: var(--white);
+  box-shadow:
+    0 0 0 1px var(--line-strong),
+    0 1px 2px rgba(20, 20, 24, 0.05),
+    0 10px 28px -18px rgba(20, 20, 24, 0.22);
+}
+
+.af {
+  position: relative;
+  transition:
+    box-shadow 180ms var(--ease-out),
+    background-color 180ms var(--ease-out);
+}
+
+.af:first-child {
+  border-start-start-radius: 16px;
+  border-start-end-radius: 16px;
+}
+
+.af:last-child {
+  border-end-start-radius: 16px;
+  border-end-end-radius: 16px;
+}
+
+.af + .af::before {
+  content: '';
+  position: absolute;
+  inset-inline: 16px 0;
+  top: 0;
+  height: 1px;
+  background: var(--line);
+  transition: opacity 180ms var(--ease-out);
+}
+
+.af:focus-within {
+  z-index: 1;
+  box-shadow:
+    0 0 0 1.5px var(--accent),
+    0 0 0 5px var(--accent-glow);
+}
+
+.af:focus-within::before,
+.af:focus-within + .af::before {
+  opacity: 0;
+}
+
+.af:has(.af__input[aria-invalid='true']) {
+  background: color-mix(in srgb, var(--danger) 5%, var(--white));
+}
+
+.af__input {
+  display: block;
+  width: 100%;
+  height: 62px;
+  padding: 26px 16px 8px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1rem;
+  outline: none;
+  appearance: none;
+}
+
+[dir='rtl'] .af__input[dir='ltr'] {
+  text-align: right;
+}
+
+.af__input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 40px var(--white) inset;
+  -webkit-text-fill-color: var(--ink);
+}
+
+.af[data-trailing] .af__input {
+  padding-inline-end: 54px;
+}
+
+.af__label {
+  position: absolute;
+  inset-inline-start: 16px;
+  top: 50%;
+  color: var(--ink-3);
+  font-size: 1rem;
+  line-height: 1;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transform-origin: left center;
+  transition:
+    transform 220ms var(--ease-out),
+    color 180ms var(--ease-out);
+}
+
+[dir='rtl'] .af__label {
+  transform-origin: right center;
+}
+
+.af__input:focus + .af__label,
+.af__input:not(:placeholder-shown) + .af__label {
+  transform: translateY(calc(-50% - 13px)) scale(0.76);
+}
+
+.af__input:focus + .af__label {
+  color: var(--accent);
+}
+
+.af__input[aria-invalid='true'] + .af__label {
+  color: var(--danger);
+}
+
+.af__reveal {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 8px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-block: auto;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    color var(--t-fast),
+    background-color var(--t-fast),
+    transform 120ms var(--ease-out);
+}
+
+.af__reveal:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+
+.af__reveal:active {
+  transform: scale(0.92);
+}
+
+.af__reveal:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+/* Password length, shown as it grows rather than as a rule to remember. */
+.af-meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-block-start: -6px;
+  padding-inline: 4px;
+}
+
+.af-meter__track {
+  flex: 0 0 56px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.af-meter__track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ink-4);
+  transform: scaleX(var(--p, 0));
+  transform-origin: left;
+  transition:
+    transform 320ms var(--ease-out),
+    background-color 200ms var(--ease-out);
+}
+
+[dir='rtl'] .af-meter__track i {
+  transform-origin: right;
+}
+
+.af-meter[data-ok] .af-meter__track i {
+  background: var(--success);
+}
+
+.af-meter__text {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+  transition: color 200ms var(--ease-out);
+}
+
+.af-meter[data-ok] .af-meter__text {
+  color: var(--success);
+}
+
+.af-meter__text svg {
+  animation: afCheck 380ms var(--ease-spring) both;
+}
+
+.auth__error {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--white));
+  color: var(--danger);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  animation: authErr 260ms var(--ease-out) both;
+}
+
+.auth__error a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth__submit {
+  --btn-h: 54px;
+  margin-block-start: var(--s-2);
+  border-radius: 15px;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+  font-size: 1rem;
+  font-weight: 600;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 1px 2px rgba(20, 20, 24, 0.14),
+    0 12px 26px -14px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+
+.auth__submit.btn--ink {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 1px 2px rgba(20, 20, 24, 0.2),
+    0 12px 26px -14px rgba(0, 0, 0, 0.55);
+}
+
+.auth__submit:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .auth__google {
@@ -179,41 +438,11 @@
   background: var(--line);
 }
 
-.auth__password {
-  position: relative;
-}
-
-.auth__password .field__input {
-  padding-inline-end: 44px;
-}
-
-.auth__reveal {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: 4px;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--ink-3);
-  cursor: pointer;
-}
-
-.auth__reveal:hover {
-  color: var(--ink);
-}
-
-.auth__reveal:focus-visible {
-  outline: none;
-  box-shadow: var(--focus);
-}
-
 .auth__legal {
-  font-size: var(--text-13, 13px);
-  line-height: 1.5;
+  font-size: 0.8125rem;
+  line-height: 1.55;
   color: var(--ink-3);
+  text-wrap: pretty;
 }
 
 .auth__legal a {
@@ -224,11 +453,11 @@
 
 .auth__mock {
   margin-block-start: var(--s-6);
-  padding: 10px 12px;
-  border-radius: var(--r-sm);
-  background: var(--warning-tint);
-  color: var(--warning);
-  font-size: var(--text-xs);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--fill);
+  color: var(--ink-3);
+  font-size: 0.8125rem;
   line-height: 1.5;
 }
 
@@ -282,6 +511,21 @@
 @keyframes authIn {
   from {
     opacity: 0;
-    transform: translate3d(0, 12px, 0);
+    transform: translate3d(0, 10px, 0);
+    filter: blur(6px);
+  }
+}
+
+@keyframes authErr {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes afCheck {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
   }
 }

@@ -1,9 +1,10 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { EyeIcon, EyeOffIcon } from '../../components/ui/Icons';
 import { ApiError, auth } from '../../data';
 import { useI18n } from '../../i18n/I18nProvider';
 import type { MessageKey } from '../../i18n/messages';
+import { AuthField, AuthFields } from './AuthField';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const MIN_PASSWORD = 8;
@@ -16,9 +17,15 @@ export function PasswordForm({ create, footer }: { create: boolean; footer?: Rea
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
-  const [error, setError] = useState<MessageKey | null>(null);
+  const [error, setErrorKey] = useState<MessageKey | null>(null);
+  const [shake, setShake] = useState(0);
   const [busy, setBusy] = useState(false);
   const p = (k: string) => `${create ? 'pf-up' : 'pf-in'}-${k}`;
+  const setError = (key: MessageKey | null) => {
+    setErrorKey(key);
+    if (key) setShake((s) => s + 1);
+  };
+  const strong = password.length >= MIN_PASSWORD;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -27,7 +34,7 @@ export function PasswordForm({ create, footer }: { create: boolean; footer?: Rea
     if (create && password.length < MIN_PASSWORD) return setError('auth.password.tooShort');
     if (!password) return setError('auth.password.passwordMissing');
     setBusy(true);
-    setError(null);
+    setErrorKey(null);
     try {
       if (create) {
         await auth.signUpWithPassword({ name: name.trim(), email, password, locale });
@@ -53,7 +60,7 @@ export function PasswordForm({ create, footer }: { create: boolean; footer?: Rea
     }
   };
 
-  const clear = () => setError(null);
+  const clear = () => setErrorKey(null);
 
   return (
     <>
@@ -66,66 +73,76 @@ export function PasswordForm({ create, footer }: { create: boolean; footer?: Rea
         </>
       )}
       <form className="auth__form" onSubmit={submit} noValidate>
-        {create && (
-          <div className="field">
-            <label className="field__label" htmlFor={p('name')}>
-              {t('auth.signUp.name')}
-            </label>
-            <input id={p('name')} className="field__input" autoComplete="name" value={name} onChange={(e) => (setName(e.target.value), clear())} />
-          </div>
-        )}
-        <div className="field">
-          <label className="field__label" htmlFor={p('email')}>
-            {t('auth.signIn.email')}
-          </label>
-          <input
+        <AuthFields shake={shake}>
+          {create && (
+            <AuthField
+              id={p('name')}
+              label={t('auth.signUp.name')}
+              autoComplete="name"
+              value={name}
+              invalid={error === 'auth.password.nameMissing'}
+              onChange={(e) => (setName(e.target.value), clear())}
+            />
+          )}
+          <AuthField
             id={p('email')}
-            className="field__input"
+            label={t('auth.signIn.email')}
             type="email"
             autoComplete={create ? 'email' : 'username'}
             dir="ltr"
             value={email}
+            invalid={error === 'auth.password.emailInvalid'}
             onChange={(e) => (setEmail(e.target.value), clear())}
           />
-        </div>
-        <div className="field">
-          <label className="field__label" htmlFor={p('password')}>
-            {t('auth.password.password')}
-          </label>
-          <div className="auth__password">
-            <input
-              id={p('password')}
-              className="field__input"
-              type={show ? 'text' : 'password'}
-              autoComplete={create ? 'new-password' : 'current-password'}
-              dir="ltr"
-              value={password}
-              aria-describedby={create ? p('hint') : undefined}
-              onChange={(e) => (setPassword(e.target.value), clear())}
-            />
-            <button type="button" className="auth__reveal" onClick={() => setShow((s) => !s)} aria-label={show ? t('auth.password.hide') : t('auth.password.show')} aria-pressed={show}>
-              {show ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
-            </button>
-          </div>
-          {create && (
-            <p id={p('hint')} className="field__hint">
+          <AuthField
+            id={p('password')}
+            label={t('auth.password.password')}
+            type={show ? 'text' : 'password'}
+            autoComplete={create ? 'new-password' : 'current-password'}
+            dir="ltr"
+            value={password}
+            invalid={error === 'auth.password.tooShort' || error === 'auth.password.passwordMissing' || error === 'auth.password.wrong'}
+            aria-describedby={create ? p('hint') : undefined}
+            onChange={(e) => (setPassword(e.target.value), clear())}
+            trailing={
+              <button type="button" className="af__reveal" onClick={() => setShow((s) => !s)} aria-label={show ? t('auth.password.hide') : t('auth.password.show')} aria-pressed={show}>
+                {show ? <EyeOffIcon size={17} /> : <EyeIcon size={17} />}
+              </button>
+            }
+          />
+        </AuthFields>
+        {create && (
+          <div className="af-meter" data-ok={strong || undefined}>
+            <span className="af-meter__track">
+              <i style={{ '--p': Math.min(password.length / MIN_PASSWORD, 1) } as CSSProperties} />
+            </span>
+            <p id={p('hint')} className="af-meter__text">
+              {strong && <CheckMark />}
               {t('auth.password.hint', { count: MIN_PASSWORD })}
             </p>
-          )}
-        </div>
+          </div>
+        )}
         {error && (
-          <p className="field__error" role="alert">
+          <p className="auth__error" role="alert">
             {t(error)}{' '}
             {error === 'auth.password.exists' && <Link to="/sign-in">{t('auth.signIn.submit')}</Link>}
           </p>
         )}
-        <button className={`btn btn--block ${create ? 'btn--primary' : 'btn--ink'}`} disabled={busy}>
+        <button className={`btn btn--block auth__submit ${create ? 'btn--primary' : 'btn--ink'}`} disabled={busy}>
           {busy && <span className="spinner" aria-hidden />}
           {create ? t('auth.signUp.submit') : t('auth.signIn.submit')}
         </button>
         {footer}
       </form>
     </>
+  );
+}
+
+function CheckMark() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m3.5 8.5 3 3 6-7" />
+    </svg>
   );
 }
 

@@ -13,7 +13,7 @@ const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
+await page.goto(process.env.URL ?? 'http://localhost:5173/', { waitUntil: 'networkidle' });
 await page.waitForTimeout(800);
 const files = [];
 for (const y of ys) {

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowIcon } from '../../components/ui/Icons';
 import { auth } from '../../data';
 import { useI18n } from '../../i18n/I18nProvider';
+import { AuthField, AuthFields } from './AuthField';
 import { AuthLayout } from './AuthLayout';
 import { PasswordForm } from './PasswordForm';
 
@@ -11,6 +12,7 @@ export default function SignInPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [error, setError] = useState(false);
+  const [shake, setShake] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const demos = auth.demoAccounts();
 
@@ -22,6 +24,7 @@ export default function SignInPage() {
       navigate(s.active ? '/app' : '/onboarding');
     } catch {
       setError(true);
+      setShake((s) => s + 1);
     } finally {
       setBusy(null);
     }
@@ -74,28 +77,25 @@ export default function SignInPage() {
       }
     >
       <form className="auth__form" onSubmit={submit} noValidate>
-        <div className="field">
-          <label className="field__label" htmlFor="si-email">
-            {t('auth.signIn.email')}
-          </label>
-          <input
+        <AuthFields shake={shake}>
+          <AuthField
             id="si-email"
-            className="field__input"
+            label={t('auth.signIn.email')}
             type="email"
             autoComplete="email"
             dir="ltr"
             value={email}
-            aria-invalid={error}
+            invalid={error}
             aria-describedby={error ? 'si-error' : undefined}
             onChange={(e) => (setEmail(e.target.value), setError(false))}
           />
-          {error && (
-            <p id="si-error" className="field__error" role="alert">
-              {t('auth.signIn.notFound')}
-            </p>
-          )}
-        </div>
-        <button className="btn btn--ink btn--block" disabled={!!busy}>
+        </AuthFields>
+        {error && (
+          <p id="si-error" className="auth__error" role="alert">
+            {t('auth.signIn.notFound')}
+          </p>
+        )}
+        <button className="btn btn--ink btn--block auth__submit" disabled={!!busy}>
           {busy === email && <span className="spinner" aria-hidden />}
           {t('auth.signIn.submit')}
         </button>

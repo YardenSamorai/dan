@@ -7,13 +7,13 @@ export const easeOutBack = (x: number) => 1 + 2.2 * (x - 1) ** 3 + 1.2 * (x - 1)
 export const easeInOutCubic = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
 export const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 
-/** A canvas drawn once and used as a texture. Sizes are in CSS-like pixels; drawn at 2x. */
-export function paint(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
+/** A canvas drawn once and used as a texture. Sizes are in CSS-like pixels; drawn at `scale`x. */
+export function paint(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void, scale = 2) {
   const c = document.createElement('canvas');
-  c.width = w * 2;
-  c.height = h * 2;
+  c.width = Math.round(w * scale);
+  c.height = Math.round(h * scale);
   const g = c.getContext('2d')!;
-  g.scale(2, 2);
+  g.scale(c.width / w, c.height / h);
   draw(g);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;

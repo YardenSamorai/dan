@@ -22,6 +22,7 @@ export function AuthScene({ variant }: { variant: 'signIn' | 'signUp' }) {
     ],
     toastTitle: t(variant === 'signUp' ? 'auth.scene.toastFirst' : 'auth.scene.toastNew'),
     toastSub: t('auth.scene.toastSub', { name: t('auth.scene.c4'), time: '11:00' }),
+    caption: t(variant === 'signUp' ? 'auth.scene.captionUp' : 'auth.scene.captionIn'),
   };
   const key = JSON.stringify(text);
 
@@ -30,8 +31,8 @@ export function AuthScene({ variant }: { variant: 'signIn' | 'signUp' }) {
     if (!el) return;
     let scene: Scene | null = null;
     let cancelled = false;
-    void import('./authStage')
-      .then(({ createAuthScene }) => {
+    void Promise.all([import('./authStage'), document.fonts.ready])
+      .then(([{ createAuthScene }]) => {
         if (cancelled) return;
         const css = getComputedStyle(el);
         scene = createAuthScene(el, {
@@ -39,6 +40,7 @@ export function AuthScene({ variant }: { variant: 'signIn' | 'signUp' }) {
           rtl: dir === 'rtl',
           accent: css.getPropertyValue('--accent').trim() || '#0f6b66',
           font: css.fontFamily,
+          displayFont: css.getPropertyValue('--font-display').trim() || css.fontFamily,
           reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
         });
         setReady(true);
