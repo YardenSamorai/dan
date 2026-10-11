@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto';
 import { ApiError } from '../src/data/contracts';
 import { freshDatabase, type MockDatabase } from '../src/data/mock/db';
 import { SLUG_PATTERN } from '../src/domain/defaults';
+import { nextMessageAt } from '../src/domain/notifications';
 import type { BusinessMember, User } from '../src/domain/platform';
-import type { TenantData } from '../src/domain/types';
+import type { Channel, TenantData } from '../src/domain/types';
 import type { Authenticator } from './auth';
 import { changedTenants, Conflict, removedTenants, type Hint, type Store } from './store';
 
@@ -18,6 +19,8 @@ export interface SupabaseConfig {
   secretKey: string;
   /** The public key; used to verify sign-in tokens. */
   publishableKey: string;
+  /** Channels with a connected provider; saves record when the next message on them is due. */
+  channels?: readonly Channel[];
 }
 
 interface ProfileRow {
@@ -108,7 +111,7 @@ export class SupabaseStore implements Store {
       profiles: after.users.filter((u) => beforeUsers.get(u.id) !== u).map((u) => ({ id: u.id, email: u.email, name: u.name, locale: u.locale })),
       businesses: Object.entries(changedTenants(before, after)).map(([id, data]) => {
         const old = before.tenants[id];
-        return { id, data, version: old ? (this.versions.get(old) ?? null) : null };
+        return { id, data, version: old ? (this.versions.get(old) ?? null) : null, nextMessageAt: nextMessageAt(data, this.cfg.channels ?? []) };
       }),
       deletedBusinesses: removedTenants(before, after),
       members: after.members.filter((m) => beforeMembers.get(m.id) !== m),
@@ -116,6 +119,11 @@ export class SupabaseStore implements Store {
     };
     if (changes.businesses.some((b) => before.tenants[b.id] && b.version === null)) throw new Error('commit: business without a known version');
     await this.rest('rpc/commit_changes', { method: 'POST', body: JSON.stringify({ changes }) });
+  }
+
+  async dueBusinesses(now: string, _channels: readonly Channel[], limit: number) {
+    const rows = await this.rest<{ id: string }[]>(`businesses?select=id&next_message_at=lte.${q(now)}&order=next_message_at.asc&limit=${limit}`);
+    return rows.map((r) => r.id);
   }
 
   /** First request after someone signs in: make sure they have a profile row. */

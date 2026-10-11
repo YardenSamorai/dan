@@ -3,9 +3,9 @@ import { Drawer } from '../../components/ui/Drawer';
 import { SearchIcon } from '../../components/ui/Icons';
 import { Avatar } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
-import { ApiError } from '../../data';
+import { ApiError, REPEAT_LIMITS } from '../../data';
 import { bookingDuration, bookingPrice, businessNow, checkSlot, eligibleStaff, termsFor, termsRange, type Conflict } from '../../domain/scheduling';
-import { snap } from '../../domain/time';
+import { addDays, snap } from '../../domain/time';
 import type { BlockKind, Customer, Minutes, TenantData } from '../../domain/types';
 import { localeMeta, locales, type Locale } from '../../i18n/config';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -100,6 +100,18 @@ function AppointmentForm({ L, prefill, onCreated }: { L: Lookup; prefill: NewApp
   const duration = bookingDuration(L.state, serviceId, addOnIds, resolved.staffId);
   const price = bookingPrice(L.state, serviceId, addOnIds, resolved.staffId);
 
+  const [everyWeeks, setEveryWeeks] = useState(0);
+  const [count, setCount] = useState(6);
+  const later = useMemo(() => {
+    if (!everyWeeks || !resolved.staffId) return [];
+    return Array.from({ length: count - 1 }, (_, i) => {
+      const d = addDays(date, (i + 1) * everyWeeks * 7);
+      return { date: d, conflict: checkSlot(L.state, { staffId: resolved.staffId, date: d, start, duration, serviceId }) };
+    });
+  }, [L.state, everyWeeks, count, date, start, duration, serviceId, resolved.staffId]);
+  const outsideHours = !!resolved.conflict && isSoftConflict(resolved.conflict);
+  const taken = later.filter((x) => x.conflict && !(outsideHours && isSoftConflict(x.conflict)));
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     const digits = q.replace(/\D/g, '');
@@ -114,7 +126,7 @@ function AppointmentForm({ L, prefill, onCreated }: { L: Lookup; prefill: NewApp
     setBusy(true);
     setError(null);
     try {
-      const a = await api.createAppointment({
+      const input = {
         serviceId,
         addOnIds,
         staffId: resolved.staffId,
@@ -123,7 +135,14 @@ function AppointmentForm({ L, prefill, onCreated }: { L: Lookup; prefill: NewApp
         force: isSoftConflict(resolved.conflict),
         customerId: customer?.id,
         customer: customer ? { name: customer.name, phone: customer.phone, email: customer.email, locale: customer.locale } : { ...newCustomer, name: newCustomer.name.trim() },
-      });
+      };
+      if (everyWeeks) {
+        const r = await api.createAppointmentSeries(input, { everyWeeks, count });
+        toast(r.skipped.length ? t('appt.new.seriesPartly', { count: r.created.length, skipped: r.skipped.length }) : t('appt.new.seriesCreated', { count: r.created.length }));
+        onCreated(r.created[0].id);
+        return;
+      }
+      const a = await api.createAppointment(input);
       toast(t('appt.new.created'));
       onCreated(a.id);
     } catch (e) {
@@ -299,6 +318,47 @@ function AppointmentForm({ L, prefill, onCreated }: { L: Lookup; prefill: NewApp
         <p className="muted">
           {fmt.timeRange(start, start + duration)} · {fmt.duration(duration)} · {fmt.money(price)}
         </p>
+        <div className="field-row">
+          <label className="field">
+            <span className="field__label">{t('appt.new.repeat')}</span>
+            <select className="field__input" value={everyWeeks} onChange={(e) => setEveryWeeks(Number(e.target.value))}>
+              {[0, 1, 2, 3, 4, 6, 8].map((n) => (
+                <option key={n} value={n}>
+                  {n ? t('appt.new.every', { count: n }) : t('appt.new.once')}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!!everyWeeks && (
+            <label className="field">
+              <span className="field__label">{t('appt.new.howMany')}</span>
+              <select className="field__input" value={count} onChange={(e) => setCount(Number(e.target.value))}>
+                {Array.from({ length: REPEAT_LIMITS.count - 1 }, (_, i) => i + 2).map((n) => (
+                  <option key={n} value={n}>
+                    {t('appointments.count', { count: n })}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        {!!everyWeeks && later.length > 0 && (
+          <div className="series-preview">
+            <p className="muted">{t('appt.new.until', { date: fmt.date(later[later.length - 1].date, 'medium') })}</p>
+            {taken.length > 0 && (
+              <div className="series-preview__taken" role="status">
+                <p>{t('appt.new.takenDates', { count: taken.length })}</p>
+                <ul>
+                  {taken.map((x) => (
+                    <li key={x.date}>
+                      {fmt.date(x.date, 'medium')} · {conflictText(x.conflict!, L.staff.get(resolved.staffId))}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
         {error && (
           <p className="field__error" role="alert">
             {error}

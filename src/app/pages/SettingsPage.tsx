@@ -6,13 +6,13 @@ import { AlertIcon, BusinessMark, ExternalIcon } from '../../components/ui/Icons
 import { Switch } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
 import { CAPABILITIES } from '../../config/product';
-import { ApiError, directory, workspace } from '../../data';
+import { ApiError, directory, INVITE_DAYS, platform, workspace, type MemberInfo } from '../../data';
 import { BUSINESS_TYPES, SLUG_PATTERN } from '../../domain/defaults';
-import { messageVars, renderTemplate, TEMPLATE_VARS } from '../../domain/notifications';
+import { alertsOf, messageVars, notificationsOf, renderTemplate, TEMPLATE_VARS } from '../../domain/notifications';
 import type { Permission } from '../../domain/permissions';
 import { businessNow, isUpcoming } from '../../domain/scheduling';
 import { isValidTimeZone } from '../../domain/time';
-import type { BookingPolicies, Business, Channel, NotificationSettings, TemplateKind } from '../../domain/types';
+import type { BookingPolicies, Business, Channel, Invite, NotificationSettings, OwnerAlerts, TemplateKind } from '../../domain/types';
 import { localeMeta, locales, type Locale } from '../../i18n/config';
 import { useI18n } from '../../i18n/I18nProvider';
 import type { MessageKey } from '../../i18n/messages';
@@ -31,7 +31,7 @@ const SECTIONS: { id: Section; needs: Permission; previewOnly?: boolean }[] = [
   { id: 'account', needs: 'billing.manage' },
   { id: 'data', needs: 'demo.reset', previewOnly: true },
 ];
-const KINDS: TemplateKind[] = ['confirmation', 'reminder', 'reschedule', 'cancellation'];
+const KINDS: TemplateKind[] = ['confirmation', 'reminder', 'reschedule', 'cancellation', 'rebook'];
 const CHANNELS: Channel[] = ['sms', 'whatsapp', 'email'];
 const CURRENCIES = ['ILS', 'USD', 'EUR', 'GBP', 'AUD', 'CAD'];
 const ZONES = ['Asia/Jerusalem', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Australia/Sydney'];
@@ -370,20 +370,67 @@ function BrandingSection() {
 
 // ── Notifications ────────────────────────────────────────────────────
 
+/** Alerts to the business itself, sent to the email and phone from the business details. */
+function OwnerAlertsPanel() {
+  const { tenant, api } = useWorkspace();
+  const { t } = useI18n();
+  const d = useDraft<OwnerAlerts>(alertsOf(tenant.business));
+  const v = d.value;
+  const b = tenant.business;
+  const missing = v.channels.filter((c) => !(c === 'email' ? b.email : b.phone)?.trim());
+  return (
+    <section className="panel">
+      <header className="panel__head">
+        <div>
+          <h3 className="panel__title">{t('settings.alerts.title')}</h3>
+          <p className="muted">{t('settings.alerts.lede')}</p>
+        </div>
+      </header>
+      <div className="panel__body form-grid">
+        <Switch checked={v.booked} onChange={(x) => d.set({ ...v, booked: x })} label={t('settings.alerts.booked')} />
+        <Switch checked={v.changed} onChange={(x) => d.set({ ...v, changed: x })} label={t('settings.alerts.changed')} />
+        <div className="toolbar">
+          {(['email', 'sms'] as const).map((c) => {
+            const on = v.channels.includes(c);
+            return (
+              <button key={c} type="button" className="chip" aria-pressed={on} onClick={() => d.set({ ...v, channels: on ? v.channels.filter((x) => x !== c) : [...v.channels, c] })}>
+                {t(`channel.${c}`)}
+              </button>
+            );
+          })}
+        </div>
+        <p className="field__hint">
+          {t('settings.alerts.where', { email: b.email || '—', phone: b.phone || '—' })} <Link to="/app/settings/business">{t('settings.alerts.edit')}</Link>
+        </p>
+        {missing.length > 0 && <p className="inline-alert inline-alert--warn">{t(`settings.alerts.missing.${missing[0]}`)}</p>}
+      </div>
+      <SaveBar dirty={d.dirty} onReset={d.reset} onSave={() => api.updateBusiness({ alerts: v })} />
+    </section>
+  );
+}
+
 function NotificationsSection() {
   const { tenant: state, api } = useWorkspace();
-  const { t } = useI18n();
-  const d = useDraft<NotificationSettings>(state.business.notifications);
+  const { t, fmt } = useI18n();
+  const d = useDraft<NotificationSettings>(notificationsOf(state.business));
+  const rebookCount = state.services.filter((s) => s.active && s.rebookAfterDays).length;
   const v = d.value;
   const sample = state.appointments.find((a) => isUpcoming(a, new Date(), state.business.timezone)) ?? state.appointments[0];
 
+  const info = platform.useInfo();
+  const off = info ? CHANNELS.filter((c) => !info.channels.includes(c)) : [];
+
   return (
     <>
-      {!CAPABILITIES.messaging && (
+      {info && off.length > 0 && (
         <p className="inline-alert inline-alert--warn">
-          <AlertIcon size={14} /> {t('settings.notifications.notConnected')}
+          <AlertIcon size={14} />{' '}
+          {info.channels.length
+            ? t('settings.notifications.partlyConnected', { on: fmt.list(info.channels.map((c) => t(`channel.${c}`))), off: fmt.list(off.map((c) => t(`channel.${c}`))) })
+            : t('settings.notifications.notConnected')}
         </p>
       )}
+      <OwnerAlertsPanel />
       <p className="page__lede">{t('settings.notifications.lede')}</p>
       {KINDS.map((k) => {
         const cfg = v[k];
@@ -396,6 +443,11 @@ function NotificationsSection() {
             </header>
             {cfg.enabled && (
               <div className="panel__body form-grid">
+                {k === 'rebook' && (
+                  <p className="field__hint">
+                    {rebookCount ? t('settings.notifications.rebookHint', { count: rebookCount }) : t('settings.notifications.rebookNone')} <Link to="/app/services">{t('settings.notifications.rebookServices')}</Link>
+                  </p>
+                )}
                 <div className="toolbar">
                   {CHANNELS.map((c) => {
                     const on = cfg.channels.includes(c);
@@ -457,17 +509,38 @@ function NotificationsSection() {
 
 // ── Team access ──────────────────────────────────────────────────────
 
+const inviteUrl = (slug: string, token: string) => `${location.origin}/join/${slug}/${token}`;
+
 function TeamSection() {
-  const { ctx, tenant, session } = useWorkspace();
-  const { t, tx } = useI18n();
+  const { ctx, tenant, session, api } = useWorkspace();
+  const { t, tx, fmt } = useI18n();
+  const toast = useToast();
   const members = workspace.useMembers(ctx);
+  const [removing, setRemoving] = useState<MemberInfo | null>(null);
+  const now = new Date().toISOString();
+  const invites = (tenant.business.invites ?? []).filter((i) => i.expiresAt > now);
+  const staffName = (id: string | null) => {
+    const st = id ? tenant.staff.find((s) => s.id === id) : undefined;
+    return st ? tx(st.name) : null;
+  };
+  const canRemove = (m: MemberInfo) => m.role !== 'owner' && m.user.id !== session.user.id && (m.role !== 'manager' || ctx.role === 'owner');
+
+  const copy = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast(t('settings.team.copied'));
+    } catch {
+      toast(t('common.unknownError'));
+    }
+  };
+
   return (
     <>
       <p className="page__lede">{t('settings.team.lede')}</p>
       <section className="panel">
         <div className="list">
           {members.map((m) => {
-            const st = m.staffId ? tenant.staff.find((s) => s.id === m.staffId) : undefined;
+            const st = staffName(m.staffId);
             return (
               <div key={m.id} className="list__row">
                 <div className="list__main">
@@ -476,17 +549,166 @@ function TeamSection() {
                   </span>
                   <span className="list__sub">
                     <span className="ltr">{m.user.email}</span>
-                    {st ? ` · ${tx(st.name)}` : ''}
+                    {st ? ` · ${st}` : ''}
                   </span>
                 </div>
                 <span className="badge badge--plain">{t(`roles.${m.role}`)}</span>
+                {canRemove(m) && (
+                  <button type="button" className="btn btn--quiet btn--sm" onClick={() => setRemoving(m)}>
+                    {t('settings.team.remove')}
+                  </button>
+                )}
               </div>
             );
           })}
         </div>
       </section>
-      <p className="inline-alert">{t('settings.team.later')}</p>
+
+      <InviteForm onCopy={copy} />
+
+      {invites.length > 0 && (
+        <section className="panel">
+          <h3 className="settings__sub panel__body">{t('settings.team.openInvites')}</h3>
+          <div className="list">
+            {invites.map((i) => {
+              const url = inviteUrl(tenant.business.slug, i.token);
+              const who = staffName(i.staffId);
+              return (
+                <div key={i.token} className="list__row feed-row">
+                  <div className="list__main">
+                    <span className="list__title">
+                      {t(`roles.${i.role}`)}
+                      {who ? ` · ${who}` : ''}
+                    </span>
+                    <span className="list__sub">{t('settings.team.expires', { date: fmt.date(i.expiresAt.slice(0, 10), 'dayMonth') })}</span>
+                  </div>
+                  <div className="feed-row__actions">
+                    <button type="button" className="btn btn--tinted btn--sm" onClick={() => copy(url)}>
+                      {t('common.copy')}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={async () => {
+                        try {
+                          await api.revokeInvite(i.token);
+                          toast(t('settings.team.revoked'));
+                        } catch {
+                          toast(t('common.unknownError'));
+                        }
+                      }}
+                    >
+                      {t('settings.team.revoke')}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <section className="panel panel__body">
+        <h3 className="settings__sub">{t('settings.team.rolesTitle')}</h3>
+        <p className="muted">{t('settings.team.roles')}</p>
+      </section>
+
+      <ConfirmDialog
+        open={!!removing}
+        title={t('settings.team.removeTitle', { name: removing?.user.name ?? '' })}
+        body={t('settings.team.removeBody')}
+        confirmLabel={t('settings.team.remove')}
+        cancelLabel={t('common.cancel')}
+        danger
+        onConfirm={async () => {
+          const m = removing;
+          setRemoving(null);
+          if (!m) return;
+          try {
+            await api.removeMember(m.id);
+            toast(t('settings.team.removed', { name: m.user.name }));
+          } catch {
+            toast(t('common.unknownError'));
+          }
+        }}
+        onCancel={() => setRemoving(null)}
+      />
     </>
+  );
+}
+
+/** Pick a role (and the staff profile they work as), get a link to send. */
+function InviteForm({ onCopy }: { onCopy: (url: string) => void }) {
+  const { ctx, tenant, api } = useWorkspace();
+  const { t, tx } = useI18n();
+  const toast = useToast();
+  const members = workspace.useMembers(ctx);
+  const [role, setRole] = useState<Invite['role']>('staff');
+  const [staffId, setStaffId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [link, setLink] = useState<string | null>(null);
+  const linked = new Set(members.map((m) => m.staffId).filter(Boolean));
+  const free = tenant.staff.filter((s) => s.active && !s.userId && !linked.has(s.id));
+  const chosen = free.some((s) => s.id === staffId) ? staffId : role === 'staff' ? (free[0]?.id ?? '') : staffId;
+  const blocked = role === 'staff' && !chosen;
+
+  const create = async () => {
+    setBusy(true);
+    try {
+      const token = await api.createInvite({ role, staffId: chosen || null });
+      setLink(inviteUrl(tenant.business.slug, token));
+    } catch (e) {
+      toast(e instanceof ApiError && e.code === 'policy' ? t('settings.team.tooMany') : t('common.unknownError'));
+    }
+    setBusy(false);
+  };
+
+  return (
+    <section className="panel panel__body invite">
+      <h3 className="settings__sub">{t('settings.team.inviteTitle')}</h3>
+      <p className="muted">{t('settings.team.inviteBody')}</p>
+      {!CAPABILITIES.backend && <p className="inline-alert">{t('settings.team.demoNote')}</p>}
+      {link ? (
+        <div className="invite__done">
+          <input className="field__input ltr" dir="ltr" readOnly value={link} aria-label={t('settings.team.link')} onFocus={(e) => e.currentTarget.select()} />
+          <div className="invite__actions">
+            <button type="button" className="btn btn--ink btn--sm" onClick={() => onCopy(link)}>
+              {t('common.copy')}
+            </button>
+            <a className="btn btn--tinted btn--sm" href={`https://wa.me/?text=${encodeURIComponent(t('settings.team.whatsappText', { business: tx(tenant.business.name), link }))}`} target="_blank" rel="noreferrer">
+              {t('settings.team.whatsapp')} <ExternalIcon size={12} />
+            </a>
+            <button type="button" className="btn btn--quiet btn--sm" onClick={() => setLink(null)}>
+              {t('settings.team.another')}
+            </button>
+          </div>
+          <p className="field__hint">{t('settings.team.linkHint', { days: INVITE_DAYS })}</p>
+        </div>
+      ) : (
+        <div className="invite__form">
+          <Field label={t('settings.team.role')} id="inv-role">
+            <select id="inv-role" className="field__input" value={role} onChange={(e) => setRole(e.target.value as Invite['role'])}>
+              <option value="staff">{t('roles.staff')}</option>
+              <option value="manager">{t('roles.manager')}</option>
+            </select>
+          </Field>
+          <Field label={t('settings.team.worksAs')} id="inv-staff" hint={role === 'staff' && !free.length ? t('settings.team.noFreeStaff') : undefined}>
+            <select id="inv-staff" className="field__input" value={chosen} onChange={(e) => setStaffId(e.target.value)} disabled={!free.length && role === 'staff'}>
+              {role === 'manager' && <option value="">{t('settings.team.noCalendar')}</option>}
+              {free.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {tx(s.name)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <button type="button" className="btn btn--primary btn--sm invite__create" disabled={busy || blocked} onClick={create}>
+            {busy && <span className="spinner" aria-hidden />}
+            {t('settings.team.createLink')}
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -50,13 +50,16 @@ export interface BookingPolicies {
   confirmationMode: 'auto' | 'manual';
 }
 
-export type TemplateKind = 'confirmation' | 'reminder' | 'reschedule' | 'cancellation';
+export type TemplateKind = 'confirmation' | 'reminder' | 'reschedule' | 'cancellation' | 'rebook';
 
+/** Stored settings may predate newer kinds; read them through `notificationsOf`. */
 export interface NotificationSettings {
   confirmation: { enabled: boolean; channels: Channel[] };
   reminder: { enabled: boolean; hoursBefore: number; channels: Channel[] };
   reschedule: { enabled: boolean; channels: Channel[] };
   cancellation: { enabled: boolean; channels: Channel[] };
+  /** "Time to book again", `Service.rebookAfterDays` after a visit. */
+  rebook: { enabled: boolean; channels: Channel[] };
   templates: Record<TemplateKind, LText>;
 }
 
@@ -158,9 +161,13 @@ export interface Business {
   hours: WeeklySchedule;
   policies: BookingPolicies;
   notifications: NotificationSettings;
+  /** Missing = email alerts for everything (see `alertsOf`). */
+  alerts?: OwnerAlerts;
   subscription: SubscriptionRef;
   /** Secret calendar subscription links (ICS). Staff see only their own. */
   calendarFeeds?: CalendarFeed[];
+  /** Open invite links for the team. Only people who manage the team see them. */
+  invites?: Invite[];
   /** Getting-started checklist: steps the owner ticked by hand, and whether it's hidden. */
   setup?: { done: SetupStep[]; dismissed?: boolean };
 }
@@ -172,6 +179,17 @@ export interface CalendarFeed {
   key: string;
   /** null = everyone's appointments. */
   staffId: string | null;
+}
+
+/** A single-use link that lets someone join the business. The link itself is the credential. */
+export interface Invite {
+  /** Unguessable; part of the link. */
+  token: string;
+  role: 'manager' | 'staff';
+  /** The staff profile the person will work as; required for the staff role. */
+  staffId: string | null;
+  createdAt: string;
+  expiresAt: string;
 }
 
 // ── Catalogue ────────────────────────────────────────────────────────
@@ -206,6 +224,8 @@ export interface Service extends Owned {
   /** Takes the whole place (e.g. one shared room): while booked, nobody else can be booked, and it needs everyone free. */
   blocksAll?: boolean;
   imageUrl?: string;
+  /** Invite the customer to book again this many days after the visit (unless they already have). */
+  rebookAfterDays?: number;
 }
 
 export interface AddOn extends Owned {
@@ -312,6 +332,8 @@ export interface Appointment extends Owned {
   source: 'online' | 'studio';
   /** Customer chose "any available". */
   anyStaff: boolean;
+  /** Shared by appointments booked together as a repeating series. */
+  seriesId?: string;
   note?: string;
   internalNote?: string;
   cancellation?: { at: string; by: Actor; reason?: string };
@@ -327,13 +349,36 @@ export interface Appointment extends Owned {
 export interface OutboxMessage extends Owned {
   id: string;
   appointmentId: string;
-  kind: TemplateKind;
+  kind: MessageKind;
+  /** Missing = the customer. `owner` = the business's own contact details (alerts). */
+  to?: 'owner';
   channel: Channel;
   locale: Locale;
   body: string;
   /** When it is (or was) due. */
   at: string;
-  state: 'queued' | 'scheduled';
+  /**
+   * queued/scheduled: waiting (scheduled = due later). sent: handed to the provider.
+   * failed: gave up after retries. skipped: too late to be useful, or nobody to send it to.
+   */
+  state: 'queued' | 'scheduled' | 'sent' | 'failed' | 'skipped';
+  attempts?: number;
+  /** When it was sent, failed or skipped. */
+  doneAt?: string;
+  /** Short reason for failed / skipped. */
+  error?: string;
+}
+
+/** Messages to the customer use the owner's templates; alerts to the business use fixed wording. */
+export type MessageKind = TemplateKind | OwnerAlertKind;
+export type OwnerAlertKind = 'ownerBooked' | 'ownerCancelled' | 'ownerRescheduled';
+
+/** What the business hears about online activity, and how. Sent to the business's email / phone. */
+export interface OwnerAlerts {
+  channels: ('email' | 'sms')[];
+  booked: boolean;
+  /** Cancelled or moved by the customer. */
+  changed: boolean;
 }
 
 /** Everything one tenant owns. The scheduling engine operates on a single tenant at a time. */

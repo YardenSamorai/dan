@@ -31,7 +31,7 @@ function createApi(ctx: TenantContext): WorkspaceApi {
     async (...args: unknown[]) => {
       const out = await rpc<{ result: unknown; tenant?: TenantData }>('workspace.call', ctx.businessId, method, args);
       if (out.tenant) tenants.set(ctx.businessId, out.tenant);
-      if (method === 'saveStaff') void members.refresh(ctx.businessId);
+      if (method === 'saveStaff' || method === 'removeMember') void members.refresh(ctx.businessId);
       if (method === 'deleteBusiness') await refreshSession();
       return out.result;
     };

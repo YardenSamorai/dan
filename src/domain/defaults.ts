@@ -48,7 +48,12 @@ export function defaultNotifications(): NotificationSettings {
     reminder: { enabled: true, hoursBefore: 24, channels: ['sms'] },
     reschedule: { enabled: true, channels: ['sms'] },
     cancellation: { enabled: true, channels: ['sms'] },
+    rebook: { enabled: true, channels: ['sms'] },
     templates: {
+      rebook: {
+        en: 'Hi {name}, it’s been a while since your last {service}. Want to book the next one? {link}\n{business}',
+        he: 'היי {name}, עבר זמן מאז ה{service} האחרון. רוצה לקבוע את הבא? {link}\n{business}',
+      },
       confirmation: {
         en: 'Hi {name}, you’re booked for {service} with {staff} on {date} at {time}. Booking ref: {code}.\n{business}',
         he: 'היי {name}, נקבע לך תור ל{service} אצל {staff} ב{date} בשעה {time}. מספר אישור: {code}.\n{business}',

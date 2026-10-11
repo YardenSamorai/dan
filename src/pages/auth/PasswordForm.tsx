@@ -5,14 +5,16 @@ import { ApiError, auth } from '../../data';
 import { useI18n } from '../../i18n/I18nProvider';
 import type { MessageKey } from '../../i18n/messages';
 import { AuthField, AuthFields } from './AuthField';
+import { useNext, withNext } from './next';
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const MIN_PASSWORD = 8;
 
 /** Email + password sign-in / sign-up, or continue with Google. */
 export function PasswordForm({ create, footer }: { create: boolean; footer?: ReactNode }) {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
+  const next = useNext();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,10 +40,10 @@ export function PasswordForm({ create, footer }: { create: boolean; footer?: Rea
     try {
       if (create) {
         await auth.signUpWithPassword({ name: name.trim(), email, password, locale });
-        navigate('/onboarding');
+        navigate(next ?? '/onboarding');
       } else {
         const s = await auth.signInWithPassword({ email, password });
-        navigate(s.active ? '/app' : '/onboarding');
+        navigate(next ?? (s.active ? '/app' : '/onboarding'));
       }
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'server';
@@ -66,7 +68,7 @@ export function PasswordForm({ create, footer }: { create: boolean; footer?: Rea
     <>
       {auth.providers.google && (
         <>
-          <button type="button" className="btn btn--ghost btn--block auth__google" onClick={() => void auth.signInWithGoogle(create ? '/onboarding' : '/app').catch(() => setError('common.unknownError'))}>
+          <button type="button" className="btn btn--ghost btn--block auth__google" onClick={() => void auth.signInWithGoogle(next ?? (create ? '/onboarding' : '/app')).catch(() => setError('common.unknownError'))}>
             <GoogleMark /> {t('auth.password.google')}
           </button>
           <p className="auth__or">{t('auth.password.or')}</p>
@@ -111,6 +113,11 @@ export function PasswordForm({ create, footer }: { create: boolean; footer?: Rea
             }
           />
         </AuthFields>
+        {!create && (
+          <Link to={withNext('/reset-password', next)} state={{ email: email.trim() }} className="auth__forgot">
+            {t('auth.reset.forgot')}
+          </Link>
+        )}
         {create && (
           <div className="af-meter" data-ok={strong || undefined}>
             <span className="af-meter__track">
@@ -125,7 +132,7 @@ export function PasswordForm({ create, footer }: { create: boolean; footer?: Rea
         {error && (
           <p className="auth__error" role="alert">
             {t(error)}{' '}
-            {error === 'auth.password.exists' && <Link to="/sign-in">{t('auth.signIn.submit')}</Link>}
+            {error === 'auth.password.exists' && <Link to={withNext('/sign-in', next)}>{t('auth.signIn.submit')}</Link>}
           </p>
         )}
         <button className={`btn btn--block auth__submit ${create ? 'btn--primary' : 'btn--ink'}`} disabled={busy}>

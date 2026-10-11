@@ -1993,6 +1993,24 @@ a.list__row:active {
   }
 }
 
+.series-preview {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.series-preview__taken {
+  padding: 10px var(--s-3);
+  border-radius: 10px;
+  background: var(--warning-tint);
+  color: var(--warning);
+  font-size: 0.875rem;
+}
+
+.series-preview__taken ul {
+  margin: 4px 0 0;
+  padding-inline-start: 1.1em;
+}
+
 .chosen {
   display: flex;
   align-items: center;
@@ -2659,6 +2677,38 @@ fieldset:disabled .field__input {
 }
 
 .feed-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.invite {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.invite__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+  gap: var(--s-3);
+}
+
+.invite__form .field {
+  margin: 0;
+}
+
+.invite__create {
+  justify-self: start;
+  min-height: 40px;
+}
+
+.invite__done {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.invite__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-2);

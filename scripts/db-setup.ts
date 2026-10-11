@@ -2,6 +2,7 @@
  * One-off database chores against Supabase:
  *   npm run db:setup                  check the schema, add the demo businesses
  *   npm run db:setup -- --import-local   also copy businesses from .data/db.json
+ *   npm run db:setup -- --refresh-demo-page   give the demo businesses the seed's page, photos and texts (bookings untouched)
  *
  * --import-local moves businesses made on the local dev server. Each owner
  * must have signed in once with the same email (so they have a profile).
@@ -55,6 +56,30 @@ const seed = freshDatabase();
 const demo = DEMO_BUSINESS_IDS.filter((id) => seed.tenants[id]).map((id) => ({ id, data: seed.tenants[id] }));
 const added = await insertBusinesses(demo);
 console.log(`✓ demo businesses: ${added.length} added, ${demo.length - added.length} already there`);
+
+if (process.argv.includes('--refresh-demo-page')) {
+  for (const { id, data: fresh } of demo) {
+    const [row] = (await rest(`businesses?id=eq.${id}&select=data,version`)) as { data: typeof fresh; version: number }[];
+    if (!row) continue;
+    const photo = <T extends { id: string }>(xs: T[], from: T[], keys: (keyof T)[]) =>
+      xs.map((x) => {
+        const f = from.find((y) => y.id === x.id);
+        return f ? { ...x, ...Object.fromEntries(keys.map((k) => [k, f[k]])) } : x;
+      });
+    const data = {
+      ...row.data,
+      business: { ...row.data.business, page: fresh.business.page, branding: fresh.business.branding, tagline: fresh.business.tagline, description: fresh.business.description },
+      services: photo(row.data.services, fresh.services, ['imageUrl']),
+      staff: photo(row.data.staff, fresh.staff, ['avatarUrl', 'bio']),
+    };
+    const updated = await rest(`businesses?id=eq.${id}&version=eq.${row.version}`, {
+      method: 'PATCH',
+      headers: { prefer: 'return=representation' },
+      body: JSON.stringify({ data, version: row.version + 1 }),
+    });
+    console.log(updated?.length ? `✓ refreshed the page of ${id}` : `– ${id} changed meanwhile, run again`);
+  }
+}
 
 if (process.argv.includes('--import-local')) {
   const local = JSON.parse(readFileSync('.data/db.json', 'utf8')) as MockDatabase;

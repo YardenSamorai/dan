@@ -48,6 +48,10 @@ create table if not exists public.businesses (
   updated_at  timestamptz not null default now()
 );
 
+-- When the next customer message / alert is due on a connected channel; set by the server on save.
+alter table public.businesses add column if not exists next_message_at timestamptz;
+create index if not exists businesses_next_message_at_idx on public.businesses (next_message_at) where next_message_at is not null;
+
 comment on table public.businesses is 'One row per business. data = TenantData (src/domain/types.ts).';
 comment on column public.businesses.version is 'Optimistic locking: saves must name the version they read.';
 
@@ -86,7 +90,7 @@ revoke all on public.profiles, public.businesses, public.members from anon, auth
 --
 -- changes = {
 --   profiles:          [{ id, email, name, locale }],
---   businesses:        [{ id, data, version }]    version null = new business
+--   businesses:        [{ id, data, version, nextMessageAt }]    version null = new business
 --   deletedBusinesses: [id],
 --   members:           [{ id, businessId, userId, role, staffId }],
 --   deletedMembers:    [id]
@@ -113,10 +117,10 @@ begin
 
   for b in select * from jsonb_array_elements(coalesce(changes -> 'businesses', '[]')) loop
     if b ->> 'version' is null then
-      insert into public.businesses (id, data) values (b ->> 'id', b -> 'data');
+      insert into public.businesses (id, data, next_message_at) values (b ->> 'id', b -> 'data', (b ->> 'nextMessageAt')::timestamptz);
     else
       update public.businesses
-         set data = b -> 'data', version = version + 1, updated_at = now()
+         set data = b -> 'data', version = version + 1, updated_at = now(), next_message_at = (b ->> 'nextMessageAt')::timestamptz
        where id = b ->> 'id' and version = (b ->> 'version')::integer;
       get diagnostics updated = row_count;
       if updated = 0 then

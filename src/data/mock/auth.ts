@@ -37,6 +37,8 @@ export const mockAuth: AuthService = {
   signInWithPassword: () => Promise.reject(new ApiError('invalid')),
   signUpWithPassword: () => Promise.reject(new ApiError('invalid')),
   signInWithGoogle: () => Promise.reject(new ApiError('invalid')),
+  requestPasswordReset: () => Promise.reject(new ApiError('invalid')),
+  resetPassword: () => Promise.reject(new ApiError('invalid')),
 
   useSession() {
     const db = useMockDb();

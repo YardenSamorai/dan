@@ -393,6 +393,44 @@ html[lang='he'] .auth__title {
   text-underline-offset: 2px;
 }
 
+.join__mark {
+  margin-block-start: var(--s-6);
+}
+
+.auth__forgot {
+  justify-self: end;
+  margin-block-start: -4px;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+  text-underline-offset: 3px;
+}
+
+.auth__forgot:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.auth__hint {
+  color: var(--ink-3);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.auth__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.auth__link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
 .auth__submit {
   --btn-h: 54px;
   margin-block-start: var(--s-2);
