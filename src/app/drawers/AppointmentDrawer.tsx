@@ -4,10 +4,10 @@ import { Drawer } from '../../components/ui/Drawer';
 import { MessageIcon, PhoneIcon } from '../../components/ui/Icons';
 import { Avatar, StaffAvatar, StatusBadge } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
-import { CAPABILITIES } from '../../config/product';
-import { ApiError } from '../../data';
+import { ApiError, platform } from '../../data';
+import { isWaiting } from '../../domain/notifications';
 import { checkSlot, eligibleStaff, termsIfMoved } from '../../domain/scheduling';
-import type { Appointment, AppointmentStatus } from '../../domain/types';
+import type { Appointment, AppointmentStatus, OutboxMessage } from '../../domain/types';
 import { localeMeta } from '../../i18n/config';
 import { useI18n } from '../../i18n/I18nProvider';
 import type { MessageKey } from '../../i18n/messages';
@@ -51,6 +51,7 @@ function Body({ a, L, onClose }: { a: Appointment; L: Lookup; onClose: () => voi
   const conflictText = useConflictText();
   const { openCustomer } = useAppUI();
   const { api, can, solo } = useWorkspace();
+  const info = platform.useInfo();
   const customer = L.customers.get(a.customerId);
   const service = L.services.get(a.serviceId);
   const staff = L.staff.get(a.staffId);
@@ -87,6 +88,16 @@ function Body({ a, L, onClose }: { a: Appointment; L: Lookup; onClose: () => voi
   };
 
   const messages = L.state.outbox.filter((m) => m.appointmentId === a.id).sort((x, y) => x.at.localeCompare(y.at));
+  const connected = info?.channels ?? [];
+  const unconnected = info ? [...new Set(messages.filter((m) => isWaiting(m) && !connected.includes(m.channel)).map((m) => m.channel))] : [];
+  const messageState = (m: OutboxMessage) => {
+    const when = fmt.dateTime(new Date(m.doneAt ?? m.at));
+    if (m.state === 'sent') return t('appt.msgSent', { when });
+    if (m.state === 'failed') return t('appt.msgFailed');
+    if (m.state === 'skipped') return t(m.error === 'no_recipient' ? 'appt.msgNoRecipient' : 'appt.msgSkipped');
+    if (m.state === 'scheduled') return t('appt.scheduled', { when });
+    return connected.includes(m.channel) ? t('appt.msgSending') : t('appt.queued', { when });
+  };
   const active = a.status !== 'cancelled' && a.status !== 'no_show' && a.status !== 'completed';
   const buffers = service && (service.bufferBefore > 0 || service.bufferAfter > 0);
 
@@ -210,12 +221,12 @@ function Body({ a, L, onClose }: { a: Appointment; L: Lookup; onClose: () => voi
       {messages.length > 0 && (
         <section className="detail__block">
           <h3 className="section-title">{t('appt.messages')}</h3>
-          {!CAPABILITIES.messaging && <p className="inline-alert inline-alert--warn">{t('preview.notSent')}</p>}
+          {unconnected.length > 0 && <p className="inline-alert inline-alert--warn">{t('appt.notConnected', { channels: fmt.list(unconnected.map((c) => t(`channel.${c}`))) })}</p>}
           {messages.map((m) => (
-            <div className="msg" key={m.id}>
+            <div className="msg" key={m.id} data-state={m.state}>
               <span className="msg__meta">
                 <MessageIcon size={12} />
-                {t(`settings.notifications.kinds.${m.kind}`)} · {t(`channel.${m.channel}`)} · {t(m.state === 'queued' ? 'appt.queued' : 'appt.scheduled', { when: fmt.dateTime(new Date(m.at)) })}
+                {t(`messageKind.${m.kind}`)} · {t(`channel.${m.channel}`)} · {messageState(m)}
               </span>
               <p className="msg__body" dir={localeMeta[m.locale].dir} lang={m.locale}>
                 {m.body}

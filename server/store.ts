@@ -1,7 +1,9 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { reviveDatabase, type MockDatabase } from '../src/data/mock/db';
+import { nextMessageAt } from '../src/domain/notifications';
 import type { User } from '../src/domain/platform';
+import type { Channel } from '../src/domain/types';
 
 /** What a request may need loaded. A store may load more; never less. */
 export interface Hint {
@@ -28,6 +30,8 @@ export interface Store {
   ensureUser?(u: Pick<User, 'id' | 'email' | 'name' | 'locale'>): Promise<void>;
   /** Store an uploaded image and return its public URL. Without it, images stay inline as data URLs. */
   putImage?(businessId: string, dataUrl: string): Promise<string>;
+  /** Businesses with a message due by `now` on one of `channels`, soonest first. */
+  dueBusinesses?(now: string, channels: readonly Channel[], limit: number): Promise<string[]>;
 }
 
 /**
@@ -50,6 +54,15 @@ export class FileStore implements Store {
 
   async snapshot(): Promise<MockDatabase> {
     return this.db;
+  }
+
+  async dueBusinesses(now: string, channels: readonly Channel[], limit: number) {
+    return Object.entries(this.db.tenants)
+      .map(([id, t]) => [id, nextMessageAt(t, channels)] as const)
+      .filter((x): x is readonly [string, string] => !!x[1] && x[1] <= now)
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .slice(0, limit)
+      .map(([id]) => id);
   }
 
   async commit(before: MockDatabase, after: MockDatabase) {

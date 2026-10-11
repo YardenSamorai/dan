@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useMemo, type MouseEvent } from 'react';
-import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, Outlet, useLocation, useMatch, useNavigate, useParams } from 'react-router-dom';
 import { PublicHeader } from '../../components/public/PublicHeader';
 import { accentStyle, loadThemeFont } from '../../components/ui/accents';
 import { BrushIcon } from '../../components/ui/Icons';
@@ -9,6 +9,10 @@ import { auth, publicBooking, workspace } from '../../data';
 import { can } from '../../domain/permissions';
 import type { SectionKind } from '../../domain/types';
 import { FormatScope, useI18n } from '../../i18n/I18nProvider';
+import { DemoFilm, FILM_SLUGS } from './film/DemoFilm';
+import { FilmCamera } from './film/FilmCamera';
+import { inFilmFrame, useFilmFrame } from './film/bridge';
+import { filmView, scenesFor } from './film/script';
 import { applyDraft, PreviewEditingProvider, useEditorPreview, usePreviewEditing } from './pageBridge';
 import { PublicTenantProvider, usePublicTenant } from './TenantContext';
 import '../../styles/public.css';
@@ -20,7 +24,12 @@ export function TenantScope() {
   const { businessSlug = '' } = useParams();
   const found = publicBooking.useBusiness(businessSlug);
   const { editing, draft } = useEditorPreview();
-  const value = useMemo(() => (found && draft ? { ...found, business: applyDraft(found.business, draft) } : found), [found, draft]);
+  const frame = useFilmFrame();
+  const film = useMemo(() => (found && frame ? filmView(found.business, scenesFor(found.business), frame) : null), [found, frame]);
+  const value = useMemo(
+    () => (found && film ? { ...found, business: film.business } : found && draft ? { ...found, business: applyDraft(found.business, draft) } : found),
+    [found, draft, film],
+  );
   const theme = value?.business.page.theme ?? 'clean';
   useEffect(() => {
     loadThemeFont(theme);
@@ -36,8 +45,17 @@ export function TenantScope() {
     <PublicTenantProvider slug={businessSlug} value={value}>
       <FormatScope currency={value.business.currency} timeZone={value.business.timezone}>
         <PreviewEditingProvider value={editing}>
-          <div className="tenant" data-accent={branding.accent} data-theme={theme} style={accentStyle(branding)} data-editing={editing ? '' : undefined} onClickCapture={editing ? stayPut : undefined}>
-            <TenantTitle />
+          <div
+            className="tenant"
+            data-accent={branding.accent}
+            data-theme={theme}
+            style={accentStyle(branding)}
+            data-editing={editing ? '' : undefined}
+            data-film={film ? '' : undefined}
+            data-typing={film?.typing || undefined}
+            onClickCapture={editing || film ? stayPut : undefined}
+          >
+            {film ? <FilmCamera focus={film.focus} business={film.business} /> : <TenantTitle />}
             <Outlet />
           </div>
         </PreviewEditingProvider>
@@ -82,7 +100,7 @@ function OwnerBar() {
   const navigate = useNavigate();
   const { hash } = useLocation();
   const member = session?.memberships.find((m) => m.businessId === business.id);
-  if (!session || !member || editing) return null;
+  if (!session || !member || editing || inFilmFrame()) return null;
   const canEdit = can(member.role, 'business.settings');
   const section = hash.slice(1);
   const open = async (to: string) => {
@@ -124,7 +142,10 @@ const NAV_KINDS: Partial<Record<SectionKind, 'services' | 'gallery' | 'about' | 
 
 export function TenantChrome() {
   const { t, tx } = useI18n();
-  const { business, base, solo } = usePublicTenant();
+  const { business, base, solo, slug } = usePublicTenant();
+  const editing = usePreviewEditing();
+  const home = !!useMatch('/book/:businessSlug');
+  const film = home && !editing && FILM_SLUGS.includes(slug) && !inFilmFrame();
   const name = tx(business.name);
   const { page } = business;
   const hero = page.sections[0];
@@ -136,6 +157,7 @@ export function TenantChrome() {
       <a href="#main" className="skip-link">
         {t('common.skipToContent')}
       </a>
+      {film && <DemoFilm />}
       <OwnerBar />
       <PublicHeader
         home={base}

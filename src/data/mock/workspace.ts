@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { IMPORT_LIMIT, LIMITS, mergeNotes } from '../../domain/customerImport';
-import { renderMessage } from '../../domain/notifications';
+import { alertsOf, notificationsOf, renderMessage, renderOwnerAlert } from '../../domain/notifications';
 import { locales } from '../../i18n/config';
 import { callingCode, cleanPhone, phoneKey } from '../../lib/phone';
 import { can, type Permission } from '../../domain/permissions';
 import { appointmentStart, availableSlots, bookingDuration, bookingPrice, checkSlot, pickStaff, termsIfMoved } from '../../domain/scheduling';
-import type { Actor, Appointment, AppointmentEvent, Customer, OutboxMessage, Service, TemplateKind, TenantData } from '../../domain/types';
-import { ApiError, type CustomerInput, type MemberInfo, type TenantContext, type WorkspaceApi, type WorkspaceData } from '../contracts';
+import type { Actor, Appointment, AppointmentEvent, Customer, Invite, OutboxMessage, OwnerAlertKind, Service, TemplateKind, TenantData } from '../../domain/types';
+import { ApiError, INVITE_DAYS, REPEAT_LIMITS, type CustomerInput, type MemberInfo, type SeriesResult, type StudioBookingInput, type TenantContext, type WorkspaceApi, type WorkspaceData } from '../contracts';
+import { addDays } from '../../domain/time';
 import { DEMO_BUSINESS_IDS, makeCode } from '../demo/seed';
 import { getDb, latency, mutateDb, mutateTenant, mutateTenantIfStored, resetDemoData, uid, useMockDb, type MockDatabase } from './db';
 
@@ -18,14 +19,20 @@ const feedKey = () => Array.from(crypto.getRandomValues(new Uint8Array(18)), (n)
 // ── Shared tenant mutations (also used by the public adapter) ────────
 
 function queueMessages(t: TenantData, a: Appointment, kind: TemplateKind): OutboxMessage[] {
-  const cfg = t.business.notifications[kind];
+  const settings = notificationsOf(t.business);
+  const cfg = settings[kind];
   if (!cfg.enabled) return [];
+  const rebookDays = kind === 'rebook' ? t.services.find((s) => s.id === a.serviceId)?.rebookAfterDays : undefined;
+  if (kind === 'rebook' && !rebookDays) return [];
   const customer = t.customers.find((c) => c.id === a.customerId);
   const locale = customer?.locale ?? t.business.defaultLocale;
+  const start = appointmentStart(a, t.business.timezone).getTime();
   const at =
     kind === 'reminder'
-      ? new Date(appointmentStart(a, t.business.timezone).getTime() - t.business.notifications.reminder.hoursBefore * 3_600_000)
-      : new Date();
+      ? new Date(start - settings.reminder.hoursBefore * 3_600_000)
+      : kind === 'rebook'
+        ? new Date(start + rebookDays! * 86_400_000)
+        : new Date();
   return cfg.channels.map((channel) => ({
     businessId: t.business.id,
     id: uid('m'),
@@ -39,10 +46,33 @@ function queueMessages(t: TenantData, a: Appointment, kind: TemplateKind): Outbo
   }));
 }
 
-/** Messages are generated and stored, never delivered: no provider is connected in this build. */
+/** Alerts to the business about something a customer did online, per the business's alert settings. */
+export function withOwnerAlert(t: TenantData, a: Appointment, kind: OwnerAlertKind): TenantData {
+  const cfg = alertsOf(t.business);
+  if (!(kind === 'ownerBooked' ? cfg.booked : cfg.changed)) return t;
+  const at = nowISO();
+  const body = renderOwnerAlert(t, a, kind);
+  const alerts: OutboxMessage[] = cfg.channels.map((channel) => ({
+    businessId: t.business.id,
+    id: uid('m'),
+    appointmentId: a.id,
+    kind,
+    to: 'owner',
+    channel,
+    locale: t.business.defaultLocale,
+    body,
+    at,
+    state: 'queued',
+  }));
+  return alerts.length ? { ...t, outbox: [...t.outbox, ...alerts] } : t;
+}
+
+/** Messages are stored here; the server's dispatcher delivers them through whichever providers are connected. */
 export function withMessages(t: TenantData, a: Appointment, kinds: TemplateKind[]): OutboxMessage[] {
-  const kept = t.outbox.filter((m) => !(m.appointmentId === a.id && m.state === 'scheduled'));
-  const active = a.status !== 'cancelled' ? kinds : kinds.filter((k) => k !== 'reminder');
+  const kept = t.outbox.filter((m) => !(m.appointmentId === a.id && m.state === 'scheduled' && m.to !== 'owner'));
+  // The visit-relative messages move with the visit and go away with it.
+  const all: TemplateKind[] = kinds.includes('reminder') ? [...kinds, 'rebook'] : kinds;
+  const active = a.status !== 'cancelled' ? all : all.filter((k) => k !== 'reminder' && k !== 'rebook');
   return [...kept, ...active.flatMap((k) => queueMessages(t, a, k))];
 }
 
@@ -70,14 +100,15 @@ export function insertAppointment(t: TenantData, a: Appointment): TenantData {
   return { ...next, outbox: withMessages(next, a, a.status === 'pending' ? [] : ['confirmation', 'reminder']) };
 }
 
-export function patchAppointmentIn(businessId: string, id: string, fn: (a: Appointment, t: TenantData) => Appointment, kinds: TemplateKind[] = []) {
+export function patchAppointmentIn(businessId: string, id: string, fn: (a: Appointment, t: TenantData) => Appointment, kinds: TemplateKind[] = [], alert?: OwnerAlertKind) {
   let out!: Appointment;
   mutateTenant(businessId, (t) => {
     const a = t.appointments.find((x) => x.id === id);
     if (!a) throw new ApiError('not_found');
     out = { ...fn(a, t), updatedAt: nowISO() };
     const next = { ...t, appointments: t.appointments.map((x) => (x.id === id ? out : x)) };
-    return kinds.length ? { ...next, outbox: withMessages(next, out, kinds) } : next;
+    const withCustomer = kinds.length ? { ...next, outbox: withMessages(next, out, kinds) } : next;
+    return alert ? withOwnerAlert(withCustomer, out, alert) : withCustomer;
   });
   return out;
 }
@@ -143,31 +174,59 @@ function createApi(ctx: TenantContext): WorkspaceApi {
   const B = ctx.businessId;
   const write = (fn: (t: TenantData) => TenantData) => mutateTenant(B, fn);
 
+  const book = (input: StudioBookingInput, series?: { id: string; first: boolean }): Appointment => {
+    const t = authorize(ctx, 'appointments.manage');
+    const staffChoice = can(ctx.role, 'calendar.all') ? input.staffId : ctx.staffId;
+    if (!staffChoice) throw new ApiError('forbidden');
+    const slot = availableSlots(t, { ...input, staffId: staffChoice }).find((x) => x.start === input.start);
+    const staffId = staffChoice === 'any' ? pickStaff(t, input.date, slot?.staffIds ?? t.staff.filter((s) => s.active).map((s) => s.id)) : staffChoice;
+    const duration = bookingDuration(t, input.serviceId, input.addOnIds, staffId);
+    const conflict = checkSlot(t, { staffId, date: input.date, start: input.start, duration, serviceId: input.serviceId });
+    if (conflict && !(input.force && conflict.kind === 'outside_shift')) throw new ApiError('slot_taken', conflict);
+    let created!: Appointment;
+    write((cur) => {
+      const [customers, customer] = upsertCustomer(cur, input.customer, input.customerId);
+      const withCustomer = { ...cur, customers };
+      created = newAppointment(
+        withCustomer,
+        { customerId: customer.id, staffId, serviceId: input.serviceId, addOnIds: input.addOnIds, date: input.date, start: input.start, status: 'confirmed', source: 'studio', anyStaff: input.staffId === 'any', note: input.customer.note || undefined },
+        'staff',
+      );
+      if (!series) return insertAppointment(withCustomer, created);
+      created = { ...created, seriesId: series.id };
+      const next = { ...withCustomer, appointments: [...withCustomer.appointments, created] };
+      return { ...next, outbox: withMessages(next, created, series.first ? ['confirmation', 'reminder'] : ['reminder']) };
+    });
+    return created;
+  };
+
   return {
     ctx,
 
     async createAppointment(input) {
       await latency(250);
-      const t = authorize(ctx, 'appointments.manage');
-      const staffChoice = can(ctx.role, 'calendar.all') ? input.staffId : ctx.staffId;
-      if (!staffChoice) throw new ApiError('forbidden');
-      const slot = availableSlots(t, { ...input, staffId: staffChoice }).find((x) => x.start === input.start);
-      const staffId = staffChoice === 'any' ? pickStaff(t, input.date, slot?.staffIds ?? t.staff.filter((s) => s.active).map((s) => s.id)) : staffChoice;
-      const duration = bookingDuration(t, input.serviceId, input.addOnIds, staffId);
-      const conflict = checkSlot(t, { staffId, date: input.date, start: input.start, duration, serviceId: input.serviceId });
-      if (conflict && !(input.force && conflict.kind === 'outside_shift')) throw new ApiError('slot_taken', conflict);
-      let created!: Appointment;
-      write((cur) => {
-        const [customers, customer] = upsertCustomer(cur, input.customer, input.customerId);
-        const withCustomer = { ...cur, customers };
-        created = newAppointment(
-          withCustomer,
-          { customerId: customer.id, staffId, serviceId: input.serviceId, addOnIds: input.addOnIds, date: input.date, start: input.start, status: 'confirmed', source: 'studio', anyStaff: input.staffId === 'any', note: input.customer.note || undefined },
-          'staff',
-        );
-        return insertAppointment(withCustomer, created);
-      });
-      return created;
+      return book(input);
+    },
+
+    async createAppointmentSeries(input, repeat) {
+      await latency(300);
+      const everyWeeks = Math.round(Number(repeat.everyWeeks));
+      const count = Math.round(Number(repeat.count));
+      if (!(everyWeeks >= 1 && everyWeeks <= REPEAT_LIMITS.everyWeeks && count >= 2 && count <= REPEAT_LIMITS.count)) throw new ApiError('invalid');
+      const id = uid('ser');
+      const first = book(input, { id, first: true });
+      const created = [first];
+      const skipped: SeriesResult['skipped'] = [];
+      for (let i = 1; i < count; i++) {
+        const date = addDays(input.date, i * everyWeeks * 7);
+        try {
+          created.push(book({ ...input, date, staffId: first.staffId, customerId: first.customerId }, { id, first: false }));
+        } catch (e) {
+          if (!(e instanceof ApiError && e.code === 'slot_taken')) throw e;
+          skipped.push({ date, conflict: e.conflict ?? { kind: 'overlap' } });
+        }
+      }
+      return { created, skipped };
     },
 
     async rescheduleAppointment(id, input) {
@@ -268,7 +327,8 @@ function createApi(ctx: TenantContext): WorkspaceApi {
     async saveService(s) {
       await latency(120);
       authorize(ctx, 'services.manage');
-      const scoped = { ...s, businessId: B, staffTerms: cleanTerms(s) };
+      const days = Number(s.rebookAfterDays);
+      const scoped = { ...s, businessId: B, staffTerms: cleanTerms(s), rebookAfterDays: days >= 1 && days <= 365 ? Math.round(days) : undefined };
       write((t) => ({ ...t, services: upsert(t.services, scoped) }));
       return scoped;
     },
@@ -350,7 +410,7 @@ function createApi(ctx: TenantContext): WorkspaceApi {
       if (patch.slug && patch.slug !== t.business.slug && Object.values(getDb().tenants).some((x) => x.business.slug === patch.slug)) throw new ApiError('slug_taken');
       let out!: TenantData['business'];
       write((cur) => {
-        out = { ...cur.business, ...patch, id: B, calendarFeeds: cur.business.calendarFeeds };
+        out = { ...cur.business, ...patch, id: B, calendarFeeds: cur.business.calendarFeeds, invites: cur.business.invites };
         return { ...cur, business: out };
       });
       return out;
@@ -402,6 +462,43 @@ function createApi(ctx: TenantContext): WorkspaceApi {
       return key;
     },
 
+    async createInvite({ role, staffId }) {
+      await latency(150);
+      const t = authorize(ctx, 'staff.manage');
+      if (role !== 'manager' && role !== 'staff') throw new ApiError('invalid');
+      if (role === 'staff' && !staffId) throw new ApiError('invalid');
+      if (staffId) {
+        const st = t.staff.find((s) => s.id === staffId);
+        if (!st) throw new ApiError('not_found');
+        if (st.userId || getDb().members.some((m) => m.businessId === B && m.staffId === staffId)) throw new ApiError('exists');
+      }
+      const now = new Date();
+      const invite: Invite = { token: feedKey(), role, staffId, createdAt: now.toISOString(), expiresAt: new Date(now.getTime() + INVITE_DAYS * 86_400_000).toISOString() };
+      write((cur) => {
+        // One open link per staff profile; expired links are dropped as new ones are made.
+        const kept = (cur.business.invites ?? []).filter((i) => i.expiresAt > invite.createdAt && !(staffId && i.staffId === staffId));
+        if (kept.length >= 20) throw new ApiError('policy');
+        return { ...cur, business: { ...cur.business, invites: [...kept, invite] } };
+      });
+      return invite.token;
+    },
+
+    async revokeInvite(token) {
+      await latency(100);
+      authorize(ctx, 'staff.manage');
+      write((cur) => ({ ...cur, business: { ...cur.business, invites: (cur.business.invites ?? []).filter((i) => i.token !== token) } }));
+    },
+
+    async removeMember(memberId) {
+      await latency(150);
+      authorize(ctx, 'staff.manage');
+      const m = getDb().members.find((x) => x.id === memberId && x.businessId === B);
+      if (!m) throw new ApiError('not_found');
+      if (m.role === 'owner' || m.userId === ctx.userId || (m.role === 'manager' && ctx.role !== 'owner')) throw new ApiError('forbidden');
+      mutateDb((db) => ({ ...db, members: db.members.filter((x) => x.id !== m.id) }));
+      write((cur) => ({ ...cur, staff: cur.staff.map((s) => (s.userId === m.userId ? { ...s, userId: undefined } : s)) }));
+    },
+
     async deleteBusiness(confirmSlug) {
       await latency(300);
       const t = authorize(ctx, 'billing.manage');
@@ -426,17 +523,17 @@ function createApi(ctx: TenantContext): WorkspaceApi {
  * the customers attached to them — the same filtering a server would apply.
  */
 export function scopeForRole(t: TenantData, ctx: TenantContext): TenantData {
-  if (can(ctx.role, 'calendar.all')) return t;
+  if (can(ctx.role, 'calendar.all')) return can(ctx.role, 'staff.manage') ? t : { ...t, business: { ...t.business, invites: undefined } };
   const appointments = t.appointments.filter((a) => a.staffId === ctx.staffId);
   const customerIds = new Set(appointments.map((a) => a.customerId));
   return {
     ...t,
-    business: { ...t.business, calendarFeeds: t.business.calendarFeeds?.filter((f) => f.staffId !== null && f.staffId === ctx.staffId) },
+    business: { ...t.business, invites: undefined, calendarFeeds: t.business.calendarFeeds?.filter((f) => f.staffId !== null && f.staffId === ctx.staffId) },
     appointments,
     customers: t.customers.filter((c) => customerIds.has(c.id)),
     timeOff: t.timeOff.filter((x) => x.staffId === ctx.staffId),
     blocks: t.blocks.filter((b) => b.staffId === null || b.staffId === ctx.staffId),
-    outbox: t.outbox.filter((m) => appointments.some((a) => a.id === m.appointmentId)),
+    outbox: t.outbox.filter((m) => m.to !== 'owner' && appointments.some((a) => a.id === m.appointmentId)),
   };
 }
 

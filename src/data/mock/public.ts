@@ -6,7 +6,7 @@ import { pageOf } from '../../domain/page';
 import type { Appointment, TenantData } from '../../domain/types';
 import { ApiError, type PublicBooking, type PublicBookingApi, type PublicBusiness } from '../contracts';
 import { getDb, getSession, latency, mutateTenant, useMockDb, useMockSession, type MockDatabase } from './db';
-import { appointmentEvent, cancelledBy, insertAppointment, newAppointment, normalizePhone, patchAppointmentIn, upsertCustomer } from './workspace';
+import { appointmentEvent, cancelledBy, insertAppointment, newAppointment, normalizePhone, patchAppointmentIn, upsertCustomer, withOwnerAlert } from './workspace';
 
 /**
  * Mock of the public booking endpoints. Availability is computed here from the
@@ -117,7 +117,7 @@ export function availabilityView(t: TenantData): TenantData {
   const from = businessNow(t).date;
   return {
     ...t,
-    business: { ...t.business, subscription: { status: 'not_configured', planId: null }, calendarFeeds: undefined },
+    business: { ...t.business, subscription: { status: 'not_configured', planId: null }, calendarFeeds: undefined, invites: undefined },
     staff: t.staff.map(({ userId: _userId, ...s }) => s),
     timeOff: t.timeOff.map(({ note: _note, ...x }) => x),
     blocks: t.blocks.map((b) => ({ ...b, label: '' })),
@@ -210,7 +210,7 @@ export const mockPublicBooking: PublicBookingApi = {
         },
         'customer',
       );
-      after = insertAppointment(withCustomer, created);
+      after = withOwnerAlert(insertAppointment(withCustomer, created), created, 'ownerBooked');
       return after;
     });
     return toPublic(after, created);
@@ -245,6 +245,7 @@ export const mockPublicBooking: PublicBookingApi = {
       a.id,
       (x) => ({ ...x, status: 'cancelled', cancellation: cancelledBy('customer'), history: [...x.history, appointmentEvent('cancelled', 'customer')] }),
       ['cancellation'],
+      'ownerCancelled',
     );
     return toPublic(getDb().tenants[t.business.id], out);
   },
@@ -273,6 +274,7 @@ export const mockPublicBooking: PublicBookingApi = {
       a.id,
       (x) => ({ ...x, ...termsIfMoved(t, a, staffId), date: to.date, start: to.start, staffId, history: [...x.history, appointmentEvent('rescheduled', 'customer', detail)] }),
       ['reschedule', 'reminder'],
+      'ownerRescheduled',
     );
     return toPublic(getDb().tenants[t.business.id], out);
   },

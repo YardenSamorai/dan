@@ -298,7 +298,26 @@ html[lang='he'] .choice-group__legend {
 }
 
 .choice--staff {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   padding-inline-end: var(--s-5);
+}
+
+@media (max-width: 520px) {
+  .choice--staff {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: var(--s-2);
+  }
+
+  .choice--staff .choice__side {
+    grid-column: 2;
+    justify-items: start;
+    text-align: start;
+  }
+
+  .choice--staff .choice__meta {
+    white-space: normal;
+  }
 }
 
 .choice__any {

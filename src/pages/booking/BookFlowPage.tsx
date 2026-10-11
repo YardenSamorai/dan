@@ -409,10 +409,7 @@ function StepStaff({ draft, update, onPick }: StepProps & { onPick: () => void }
   // Only worth showing when the people differ; otherwise the price was already on the service.
   const all = service ? termsRange(service) : null;
   const varies = !!all && (all.price[0] !== all.price[1] || all.duration[0] !== all.duration[1]);
-  const termsOf = (id: string) => {
-    const r = termsRange(service!, id === 'any' ? service!.staffIds : [id]);
-    return `${fmt.moneyRange(r.price)} · ${fmt.durationRange(r.duration)}`;
-  };
+  const termsOf = (id: string) => termsRange(service!, id === 'any' ? service!.staffIds : [id]);
 
   return (
     <>
@@ -446,7 +443,14 @@ function StepStaff({ draft, update, onPick }: StepProps & { onPick: () => void }
                 {o.sub && <span className="choice__desc">{o.sub}</span>}
               </span>
               <span className="choice__side">
-                {varies && <span className="choice__price tabular">{termsOf(o.id)}</span>}
+                {varies && (
+                  <>
+                    <span className="choice__price tabular">{fmt.moneyRange(termsOf(o.id).price)}</span>
+                    <span className="choice__meta">
+                      <ClockIcon size={12} /> {fmt.durationRange(termsOf(o.id).duration)}
+                    </span>
+                  </>
+                )}
                 <span className="choice__meta">{next ? t('booking.staff.nextAvailable', { when: next }) : t('booking.staff.unavailable')}</span>
               </span>
             </label>

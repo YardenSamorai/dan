@@ -5,11 +5,13 @@ import { auth } from '../../data';
 import { useI18n } from '../../i18n/I18nProvider';
 import { AuthField, AuthFields } from './AuthField';
 import { AuthLayout } from './AuthLayout';
+import { useNext, withNext } from './next';
 import { PasswordForm } from './PasswordForm';
 
 export default function SignInPage() {
   const { t, tx } = useI18n();
   const navigate = useNavigate();
+  const next = useNext();
   const [email, setEmail] = useState('');
   const [error, setError] = useState(false);
   const [shake, setShake] = useState(0);
@@ -21,7 +23,7 @@ export default function SignInPage() {
     setError(false);
     try {
       const s = await auth.signIn(address);
-      navigate(s.active ? '/app' : '/onboarding');
+      navigate(next ?? (s.active ? '/app' : '/onboarding'));
     } catch {
       setError(true);
       setShake((s) => s + 1);
@@ -40,7 +42,7 @@ export default function SignInPage() {
       <AuthLayout variant="signIn" title={t('auth.signIn.title')} lede={t('auth.signIn.lede')}>
         <PasswordForm create={false} />
         <p className="auth__switch">
-          {t('auth.signIn.noAccount')} <Link to="/sign-up">{t('auth.signIn.create')}</Link>
+          {t('auth.signIn.noAccount')} <Link to={withNext('/sign-up', next)}>{t('auth.signIn.create')}</Link>
         </p>
       </AuthLayout>
     );
@@ -101,7 +103,7 @@ export default function SignInPage() {
         </button>
       </form>
       <p className="auth__switch">
-        {t('auth.signIn.noAccount')} <Link to="/sign-up">{t('auth.signIn.create')}</Link>
+        {t('auth.signIn.noAccount')} <Link to={withNext('/sign-up', next)}>{t('auth.signIn.create')}</Link>
       </p>
     </AuthLayout>
   );

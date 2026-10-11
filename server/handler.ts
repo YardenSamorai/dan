@@ -4,11 +4,13 @@ import { ApiError, type NewBusinessInput, type PublicBookingInput, type TenantCo
 import { mockAuth, mockDirectory, sessionInfo } from '../src/data/mock/auth';
 import { getDb, mutateDb, type MockDatabase } from '../src/data/mock/db';
 import { availabilityView, bySlug, mockPublicBooking, project, toPublic, visible } from '../src/data/mock/public';
+import { mockInvites } from '../src/data/mock/invites';
 import { membersOf, mockWorkspace, scopeForRole } from '../src/data/mock/workspace';
 import type { Locale } from '../src/i18n/config';
 import { bearer, type Authenticator } from './auth';
 import { inScope } from './context';
-import { Conflict, type Hint, type Store } from './store';
+import { changedTenants, Conflict, type Hint, type Store } from './store';
+import type { Channel, TenantData } from '../src/domain/types';
 
 /**
  * The whole API is one POST /api/rpc endpoint: `{ fn, args }` in, `{ result }`
@@ -20,6 +22,7 @@ interface Call {
   userId: string | null;
   auth: Authenticator;
   store: Store;
+  channels: readonly Channel[];
 }
 
 /** Replaces every inline image (data URL) in `v` with the URL `put` stored it under. */
@@ -42,6 +45,7 @@ interface Fn {
 
 const WORKSPACE_METHODS = new Set<keyof WorkspaceApi>([
   'createAppointment',
+  'createAppointmentSeries',
   'rescheduleAppointment',
   'cancelAppointment',
   'setAppointmentStatus',
@@ -63,6 +67,9 @@ const WORKSPACE_METHODS = new Set<keyof WorkspaceApi>([
   'setPublished',
   'savePage',
   'calendarFeed',
+  'createInvite',
+  'revokeInvite',
+  'removeMember',
   'deleteBusiness',
   'resetDemo',
 ]);
@@ -137,6 +144,11 @@ const FNS: Record<string, Fn> = {
     },
   },
 
+  /** Which message channels actually deliver here, so the UI never claims more. */
+  'platform.info': {
+    run: (_, c) => ({ channels: c.channels }),
+  },
+
   'auth.demoAccounts': {
     run: (_, c) => (c.auth.devSignIn ? mockAuth.demoAccounts() : []),
   },
@@ -186,6 +198,18 @@ const FNS: Record<string, Fn> = {
     run: ([slug, token, to]) => mockPublicBooking.rescheduleBooking(str(slug), str(token), to),
   },
 
+  'invite.peek': {
+    hint: ([slug]) => ({ slugs: [str(slug)] }),
+    run: ([slug, token]) => mockInvites.peek(str(slug), str(token)),
+  },
+  'invite.accept': {
+    hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
+    run: ([slug, token], c) => {
+      requireUser(c);
+      return mockInvites.accept(str(slug), str(token));
+    },
+  },
+
   'workspace.tenant': {
     hint: ([businessId], c) => ({ userId: c.userId, businessId: str(businessId) }),
     run: ([businessId], c, db) => {
@@ -227,6 +251,8 @@ const STATUS: Partial<Record<ApiError['code'], number>> = { unauthenticated: 401
 export interface ApiDeps {
   store: Store;
   auth: Authenticator;
+  /** Channels with a connected provider. */
+  channels?: readonly Channel[];
 }
 
 /** GET /api/ics/{slug}/{key}.ics: the link itself is the credential, like Google's "secret address". */
@@ -250,7 +276,12 @@ export async function handleIcs(req: Request, deps: ApiDeps): Promise<Response> 
 
 const safeEqual = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
-export async function handleRpc(req: Request, deps: ApiDeps): Promise<Response> {
+export interface RpcHooks {
+  /** After a successful save, with the businesses it changed. */
+  onSaved?: (tenants: TenantData[]) => void;
+}
+
+export async function handleRpc(req: Request, deps: ApiDeps, hooks: RpcHooks = {}): Promise<Response> {
   if (req.method !== 'POST') return json({ error: 'invalid' }, 405);
   let body: { fn?: unknown; args?: unknown };
   try {
@@ -262,7 +293,7 @@ export async function handleRpc(req: Request, deps: ApiDeps): Promise<Response> 
   if (!fn) return json({ error: 'invalid' }, 404);
   const args = Array.isArray(body.args) ? body.args : [];
   const token = bearer(req);
-  const call: Call = { userId: await deps.auth.userId(token), auth: deps.auth, store: deps.store };
+  const call: Call = { userId: await deps.auth.userId(token), auth: deps.auth, store: deps.store, channels: deps.channels ?? [] };
   if (call.userId && deps.auth.profile && deps.store.ensureUser) {
     try {
       const p = await deps.auth.profile(token);
@@ -277,7 +308,10 @@ export async function handleRpc(req: Request, deps: ApiDeps): Promise<Response> 
     try {
       const before = await deps.store.snapshot(fn.hint?.(args, call) ?? {});
       const out = await inScope(before, call.userId, () => fn.run(args, call, getDb));
-      if (out.db !== before) await deps.store.commit(before, out.db);
+      if (out.db !== before) {
+        await deps.store.commit(before, out.db);
+        hooks.onSaved?.(Object.values(changedTenants(before, out.db)));
+      }
       return json({ result: out.result ?? null });
     } catch (e) {
       if (e instanceof Conflict && attempt < 3) continue;

@@ -11,7 +11,9 @@ import type {
   Branding,
   Business,
   BusinessType,
+  Channel,
   Customer,
+  Invite,
   ISODate,
   Minutes,
   PageConfig,
@@ -98,6 +100,10 @@ export interface AuthService {
   signUpWithPassword(input: { name: string; email: string; password: string; locale: Locale }): Promise<SessionInfo>;
   /** `password` method with Google enabled: leaves the page for Google and comes back to `next`. */
   signInWithGoogle(next: string): Promise<void>;
+  /** `password` method. Emails a one-time code; says nothing about whether the address has an account. Throws `rate_limited`. */
+  requestPasswordReset(email: string): Promise<void>;
+  /** `password` method. Checks the emailed code, sets the new password and signs in. Throws `invalid` for a wrong or expired code, `policy` for a rejected password (too weak, or the same as before). */
+  resetPassword(input: { email: string; code: string; password: string }): Promise<SessionInfo>;
   signOut(): Promise<void>;
   switchBusiness(businessId: string): Promise<void>;
   /** Demo accounts available for one-click sign-in (mock only; empty with a real backend). */
@@ -268,6 +274,20 @@ export interface StudioBookingInput {
   force?: boolean;
 }
 
+export interface RepeatInput {
+  everyWeeks: number;
+  /** Total appointments, the first one included. */
+  count: number;
+}
+
+export const REPEAT_LIMITS = { everyWeeks: 8, count: 26 } as const;
+
+export interface SeriesResult {
+  created: Appointment[];
+  /** Dates that could not be booked; the rest of the series still was. */
+  skipped: { date: ISODate; conflict: Conflict }[];
+}
+
 export interface RescheduleInput {
   date: ISODate;
   start: Minutes;
@@ -290,6 +310,8 @@ export interface PageSaveInput {
 export interface WorkspaceApi {
   readonly ctx: TenantContext;
   createAppointment(input: StudioBookingInput): Promise<Appointment>;
+  /** The first date must be free; later dates that aren't are skipped and reported. */
+  createAppointmentSeries(input: StudioBookingInput, repeat: RepeatInput): Promise<SeriesResult>;
   rescheduleAppointment(id: string, input: RescheduleInput): Promise<Appointment>;
   cancelAppointment(id: string, reason?: string): Promise<Appointment>;
   setAppointmentStatus(id: string, status: AppointmentStatus): Promise<Appointment>;
@@ -320,6 +342,14 @@ export interface WorkspaceApi {
    * `rotate` replaces it, so the old link stops working. Staff may only ask for their own.
    */
   calendarFeed(staffId: string | null, rotate?: boolean): Promise<string>;
+  /**
+   * A single-use join link token, valid for INVITE_DAYS. The staff role needs a staff
+   * profile nobody signs in as yet; a manager may optionally have one.
+   */
+  createInvite(input: { role: Invite['role']; staffId: string | null }): Promise<string>;
+  revokeInvite(token: string): Promise<void>;
+  /** Takes away someone's access. Nobody can remove the owner or themselves; only the owner removes managers. */
+  removeMember(memberId: string): Promise<void>;
   /** Owner only. Permanently removes the business, its data and everyone's access. `confirmSlug` must match. */
   deleteBusiness(confirmSlug: string): Promise<void>;
   resetDemo(): Promise<void>;
@@ -339,4 +369,31 @@ export interface WorkspaceData {
   /** Members of the workspace; empty unless ctx may manage the team. */
   useMembers(ctx: TenantContext): MemberInfo[];
   api(ctx: TenantContext): WorkspaceApi;
+}
+
+export interface PlatformInfo {
+  /** Message channels that really deliver. Messages on other channels are kept, not sent. */
+  channels: Channel[];
+}
+
+export interface PlatformService {
+  /** null while loading. */
+  useInfo(): PlatformInfo | null;
+}
+
+export const INVITE_DAYS = 7;
+
+/** What someone opening a join link sees before accepting. */
+export interface InvitePreview {
+  businessName: LText;
+  branding: Branding;
+  role: Invite['role'];
+  staffName: LText | null;
+}
+
+export interface InviteService {
+  /** null when the link is wrong, used, revoked or expired. */
+  peek(slug: string, token: string): Promise<InvitePreview | null>;
+  /** Signed-in callers only. Joins the business (or does nothing if already a member) and returns its id. Throws `not_found` for a dead link. */
+  accept(slug: string, token: string): Promise<string>;
 }

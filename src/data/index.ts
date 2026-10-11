@@ -1,8 +1,11 @@
-import type { AuthService, BusinessDirectory, PublicBookingApi, WorkspaceData } from './contracts';
+import type { AuthService, BusinessDirectory, InviteService, PlatformInfo, PlatformService, PublicBookingApi, WorkspaceData } from './contracts';
 import { mockAuth, mockDirectory } from './mock/auth';
+import { mockInvites } from './mock/invites';
 import { mockPublicBooking } from './mock/public';
 import { mockWorkspace } from './mock/workspace';
 import { remoteAuth, remoteDirectory } from './remote/auth';
+import { remoteInvites } from './remote/invites';
+import { remotePlatform } from './remote/platform';
 import { remotePublicBooking } from './remote/public';
 import { remoteWorkspace } from './remote/workspace';
 
@@ -17,5 +20,9 @@ export const auth: AuthService = remote ? remoteAuth : mockAuth;
 export const directory: BusinessDirectory = remote ? remoteDirectory : mockDirectory;
 export const publicBooking: PublicBookingApi = remote ? remotePublicBooking : mockPublicBooking;
 export const workspace: WorkspaceData = remote ? remoteWorkspace : mockWorkspace;
+export const invites: InviteService = remote ? remoteInvites : mockInvites;
+/** The in-browser demo never delivers anything. */
+const NOTHING_CONNECTED: PlatformInfo = { channels: [] };
+export const platform: PlatformService = remote ? remotePlatform : { useInfo: () => NOTHING_CONNECTED };
 
 export * from './contracts';

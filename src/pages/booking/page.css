@@ -1322,6 +1322,7 @@ html:has(.tenant[data-editing]) {
 
 .tenant-site[data-theme='night'] {
   --porcelain: #0e0e10;
+  --porcelain-2: #141416;
   --bg: #0e0e10;
   --paper: #1a1a1d;
   --surface: #1a1a1d;
@@ -1392,5 +1393,56 @@ html:has(.tenant[data-editing]) {
   .pg-hero__bg,
   .pg-hero__intro {
     animation: none;
+  }
+}
+
+/* ── Demo film: the page building itself inside the film's phone ──── */
+
+html:has(.tenant[data-film]) {
+  scrollbar-width: none;
+}
+
+html:has(.tenant[data-film])::-webkit-scrollbar {
+  display: none;
+}
+
+.tenant[data-film] .pg-hero__none {
+  visibility: hidden;
+}
+
+.tenant[data-film],
+.tenant[data-film] * {
+  transition:
+    background-color 900ms var(--ease-out),
+    color 900ms var(--ease-out),
+    border-color 900ms var(--ease-out),
+    border-radius 900ms var(--ease-out);
+}
+
+.tenant[data-film] :is(.tenant-section, .svc-row, .svc-card, .team-card, .pg-gallery li, .pg-review, .pg-hero__tagline, .pg-hero__desc, .pg-hero__intro .biz-mark, .addon) {
+  animation: filmIn 1100ms var(--ease-out) both;
+}
+
+@keyframes filmIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+.tenant[data-typing] .pg-hero__title::after {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 0.85em;
+  margin-inline-start: 6px;
+  vertical-align: -0.08em;
+  background: var(--accent);
+  animation: filmCaret 1s steps(1) infinite;
+}
+
+@keyframes filmCaret {
+  50% {
+    opacity: 0;
   }
 }

@@ -272,6 +272,19 @@ function ServiceForm({ initial, onSaved }: { initial: Service; onSaved: () => vo
       </p>
       {!solo && <StaffTermsField service={s} onChange={setS} />}
       <label className="field">
+        <span className="field__label">{t('servicesAdmin.fields.rebook')}</span>
+        <select className="field__input" value={s.rebookAfterDays ?? 0} onChange={(e) => set('rebookAfterDays', Number(e.target.value) || undefined)} aria-describedby="svc-rebook-hint">
+          {[...new Set([0, 7, 14, 21, 28, 35, 42, 56, 84, s.rebookAfterDays ?? 0])].map((n) => (
+            <option key={n} value={n}>
+              {!n ? t('servicesAdmin.fields.rebookNever') : n % 7 ? t('servicesAdmin.fields.rebookAfterDays', { count: n }) : t('servicesAdmin.fields.rebookAfter', { count: n / 7 })}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p id="svc-rebook-hint" className="field__hint">
+        {t('servicesAdmin.fields.rebookHint')}
+      </p>
+      <label className="field">
         <span className="field__label">
           {t('servicesAdmin.fields.image')} <span className="muted">({t('common.optional')})</span>
         </span>

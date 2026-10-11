@@ -142,6 +142,33 @@ export const remoteAuth: AuthService = {
     if (error) throw new ApiError('server');
   },
 
+  async requestPasswordReset(email) {
+    if (!supabase) throw new ApiError('invalid');
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
+    if (error && (error.status === 429 || error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit')) throw new ApiError('rate_limited');
+    if (error && !error.status) throw new ApiError('network');
+  },
+
+  async resetPassword({ email, code, password }) {
+    if (!supabase) throw new ApiError('invalid');
+    const address = email.trim().toLowerCase();
+    // A retry after a rejected password: the code was already used and the person is signed in.
+    const current = (await supabase.auth.getSession()).data.session;
+    if (current?.user.email?.toLowerCase() !== address) {
+      const verified = await supabase.auth.verifyOtp({ email: address, token: code.replace(/\s/g, ''), type: 'recovery' });
+      if (verified.error) {
+        if (verified.error.status === 429) throw new ApiError('rate_limited');
+        throw new ApiError(verified.error.status ? 'invalid' : 'network');
+      }
+    }
+    const updated = await supabase.auth.updateUser({ password });
+    if (updated.error) throw new ApiError(updated.error.code === 'weak_password' || updated.error.code === 'same_password' || updated.error.status === 422 ? 'policy' : 'server');
+    setActive(null);
+    await refreshSession();
+    if (!session) throw new ApiError('server');
+    return session;
+  },
+
   async signIn(email) {
     const { token } = await rpc<{ token: string }>('auth.devSignIn', email);
     setActive(null);

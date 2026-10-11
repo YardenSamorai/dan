@@ -12,7 +12,7 @@ import type { Locale } from '../../i18n/config';
  * Nothing outside the mock adapters imports this file.
  */
 
-export const SEED_VERSION = 7;
+export const SEED_VERSION = 8;
 export const DEMO_BUSINESS_IDS = ['biz_demo_studio', 'biz_lash_room'];
 const TZ = 'Asia/Jerusalem';
 
@@ -58,7 +58,38 @@ function tenStudio(today: string, createdAt: string): TenantData {
     phone: '03-555-0110',
     email: 'hello@ten-atelier.example',
     social: { instagram: 'ten.atelier.demo' },
-    branding: { accent: 'fig' },
+    branding: { accent: 'fig', coverUrl: '/demo/cover.webp' },
+    page: {
+      theme: 'editorial',
+      sections: [
+        { id: 'hero', kind: 'hero', visible: true, layout: 'cover' },
+        { id: 'services', kind: 'services', visible: true, layout: 'list' },
+        { id: 'gallery', kind: 'gallery', visible: true, layout: 'grid', images: [1, 2, 3, 6, 5, 4].map((n) => `/demo/gallery-${n}.webp`) },
+        { id: 'team', kind: 'team', visible: true },
+        {
+          id: 'about',
+          kind: 'about',
+          visible: true,
+          imageUrl: '/demo/gallery-4.webp',
+          title: { en: 'A small studio, on purpose', he: 'סטודיו קטן, בכוונה' },
+          body: {
+            en: 'Four chairs, one long oak table and a window onto Shabazi Street. We keep the studio small so every appointment gets the time it needs.\nWe work only with gel, and we tell you honestly what will last on your nails.',
+            he: 'ארבעה כיסאות, שולחן עץ ארוך וחלון לרחוב שבזי. אנחנו שומרות על סטודיו קטן כדי שלכל תור יהיה הזמן שהוא צריך.\nאנחנו עובדות רק עם ג׳ל, ואומרות בכנות מה יחזיק על הציפורניים שלך.',
+          },
+        },
+        {
+          id: 'reviews',
+          kind: 'reviews',
+          visible: true,
+          items: [
+            { id: 'r1', title: { en: 'Shira K.', he: 'שירה כ.' }, body: { en: 'Three weeks and not a single chip. Booking took me under a minute.', he: 'שלושה שבועות ואף סדק. קבעתי את התור בפחות מדקה.' } },
+            { id: 'r2', title: { en: 'Yael M.', he: 'יעל מ.' }, body: { en: 'Noa listened to what I wanted and talked me out of what wouldn’t work. Exactly right.', he: 'נועה הקשיבה למה שרציתי, והורידה אותי ממה שלא היה מחזיק. בדיוק נכון.' } },
+            { id: 'r3', title: { en: 'Tamar F.', he: 'תמר פ.' }, body: { en: 'Quiet, clean and always on time. I can move my appointment myself when plans change.', he: 'שקט, נקי ותמיד בזמן. כשמשהו משתנה אני מזיזה את התור לבד.' } },
+          ],
+        },
+        { id: 'info', kind: 'info', visible: true },
+      ],
+    },
     hours: weekly({
       0: dayHours([range('09:00', '20:00')]),
       1: dayHours([range('09:00', '20:00')]),
@@ -80,6 +111,7 @@ function tenStudio(today: string, createdAt: string): TenantData {
     bufferBefore: 0,
     ...s,
   });
+  const photo: Record<string, number> = { 'gel-manicure': 1, 'gel-refill': 6, 'french-gel': 2, 'builder-gel': 3, 'gel-pedicure': 5, removal: 4 };
   const services: Service[] = [
     svc({
       id: 'gel-manicure',
@@ -146,14 +178,21 @@ function tenStudio(today: string, createdAt: string): TenantData {
       bufferAfter: 5,
       staffIds: ALL,
     }),
-  ];
+  ].map((s) => ({ ...s, imageUrl: `/demo/gallery-${photo[s.id]}.webp` }));
 
+  const BIOS: Record<string, Staff['bio']> = {
+    noa: { en: 'Opened the studio in 2016. Loves a clean, short almond.', he: 'פתחה את הסטודיו ב־2016. אוהבת שקד קצר ונקי.' },
+    maya: { en: 'Calm hands and fine lines. Ask her for French.', he: 'ידיים רגועות וקווים עדינים. תבקשו ממנה פרנץ׳.' },
+    lior: { en: 'Builder gel and repairs. Makes weak nails strong again.', he: 'בניית ג׳ל ותיקונים. מחזירה כוח לציפורניים חלשות.' },
+    dana: { en: 'Joined last year. Pedicures and bold colour.', he: 'הצטרפה בשנה שעברה. פדיקור וצבעים נועזים.' },
+  };
   const person = (id: string, name: Staff['name'], role: Staff['role'], color: string, schedule: Staff['schedule'], userId?: string): Staff => ({
     businessId: B,
     id,
     name,
     role,
-    bio: { en: '' },
+    bio: BIOS[id] ?? { en: '' },
+    avatarUrl: BIOS[id] ? `/demo/staff-${id}.webp` : undefined,
     color,
     active: true,
     onlineBookable: true,

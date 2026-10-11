@@ -10,6 +10,8 @@ import { TenantChrome, TenantScope } from './pages/booking/TenantLayout';
 
 const SignInPage = lazy(() => import('./pages/auth/SignInPage'));
 const SignUpPage = lazy(() => import('./pages/auth/SignUpPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const JoinPage = lazy(() => import('./pages/auth/JoinPage'));
 const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
 const TenantHome = lazy(() => import('./pages/booking/TenantHome'));
 const BookFlowPage = lazy(() => import('./pages/booking/BookFlowPage'));
@@ -35,6 +37,8 @@ function useProductTitle() {
       ? t('auth.signIn.title')
       : pathname.startsWith('/sign-up')
         ? t('auth.signUp.title')
+        : pathname.startsWith('/reset-password')
+        ? t('auth.reset.title')
         : pathname.startsWith('/onboarding')
           ? t('onboarding.title')
           : null;
@@ -82,6 +86,8 @@ export function App() {
             </Route>
             <Route path="sign-in" element={<SignInPage />} />
             <Route path="sign-up" element={<SignUpPage />} />
+            <Route path="reset-password" element={<ResetPasswordPage />} />
+            <Route path="join/:slug/:token" element={<JoinPage />} />
             <Route path="onboarding" element={<OnboardingPage />} />
             <Route path="book/:businessSlug" element={<TenantScope />}>
               <Route path="new" element={<BookFlowPage />} />

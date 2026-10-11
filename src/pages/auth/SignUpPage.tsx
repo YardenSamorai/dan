@@ -4,6 +4,7 @@ import { auth } from '../../data';
 import { useI18n } from '../../i18n/I18nProvider';
 import { AuthField, AuthFields } from './AuthField';
 import { AuthLayout } from './AuthLayout';
+import { useNext, withNext } from './next';
 import { PasswordForm } from './PasswordForm';
 
 function Consent() {
@@ -32,6 +33,7 @@ function Consent() {
 export default function SignUpPage() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
+  const next = useNext();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState(false);
@@ -44,7 +46,7 @@ export default function SignUpPage() {
     setError(false);
     try {
       await auth.signUp({ name, email, locale });
-      navigate('/onboarding');
+      navigate(next ?? '/onboarding');
     } catch {
       setError(true);
       setShake((s) => s + 1);
@@ -55,7 +57,7 @@ export default function SignUpPage() {
 
   const haveAccount = (
     <p className="auth__switch">
-      {t('auth.signUp.haveAccount')} <Link to="/sign-in">{t('auth.signIn.submit')}</Link>
+      {t('auth.signUp.haveAccount')} <Link to={withNext('/sign-in', next)}>{t('auth.signIn.submit')}</Link>
     </p>
   );
 
