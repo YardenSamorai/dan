@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { publicBooking, type PublicBooking } from '../../data';
+import { ApiError, publicBooking, type PublicBooking } from '../../data';
 import { rememberBooking, useMyBookingIds } from '../../data/mine';
 import { isUpcoming } from '../../domain/scheduling';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -19,9 +19,10 @@ export default function MyBookingsPage() {
   const tenant = usePublicTenant();
   const ids = useMyBookingIds(tenant.slug);
   const navigate = useNavigate();
-  const [code, setCode] = useState('');
   const [phone, setPhone] = useState('');
-  const [error, setError] = useState(false);
+  const [proof, setProof] = useState('');
+  const [error, setError] = useState<'notFound' | 'tooMany' | null>(null);
+  const [foundCount, setFoundCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const tz = tenant.business.timezone;
   const upcoming = (b: PublicBooking) => isUpcoming(b, new Date(), tz);
@@ -29,11 +30,18 @@ export default function MyBookingsPage() {
   const find = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const found = await publicBooking.findBooking(tenant.slug, code, phone).catch(() => null);
+    setFoundCount(0);
+    const found = await publicBooking.findBookings(tenant.slug, phone, proof).catch((err) => (err instanceof ApiError && err.code === 'rate_limited' ? 'tooMany' : null));
     setBusy(false);
-    if (!found) return setError(true);
-    rememberBooking(tenant.slug, found.id);
-    navigate(`${tenant.base}/bookings/${found.id}`);
+    if (found === 'tooMany') return setError('tooMany');
+    if (!found?.length) return setError('notFound');
+    for (const b of found) rememberBooking(tenant.slug, b.id);
+    if (found.length === 1) return navigate(`${tenant.base}/bookings/${found[0].id}`);
+    setFoundCount(found.length);
+  };
+  const edit = (set: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    set(e.target.value);
+    setError(null);
   };
 
   const list = (filter: (b: PublicBooking) => boolean) =>
@@ -77,20 +85,28 @@ export default function MyBookingsPage() {
           <h2 className="mine__find-title">{t('mine.find.title')}</h2>
           <p className="muted">{t('mine.find.lede')}</p>
           <div className="field">
-            <label className="field__label" htmlFor="find-code">
-              {t('mine.find.code')}
-            </label>
-            <input id="find-code" className="field__input" value={code} dir="ltr" autoCapitalize="characters" onChange={(e) => (setCode(e.target.value), setError(false))} />
-          </div>
-          <div className="field">
             <label className="field__label" htmlFor="find-phone">
               {t('mine.find.phone')}
             </label>
-            <input id="find-phone" className="field__input" type="tel" dir="ltr" value={phone} onChange={(e) => (setPhone(e.target.value), setError(false))} />
+            <input id="find-phone" className="field__input" type="tel" dir="ltr" autoComplete="tel" value={phone} onChange={edit(setPhone)} />
+          </div>
+          <div className="field">
+            <label className="field__label" htmlFor="find-proof">
+              {t('mine.find.proof')}
+            </label>
+            <input id="find-proof" className="field__input" autoComplete="given-name" aria-describedby="find-proof-hint" value={proof} onChange={edit(setProof)} />
+            <p id="find-proof-hint" className="field__hint">
+              {t('mine.find.proofHint')}
+            </p>
           </div>
           {error && (
             <p className="field__error" role="alert">
-              {t('mine.find.notFound')}
+              {t(`mine.find.${error}`)}
+            </p>
+          )}
+          {foundCount > 0 && (
+            <p className="mine__found" role="status">
+              {t('mine.find.found', { count: foundCount })}
             </p>
           )}
           <button className="btn btn--ink btn--block" disabled={busy}>

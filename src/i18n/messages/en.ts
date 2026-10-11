@@ -973,11 +973,14 @@ export const en = {
     empty: 'No upcoming bookings on this device.',
     find: {
       title: 'Find a booking',
-      lede: 'Booked on another device? Enter your booking ref and mobile number.',
-      code: 'Booking ref',
+      lede: 'Booked on another device, or did the business book for you? Enter your mobile number and first name.',
       phone: 'Mobile number',
+      proof: 'First name or booking ref',
+      proofHint: 'The name you gave when you booked.',
       submit: 'Find booking',
-      notFound: 'We couldn’t find a booking with those details. Check the numbers and try again.',
+      notFound: 'We couldn’t find upcoming bookings with those details. Check the number and name and try again.',
+      tooMany: 'Too many tries with this number. Try again in 15 minutes.',
+      found: { one: 'We found 1 booking. It’s in your list now.', other: 'We found {count} bookings. They’re in your list now.' },
     },
     manage: {
       title: 'Your appointment',

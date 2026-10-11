@@ -109,6 +109,21 @@ try {
     const fetched = await call('public.booking', [SLUG, booked.id]);
     check('booking readable by its token', fetched.result?.code === booked.code);
 
+    const byName = await call('public.findBookings', [SLUG, '050-111-1111', ' test ']);
+    check('phone + first name finds the booking', byName.status === 200 && byName.result.some((b: any) => b.id === booked.id), byName);
+    const byCode = await call('public.findBookings', [SLUG, '0501111111', booked.code.toLowerCase()]);
+    check('phone + booking ref finds exactly that booking', byCode.result?.length === 1 && byCode.result[0].id === booked.id, byCode);
+    const wrongName = await call('public.findBookings', [SLUG, '0501111111', 'Someone']);
+    check('phone + wrong name finds nothing', wrongName.status === 200 && wrongName.result.length === 0, wrongName);
+    const wrongPhone = await call('public.findBookings', [SLUG, '0509999999', 'Test']);
+    check('right name + wrong phone finds nothing', wrongPhone.result?.length === 0, wrongPhone);
+    const phoneOnly = await call('public.findBookings', [SLUG, '0501111111', '']);
+    check('phone alone finds nothing', phoneOnly.result?.length === 0, phoneOnly);
+    const guessed = `05${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`;
+    const guesses = [];
+    for (let i = 0; i < 6; i++) guesses.push((await call('public.findBookings', [SLUG, guessed, `guess${i}`])).status);
+    check('repeated wrong guesses for one number → 429', guesses.slice(0, 5).every((s) => s === 200) && guesses[5] === 429, guesses);
+
     const cancelled = await call('public.cancelBooking', [SLUG, booked.id]);
     check('customer can cancel within policy', cancelled.status === 200 && cancelled.result.status === 'cancelled', cancelled);
   }

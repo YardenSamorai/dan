@@ -391,11 +391,24 @@ html[data-film-playing] .site-header {
   }
 }
 
+/* Floats just under the fixed header, over the hero's top padding, so it never sits beneath the header. */
 .film-replay {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(var(--header-h) + 10px);
+  z-index: 5;
   display: flex;
   justify-content: center;
-  padding: var(--s-3);
-  background: #f6f3ee;
+  pointer-events: none;
+}
+
+.film-replay .btn {
+  border: 1px solid color-mix(in oklab, var(--ink) 10%, transparent);
+  background: color-mix(in oklab, #fff 86%, transparent);
+  box-shadow: 0 6px 18px -10px rgba(20, 10, 15, 0.35);
+  color: var(--ink);
+  pointer-events: auto;
+  backdrop-filter: blur(10px);
 }
 
 .film-still {

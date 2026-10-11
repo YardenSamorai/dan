@@ -7,6 +7,7 @@ dist
 .dev.vars
 .dev.vars.*
 .wrangler/
+supabase/.temp/
 qa/shots
 *.log
 *.tsbuildinfo
