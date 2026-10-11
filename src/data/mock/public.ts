@@ -29,6 +29,22 @@ function isBlocked(t: TenantData, who: { phone: string; email?: string }) {
   return t.customers.some((c) => c.blocked && (normalizePhone(c.phone) === phone || (!!email && c.email?.trim().toLowerCase() === email)));
 }
 
+/** Case, spacing, niqqud and punctuation (geresh, hyphens, quotes) don't count when comparing names. */
+const nameKey = (s: string) =>
+  s
+    .normalize('NFKD')
+    .replace(/[\u0591-\u05c7\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
+/** The name the customer types matches their whole saved name or any single word of it. */
+const nameMatches = (saved: string, given: string) => {
+  const full = nameKey(saved);
+  return full === given || full.split(' ').includes(given);
+};
+
 export const visible = (db: MockDatabase, t: TenantData, userId?: string) =>
   t.business.status === 'published' || (!!userId && db.members.some((m) => m.businessId === t.business.id && m.userId === userId));
 
@@ -223,15 +239,21 @@ export const mockPublicBooking: PublicBookingApi = {
     return useMemo(() => (t && a ? toPublic(t, a) : undefined), [t, a]);
   },
 
-  async findBooking(slug, code, phone) {
+  async findBookings(slug, phone, proof) {
     await latency(400);
     const t = requireTenant(slug);
     const digits = normalizePhone(phone);
-    const a = t.appointments.find((x) => {
-      const c = t.customers.find((y) => y.id === x.customerId);
-      return x.code.toUpperCase() === code.trim().toUpperCase() && c && normalizePhone(c.phone) === digits;
-    });
-    return a ? toPublic(t, a) : null;
+    const given = nameKey(proof);
+    if (digits.length < 9 || !given) return [];
+    const mine = new Set(t.customers.filter((c) => normalizePhone(c.phone) === digits).map((c) => c.id));
+    const byCode = t.appointments.find((a) => mine.has(a.customerId) && a.code.toUpperCase() === proof.trim().toUpperCase());
+    if (byCode) return [toPublic(t, byCode)];
+    const named = new Set(t.customers.filter((c) => mine.has(c.id) && nameMatches(c.name, given)).map((c) => c.id));
+    const today = businessNow(t).date;
+    return t.appointments
+      .filter((a) => named.has(a.customerId) && a.status !== 'cancelled' && a.date >= today)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start)
+      .map((a) => toPublic(t, a));
   },
 
   async cancelBooking(slug, token) {

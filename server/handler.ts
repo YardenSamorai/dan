@@ -5,7 +5,7 @@ import { mockAuth, mockDirectory, sessionInfo } from '../src/data/mock/auth';
 import { getDb, mutateDb, type MockDatabase } from '../src/data/mock/db';
 import { availabilityView, bySlug, mockPublicBooking, project, toPublic, visible } from '../src/data/mock/public';
 import { mockInvites } from '../src/data/mock/invites';
-import { membersOf, mockWorkspace, scopeForRole } from '../src/data/mock/workspace';
+import { membersOf, mockWorkspace, normalizePhone, scopeForRole } from '../src/data/mock/workspace';
 import type { Locale } from '../src/i18n/config';
 import { bearer, type Authenticator } from './auth';
 import { inScope } from './context';
@@ -37,6 +37,14 @@ async function uploadInline(v: unknown, put: (dataUrl: string) => Promise<string
 }
 
 const WITH_IMAGES = new Set<string>(['savePage', 'updateBusiness', 'saveService', 'saveStaff']);
+
+/**
+ * Wrong guesses allowed per business and mobile number before booking lookups
+ * pause. Counted per server instance, so it slows guessing rather than
+ * stopping a determined attacker outright.
+ */
+const LOOKUP_LIMIT = { misses: 5, windowMs: 15 * 60_000 };
+const lookupMisses = new Map<string, { count: number; until: number }>();
 
 interface Fn {
   hint?: (args: any[], c: Call) => Hint;
@@ -185,9 +193,19 @@ const FNS: Record<string, Fn> = {
     hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
     run: ([slug, input]) => mockPublicBooking.createBooking(str(slug), input as PublicBookingInput),
   },
-  'public.findBooking': {
+  'public.findBookings': {
     hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
-    run: ([slug, code, phone]) => mockPublicBooking.findBooking(str(slug), str(code), str(phone)),
+    run: async ([slug, phone, proof]) => {
+      const key = `${str(slug)}|${normalizePhone(str(phone))}`;
+      const now = Date.now();
+      if (lookupMisses.size > 10_000) for (const [k, m] of lookupMisses) if (m.until <= now) lookupMisses.delete(k);
+      const miss = lookupMisses.get(key);
+      if (miss && miss.until > now && miss.count >= LOOKUP_LIMIT.misses) throw new ApiError('rate_limited');
+      const found = await mockPublicBooking.findBookings(str(slug), str(phone), str(proof));
+      if (found.length) lookupMisses.delete(key);
+      else lookupMisses.set(key, { count: miss && miss.until > now ? miss.count + 1 : 1, until: now + LOOKUP_LIMIT.windowMs });
+      return found;
+    },
   },
   'public.cancelBooking': {
     hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),

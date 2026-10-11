@@ -231,7 +231,12 @@ export interface PublicBookingApi {
   createBooking(slug: string, input: PublicBookingInput): Promise<PublicBooking>;
   /** null = still loading; undefined = no such booking. */
   useBooking(slug: string, token: string): PublicBooking | null | undefined;
-  findBooking(slug: string, code: string, phone: string): Promise<PublicBooking | null>;
+  /**
+   * Bookings for a mobile number, proven by the customer's first name (every
+   * upcoming booking) or a booking ref (that booking). Empty when nothing
+   * matches; throws `rate_limited` after repeated misses for the same number.
+   */
+  findBookings(slug: string, phone: string, proof: string): Promise<PublicBooking[]>;
   cancelBooking(slug: string, token: string): Promise<PublicBooking>;
   rescheduleBooking(slug: string, token: string, to: { date: ISODate; start: Minutes }): Promise<PublicBooking>;
 }

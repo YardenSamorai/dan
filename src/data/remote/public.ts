@@ -78,10 +78,10 @@ export const remotePublicBooking: PublicBookingApi = {
     return b ?? undefined;
   },
 
-  async findBooking(slug, code, phone) {
-    const b = await rpc<PublicBooking | null>('public.findBooking', slug, code, phone);
-    if (b) bookings.set(bookingKey(slug, b.id), b);
-    return b;
+  async findBookings(slug, phone, proof) {
+    const found = await rpc<PublicBooking[]>('public.findBookings', slug, phone, proof);
+    for (const b of found) bookings.set(bookingKey(slug, b.id), b);
+    return found;
   },
 
   async cancelBooking(slug, token) {
