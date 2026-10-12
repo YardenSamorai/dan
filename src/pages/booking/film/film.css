@@ -1,14 +1,18 @@
 /* ── Demo film: the example page builds itself as you scroll ──────── */
 
+/* Share of a screen the film keeps scrolling after it's done, while the tour slides over it. */
+.demo {
+  --film-outro: 0.85;
+}
+
 .film {
   position: relative;
-  height: calc(var(--film-length) * 100svh + 100svh);
-  background:
-    radial-gradient(60% 55% at 28% 48%, color-mix(in oklab, var(--accent) 9%, transparent), transparent 70%),
-    #f6f3ee;
+  height: calc((var(--film-length) + 1 + var(--film-outro, 0)) * 100svh);
+  background: #141418;
   color: var(--ink);
 }
 
+/* `--out` (0..1, set from the scroll) recedes the finished film as the tour covers it. */
 .film__stage {
   position: sticky;
   top: 0;
@@ -19,6 +23,22 @@
   height: 100svh;
   padding: var(--s-16) clamp(24px, 5vw, 96px) var(--s-8);
   overflow: hidden;
+  border-radius: calc(var(--out, 0) * 40px);
+  background:
+    radial-gradient(60% 55% at 28% 48%, color-mix(in oklab, var(--accent) 9%, transparent), transparent 70%),
+    #f6f3ee;
+  transform: scale(calc(1 - var(--out, 0) * 0.08));
+  transform-origin: 50% 30%;
+}
+
+.film__stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: #141418;
+  opacity: calc(var(--out, 0) * 0.55);
+  pointer-events: none;
 }
 
 .film__bar {
@@ -324,11 +344,6 @@ html[data-film-playing] .site-header {
     box-shadow var(--t-base) var(--ease-out),
     transform 400ms var(--ease-out),
     visibility 400ms;
-}
-
-.film__end {
-  position: absolute;
-  bottom: 0;
 }
 
 @media (max-width: 819px) {

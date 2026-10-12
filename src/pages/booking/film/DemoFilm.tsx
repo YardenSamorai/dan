@@ -4,6 +4,7 @@ import { ArrowDownIcon, ArrowIcon, PlayIcon } from '../../../components/ui/Icons
 import { useI18n } from '../../../i18n/I18nProvider';
 import { usePublicTenant } from '../TenantContext';
 import { FILM_PARAM, type FromFilm, type ToFilm } from './bridge';
+import { DemoTour, LIVE_ID } from './DemoTour';
 import { FilmPanel } from './FilmPanel';
 import { filmView, frameAt, sceneStarts, scenesFor, type FilmFrame } from './script';
 import './film.css';
@@ -37,7 +38,13 @@ export function DemoFilm() {
   const { t } = useI18n();
   const [still] = useState(stillMotion);
   const [open, setOpen] = useState(() => !seenBefore());
-  if (still) return <FilmStill />;
+  if (still)
+    return (
+      <>
+        <FilmStill />
+        <DemoTour />
+      </>
+    );
   if (!open)
     return (
       <div className="film-replay">
@@ -53,7 +60,12 @@ export function DemoFilm() {
         </button>
       </div>
     );
-  return <Film />;
+  return (
+    <div className="demo">
+      <Film />
+      <DemoTour overlap />
+    </div>
+  );
 }
 
 function Film() {
@@ -78,9 +90,14 @@ function Film() {
       const el = root.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
-      const run = r.height - window.innerHeight;
+      // The last stretch of the section is the outro: the film is done and recedes under the tour.
+      const outro = (parseFloat(getComputedStyle(el).getPropertyValue('--film-outro')) || 0) * window.innerHeight;
+      const run = r.height - window.innerHeight - outro;
       target = run > 0 ? Math.min(Math.max(-r.top / run, 0), 1) : 0;
-      document.documentElement.toggleAttribute('data-film-playing', r.bottom > 80);
+      const out = outro > 0 ? Math.min(Math.max((-r.top - run) / outro, 0), 1) : 0;
+      stage.current?.style.setProperty('--out', out.toFixed(3));
+      const story = el.parentElement ?? el;
+      document.documentElement.toggleAttribute('data-film-playing', story.getBoundingClientRect().bottom > 80);
       if (target > 0.97) {
         try {
           sessionStorage.setItem(SEEN, '1');
@@ -164,7 +181,8 @@ function Film() {
   const jump = (i: number) => {
     const el = root.current;
     if (!el) return;
-    const run = el.offsetHeight - window.innerHeight;
+    const outro = (parseFloat(getComputedStyle(el).getPropertyValue('--film-outro')) || 0) * window.innerHeight;
+    const run = el.offsetHeight - window.innerHeight - outro;
     const top = el.getBoundingClientRect().top + window.scrollY + run * (starts[i] + 0.002);
     window.scrollTo({ top, behavior: 'smooth' });
   };
@@ -177,7 +195,7 @@ function Film() {
           <span className="film__progress" aria-hidden>
             <span style={{ transform: `scaleX(${p})` }} />
           </span>
-          <a href="#film-end" className="film__skip">
+          <a href={`#${LIVE_ID}`} className="film__skip">
             {t('film.skip')} <ArrowDownIcon size={14} />
           </a>
         </div>
@@ -199,7 +217,7 @@ function Film() {
                   <Link to={`${base}/new`} className="btn btn--primary btn--lg" tabIndex={i === index ? undefined : -1}>
                     {t('film.book')}
                   </Link>
-                  <a href="#film-end" className="link-arrow" tabIndex={i === index ? undefined : -1}>
+                  <a href={`#${LIVE_ID}`} className="link-arrow" tabIndex={i === index ? undefined : -1}>
                     {t('film.seePage')} <ArrowIcon />
                   </a>
                 </div>
@@ -244,7 +262,6 @@ function Film() {
           </div>
         </div>
       </div>
-      <span id="film-end" className="film__end" />
     </section>
   );
 }

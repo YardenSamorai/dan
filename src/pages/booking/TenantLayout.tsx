@@ -10,6 +10,7 @@ import { can } from '../../domain/permissions';
 import type { SectionKind } from '../../domain/types';
 import { FormatScope, useI18n } from '../../i18n/I18nProvider';
 import { DemoFilm, FILM_SLUGS } from './film/DemoFilm';
+import { DemoClosing } from './film/DemoTour';
 import { FilmCamera } from './film/FilmCamera';
 import { inFilmFrame, useFilmFrame } from './film/bridge';
 import { filmView, scenesFor } from './film/script';
@@ -179,6 +180,7 @@ export function TenantChrome() {
           <Outlet />
         </Suspense>
       </main>
+      {film && <DemoClosing />}
       <footer className="site-footer">
         <div className="container">
           <div className="site-footer__top">

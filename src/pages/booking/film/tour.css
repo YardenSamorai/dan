@@ -1,0 +1,1330 @@
+/* ── Demo tour: the product story between the film and the live page ── */
+
+.demo-tour,
+.dt-close {
+  --dt-ink: #141418;
+  --dt-ink-2: #1d1d22;
+  --dt-paper: #f6f5f2;
+  --dt-line: rgba(20, 20, 24, 0.09);
+  --dt-blue: #5b6cff;
+  --dt-mint: #35c78a;
+  --dt-amber: #f2b94b;
+  --dt-violet: #8b7dff;
+  --dt-radius: 36px;
+  --font-display: var(--font-sans);
+  --ink: #1c1c1e;
+  --ink-2: #3f3f44;
+  --ink-3: #6e6e73;
+  --ink-4: #a1a1a6;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+
+.demo-tour {
+  position: relative;
+  z-index: 2;
+  background: var(--dt-paper);
+}
+
+/* Rises over the film's last frame while the film recedes behind it. */
+.demo-tour[data-overlap] {
+  margin-block-start: calc(var(--film-outro) * -100svh);
+  background: transparent;
+}
+
+.demo-tour[data-overlap] > :not(.dt-system) {
+  background: var(--dt-paper);
+}
+
+.dt-wrap {
+  width: 100%;
+  max-width: 1240px;
+  margin-inline: auto;
+  padding-inline: clamp(20px, 5vw, 64px);
+}
+
+.dt-display {
+  margin: 0;
+  font-size: clamp(2.2rem, 4.6vw, 4.25rem);
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.034em;
+  text-wrap: balance;
+}
+
+.dt-display--sm {
+  font-size: clamp(1.9rem, 3.4vw, 3rem);
+  letter-spacing: -0.028em;
+}
+
+html[lang='he'] .dt-display {
+  line-height: 1.1;
+  letter-spacing: -0.012em;
+}
+
+.dt-lede {
+  max-width: 36em;
+  margin: var(--s-5) 0 0;
+  font-size: clamp(1.05rem, 1.4vw, 1.2rem);
+  line-height: 1.6;
+  color: var(--ink-3);
+  text-wrap: pretty;
+}
+
+/* ── The system: a dark panel with the page at its centre ── */
+
+.dt-system {
+  position: relative;
+  overflow: hidden;
+  padding-block: clamp(72px, 10vw, 136px) clamp(64px, 8vw, 112px);
+  border-radius: var(--dt-radius);
+  background:
+    radial-gradient(60% 50% at 50% 46%, rgba(91, 108, 255, 0.16), transparent 70%),
+    radial-gradient(40% 40% at 85% 10%, rgba(139, 125, 255, 0.1), transparent 70%),
+    var(--dt-ink);
+  box-shadow: 0 -40px 80px -40px rgba(10, 10, 20, 0.45);
+  color: #f5f5f7;
+}
+
+.demo-tour:not([data-overlap]) .dt-system {
+  border-radius: 0 0 var(--dt-radius) var(--dt-radius);
+}
+
+.dt-system .dt-lede {
+  color: rgba(245, 245, 247, 0.66);
+}
+
+.dt-system__head {
+  max-width: 50rem;
+}
+
+.dt-map {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas:
+    'cal page rules'
+    'customer page insights';
+  align-items: center;
+  gap: clamp(28px, 4vw, 56px) clamp(32px, 6vw, 96px);
+  margin-block: clamp(56px, 7vw, 96px);
+}
+
+.dt-map__lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.dt-map__lines path {
+  fill: none;
+  stroke: rgba(141, 152, 255, 0.5);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 7;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transition: opacity 900ms var(--ease-out) 500ms;
+}
+
+.dt-map[data-seen] .dt-map__lines path {
+  opacity: 1;
+  animation: dtFlow 2.4s linear infinite;
+}
+
+@keyframes dtFlow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.dt-map__page {
+  grid-area: page;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: var(--s-4);
+  margin: 0;
+}
+
+.dt-map figcaption {
+  font-size: var(--text-13);
+  font-weight: 600;
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.dt-node {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: var(--s-3);
+  margin: 0;
+  transition:
+    opacity 800ms var(--ease-out),
+    transform 1000ms var(--ease-out);
+  transition-delay: calc(var(--i) * 110ms + 120ms);
+}
+
+.dt-node--cal {
+  grid-area: cal;
+}
+
+.dt-node--rules {
+  grid-area: rules;
+}
+
+.dt-node--customer {
+  grid-area: customer;
+}
+
+.dt-node--insights {
+  grid-area: insights;
+}
+
+.dt-map:not([data-seen]) .dt-node {
+  opacity: 0;
+}
+
+.dt-map:not([data-seen]) :is(.dt-node--cal, .dt-node--customer) {
+  transform: translateX(calc(var(--dir, 1) * 48px)) scale(0.96);
+}
+
+.dt-map:not([data-seen]) :is(.dt-node--rules, .dt-node--insights) {
+  transform: translateX(calc(var(--dir, 1) * -48px)) scale(0.96);
+}
+
+[dir='rtl'] .dt-map {
+  --dir: -1;
+}
+
+.dt-node__card {
+  padding: 16px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow:
+    0 30px 60px -30px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+/* The phone: the business's own page, in its own accent */
+.dt-phone {
+  width: 248px;
+  padding: 10px;
+  border-radius: 42px;
+  background: #0b0b0d;
+  box-shadow:
+    inset 0 0 0 1.5px #34343a,
+    0 50px 90px -30px rgba(0, 0, 0, 0.75),
+    0 0 0 10px rgba(91, 108, 255, 0.06),
+    0 0 120px rgba(91, 108, 255, 0.22);
+}
+
+.dt-phone__screen {
+  overflow: hidden;
+  height: 470px;
+  border-radius: 33px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.dt-phone__cover {
+  height: 120px;
+  background: linear-gradient(140deg, color-mix(in oklab, var(--accent) 70%, #fff), var(--accent));
+}
+
+.dt-phone__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dt-phone__body {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 0 16px 16px;
+  text-align: center;
+}
+
+.dt-phone__mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-block-start: -22px;
+  border: 3px solid #fff;
+  border-radius: 14px;
+  background: var(--accent);
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.dt-phone__name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.dt-phone__tagline {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.dt-phone__book {
+  margin-block-start: 6px;
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.dt-phone__next {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.dt-phone__next i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dt-mint);
+  box-shadow: 0 0 0 3px rgba(53, 199, 138, 0.18);
+}
+
+.dt-phone__svcs {
+  display: grid;
+  width: 100%;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: start;
+}
+
+.dt-phone__svcs li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-block: 9px;
+  border-top: 1px solid var(--dt-line);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.dt-phone__svcs small {
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+/* Calendar card */
+.dt-cal {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dt-cal__top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+}
+
+.dt-cal__top b {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.dt-cal__heads {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dt-cal__heads span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dt-cal__heads .avatar {
+  --avatar: 20px;
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+
+.dt-cal__body {
+  --row: 30px;
+  position: relative;
+  height: calc(var(--row) * 3.2);
+  border-top: 1px solid var(--dt-line);
+  background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--row) - 1px), var(--dt-line) calc(var(--row) - 1px) var(--row));
+}
+
+.dt-cal__body i {
+  --c: var(--dt-mint);
+  position: absolute;
+  inset-inline-start: calc(var(--col) * (100% / var(--cols)) + 2px);
+  top: calc(var(--at) * var(--row) + 2px);
+  width: calc(100% / var(--cols) - 6px);
+  height: calc(var(--len) * var(--row) - 4px);
+  border-inline-start: 3px solid var(--c);
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--c) 14%, #fff);
+}
+
+.dt-cal__body i[data-tone='amber'] {
+  --c: var(--dt-amber);
+}
+
+.dt-cal__body i[data-tone='violet'] {
+  --c: var(--dt-violet);
+}
+
+.dt-cal__body i[data-tone='blue'] {
+  --c: var(--dt-blue);
+  box-shadow: 0 0 0 1.5px var(--dt-blue);
+}
+
+.dt-cal__now {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(var(--row) * 1.45);
+  height: 1.5px;
+  background: var(--dt-blue);
+}
+
+.dt-cal__now::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -3px;
+  top: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dt-blue);
+}
+
+/* Rules card */
+.dt-rules {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dt-rules li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 8px;
+  border-bottom: 1px solid var(--dt-line);
+}
+
+.dt-rules li:last-child {
+  border-bottom: 0;
+}
+
+.dt-rules span {
+  display: grid;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.dt-rules b {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.dt-switch {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 18px;
+  border-radius: 999px;
+  background: #e4e4e8;
+}
+
+.dt-switch::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 2px;
+  top: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.dt-switch[data-on] {
+  background: var(--dt-mint);
+}
+
+.dt-switch[data-on]::after {
+  inset-inline-start: 14px;
+}
+
+/* Customer card */
+.dt-person {
+  display: grid;
+  gap: 10px;
+}
+
+.dt-person__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dt-person__head span {
+  display: grid;
+}
+
+.dt-person__head b {
+  font-weight: 650;
+}
+
+.dt-person__head small,
+.dt-person__stats dt {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.dt-person__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.dt-person__stats div {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f5f5f7;
+}
+
+.dt-person__stats dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.dt-person__note {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--dt-amber) 14%, #fff);
+  font-size: 11.5px;
+  color: #6b4d12;
+}
+
+.dt-person__next {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--dt-blue);
+}
+
+/* Insights card */
+.dt-ins {
+  display: grid;
+  gap: 8px;
+}
+
+.dt-ins > small {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.dt-ins__row {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dt-ins__row > span {
+  display: grid;
+}
+
+.dt-ins__row b {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.dt-ins__row small {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.dt-ins__row em {
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--dt-mint) 16%, #fff);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 600;
+  color: #1f7a52;
+}
+
+.dt-ins__bars {
+  display: flex;
+  align-items: end;
+  gap: 6px;
+  height: 64px;
+}
+
+.dt-ins__bars i {
+  flex: 1;
+  height: calc(var(--h) * 1%);
+  border-radius: 5px 5px 2px 2px;
+  background: #e8e8ee;
+  transform-origin: bottom;
+  transition: transform 900ms var(--ease-out);
+  transition-delay: calc(var(--i) * 60ms + 600ms);
+}
+
+.dt-ins__bars i[data-peak] {
+  background: var(--dt-blue);
+}
+
+.dt-map:not([data-seen]) .dt-ins__bars i {
+  transform: scaleY(0.15);
+}
+
+/* Three things a basic booking tool doesn't do */
+.dt-points {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(24px, 4vw, 56px);
+  margin: 0;
+  padding: clamp(32px, 4vw, 48px) 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  list-style: none;
+}
+
+.dt-points__icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-block-end: var(--s-4);
+  border-radius: 11px;
+  background: rgba(91, 108, 255, 0.16);
+  color: #aab3ff;
+}
+
+.dt-points li:nth-child(2) .dt-points__icon {
+  background: rgba(53, 199, 138, 0.15);
+  color: #7fe0b5;
+}
+
+.dt-points li:nth-child(3) .dt-points__icon {
+  background: rgba(139, 125, 255, 0.16);
+  color: #c2b9ff;
+}
+
+.dt-points h3 {
+  margin: 0 0 var(--s-2);
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.dt-points p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(245, 245, 247, 0.6);
+}
+
+/* ── A day: a real sequence, so it reads as a timeline ── */
+
+.dt-day {
+  padding-block: clamp(80px, 11vw, 152px) clamp(56px, 7vw, 96px);
+}
+
+.dt-day__grid {
+  display: grid;
+  gap: clamp(36px, 5vw, 64px);
+}
+
+.dt-day__list {
+  width: 100%;
+  max-width: 1080px;
+}
+
+.dt-day__list {
+  --rail: 1.5px;
+  position: relative;
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  view-timeline: --dt-day block;
+}
+
+.dt-day__list::before,
+.dt-day__list::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 5.5rem;
+  top: 14px;
+  bottom: 14px;
+  width: var(--rail);
+  background: var(--dt-line);
+}
+
+.dt-day__list::after {
+  background: linear-gradient(var(--dt-blue), var(--dt-mint), var(--dt-amber), var(--dt-violet), var(--ink));
+}
+
+@supports (animation-timeline: view()) {
+  .dt-day__list::after {
+    animation: dtRail linear both;
+    animation-timeline: --dt-day;
+    animation-range: cover 25% cover 75%;
+  }
+}
+
+@keyframes dtRail {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+.dt-moment {
+  --tone: var(--dt-blue);
+  position: relative;
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) minmax(0, 18rem);
+  gap: 0 clamp(20px, 3vw, 40px);
+  align-items: start;
+  padding-block: clamp(20px, 3vw, 32px);
+}
+
+.dt-moment + .dt-moment {
+  border-top: 1px solid var(--dt-line);
+}
+
+.dt-moment[data-tone='mint'] {
+  --tone: var(--dt-mint);
+}
+
+.dt-moment[data-tone='amber'] {
+  --tone: var(--dt-amber);
+}
+
+.dt-moment[data-tone='violet'] {
+  --tone: var(--dt-violet);
+}
+
+.dt-moment[data-tone='ink'] {
+  --tone: var(--ink);
+}
+
+.dt-moment::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: calc(5.5rem - 5px);
+  top: calc(clamp(20px, 3vw, 32px) + 9px);
+  z-index: 1;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--dt-paper);
+  border-radius: 50%;
+  background: var(--tone);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--tone) 18%, transparent);
+}
+
+.dt-moment__time {
+  padding-inline-end: 20px;
+  font-size: 1.05rem;
+  font-weight: 650;
+  line-height: 1.8;
+  color: var(--ink-3);
+}
+
+.dt-moment__text {
+  padding-inline-start: 8px;
+}
+
+.dt-moment h3 {
+  margin: 0;
+  font-size: clamp(1.15rem, 1.6vw, 1.35rem);
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.dt-moment p {
+  margin: var(--s-2) 0 var(--s-4);
+  line-height: 1.6;
+  color: var(--ink-3);
+  text-wrap: pretty;
+}
+
+.dt-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tone) 13%, #fff);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--tone) 70%, #1c1c1e);
+}
+
+.dt-tag::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+/* The bit of interface each moment happens in */
+.dt-moment__ui {
+  display: grid;
+  align-self: center;
+}
+
+.dt-ui {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--dt-line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 36px -24px rgba(20, 20, 40, 0.35);
+  font-size: 13px;
+}
+
+.dt-ui--toast span:last-child {
+  display: grid;
+}
+
+.dt-ui--toast b {
+  font-weight: 650;
+}
+
+.dt-ui--toast small {
+  color: var(--ink-3);
+}
+
+.dt-ui__check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--dt-blue) 30%, #fff);
+}
+
+.dt-ui--move {
+  flex-wrap: wrap;
+  color: var(--ink-3);
+}
+
+.dt-ui__old,
+.dt-ui__new {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-weight: 650;
+}
+
+.dt-ui__old {
+  background: #f2f2f4;
+  color: var(--ink-4);
+  text-decoration: line-through;
+}
+
+.dt-ui__new {
+  background: color-mix(in oklab, var(--dt-mint) 16%, #fff);
+  color: #1f7a52;
+}
+
+.dt-ui--move small {
+  flex-basis: 100%;
+  font-size: 11.5px;
+}
+
+.dt-ui--strip {
+  gap: 4px;
+  padding: 10px;
+}
+
+.dt-ui--strip i {
+  display: grid;
+  flex: 1.4;
+  place-items: center;
+  height: 40px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--dt-blue) 14%, #fff);
+  border-inline-start: 3px solid var(--dt-blue);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.dt-ui--strip i[data-kind='prep'],
+.dt-ui--strip i[data-kind='break'] {
+  flex: 1;
+  border: 0;
+  background: repeating-linear-gradient(-45deg, #f4f4f6 0 5px, #ebebef 5px 10px);
+}
+
+.dt-ui--strip i[data-kind='break'] {
+  flex: 1.3;
+  background: repeating-linear-gradient(-45deg, color-mix(in oklab, var(--dt-amber) 14%, #fff) 0 5px, color-mix(in oklab, var(--dt-amber) 26%, #fff) 5px 10px);
+  color: #7a5a14;
+}
+
+.dt-ui--team {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.dt-ui__seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: #f2f2f4;
+  font-size: 11.5px;
+}
+
+.dt-ui__seg > * {
+  padding: 5px 9px;
+  border-radius: 7px;
+}
+
+.dt-ui__seg b {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  font-weight: 650;
+}
+
+.dt-ui__seg span {
+  color: var(--ink-3);
+}
+
+.dt-ui__faces {
+  display: flex;
+}
+
+.dt-ui__faces .avatar {
+  margin-inline-start: -6px;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.dt-ui--stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dt-ui--stats dt {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.dt-ui--stats dd {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ── Who it's for ── */
+
+.dt-trust {
+  padding-block: clamp(56px, 7vw, 96px);
+}
+
+.dt-trust__head {
+  max-width: 46rem;
+}
+
+.dt-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: clamp(28px, 3vw, 40px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dt-types li {
+  padding: 9px 16px;
+  border: 1px solid var(--dt-line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.95rem;
+  font-weight: 550;
+}
+
+.dt-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(24px, 3vw, 40px);
+  margin: clamp(48px, 6vw, 72px) 0 0;
+  padding: clamp(28px, 3vw, 40px) 0 0;
+  border-top: 1px solid var(--dt-line);
+  list-style: none;
+}
+
+.dt-facts svg {
+  color: var(--dt-blue);
+}
+
+.dt-facts h3 {
+  margin: var(--s-3) 0 var(--s-1);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.dt-facts p {
+  margin: 0;
+  font-size: 0.93rem;
+  line-height: 1.55;
+  color: var(--ink-3);
+}
+
+/* ── Into the live page ── */
+
+.dt-bridge {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+  padding: clamp(40px, 5vw, 64px) var(--s-5) clamp(48px, 6vw, 80px);
+  text-align: center;
+  scroll-margin-block-start: 0;
+}
+
+.dt-bridge__title {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.2vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.dt-bridge__body {
+  max-width: 32em;
+  margin: 0;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.dt-bridge__arrow {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-block-start: var(--s-4);
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  animation: dtNudge 2.2s var(--ease-in-out) infinite;
+}
+
+@keyframes dtNudge {
+  50% {
+    transform: translateY(5px);
+  }
+}
+
+/* ── The closing panel, after the live page ── */
+
+.dt-close {
+  padding: clamp(32px, 5vw, 72px) clamp(12px, 3vw, 40px);
+}
+
+.dt-close__panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(40px, 6vw, 96px);
+  max-width: 1320px;
+  margin-inline: auto;
+  padding: clamp(40px, 7vw, 104px) clamp(24px, 6vw, 96px);
+  border-radius: var(--dt-radius);
+  background:
+    radial-gradient(50% 70% at 80% 50%, rgba(91, 108, 255, 0.18), transparent 70%),
+    var(--dt-ink);
+  color: #f5f5f7;
+}
+
+.dt-close .dt-lede {
+  color: rgba(245, 245, 247, 0.66);
+}
+
+.dt-close__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-4) var(--s-6);
+  margin-block-start: var(--s-8);
+}
+
+.dt-close .btn--light {
+  transition:
+    transform var(--t-press) var(--ease-out),
+    box-shadow 240ms var(--ease-out);
+}
+
+@media (hover: hover) {
+  .dt-close .btn--light:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 40px -12px rgba(91, 108, 255, 0.7);
+  }
+}
+
+.dt-close__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-weight: 600;
+  color: rgba(245, 245, 247, 0.8);
+  text-decoration: none;
+}
+
+.dt-close__more:hover {
+  color: #fff;
+  text-decoration: underline;
+  text-decoration-color: var(--dt-blue);
+  text-underline-offset: 4px;
+}
+
+/* A week of slots filling up, in the shape of the product mark */
+.dt-slots {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(8px, 1vw, 12px);
+  max-width: 420px;
+  justify-self: center;
+  width: 100%;
+}
+
+.dt-slots i {
+  aspect-ratio: 1;
+  border-radius: 28%;
+  background: rgba(255, 255, 255, 0.07);
+  transition:
+    background-color 500ms var(--ease-out),
+    transform 600ms var(--ease-out);
+  transition-delay: calc(var(--i) * 70ms);
+}
+
+.dt-slots[data-seen] i[data-fill] {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.dt-slots[data-seen] i[data-fill='2'] {
+  background: var(--dt-blue);
+  box-shadow: 0 0 30px rgba(91, 108, 255, 0.55);
+}
+
+.dt-slots[data-seen] i[data-fill='3'] {
+  background: var(--dt-mint);
+}
+
+.dt-slots[data-seen] i[data-fill='4'] {
+  background: var(--dt-amber);
+}
+
+.dt-slots[data-seen] i[data-fill='5'] {
+  background: var(--dt-violet);
+}
+
+.dt-slots:not([data-seen]) i {
+  transform: scale(0.86);
+}
+
+/* ── Smaller screens ── */
+
+@media (max-width: 1080px) {
+  .dt-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .dt-map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      'page page'
+      'cal rules'
+      'customer insights';
+    gap: var(--s-6) var(--s-4);
+  }
+
+  .dt-map__lines {
+    display: none;
+  }
+
+  .dt-map__page {
+    margin-block-end: var(--s-6);
+  }
+
+  .dt-map:not([data-seen]) .dt-node {
+    transform: translateY(24px);
+  }
+
+  .dt-points {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dt-moment {
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+  }
+
+  .dt-day__list::before,
+  .dt-day__list::after {
+    inset-inline-start: 4.5rem;
+  }
+
+  .dt-moment::before {
+    inset-inline-start: calc(4.5rem - 5px);
+  }
+
+  .dt-moment__ui {
+    grid-column: 2;
+    max-width: 22rem;
+    margin-block-start: var(--s-4);
+    padding-inline-start: 8px;
+  }
+
+  .dt-close__panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dt-slots {
+    max-width: 320px;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 600px) {
+  .demo-tour,
+  .dt-close {
+    --dt-radius: 26px;
+  }
+
+  .dt-map {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'page'
+      'cal'
+      'customer'
+      'rules'
+      'insights';
+  }
+
+  .dt-node {
+    max-width: 22rem;
+    width: 100%;
+    justify-self: center;
+  }
+
+  .dt-phone {
+    width: 216px;
+    border-radius: 38px;
+  }
+
+  .dt-phone__screen {
+    height: 392px;
+    border-radius: 29px;
+  }
+
+  .dt-phone__cover {
+    height: 96px;
+  }
+
+  .dt-moment {
+    grid-template-columns: 3.6rem minmax(0, 1fr);
+  }
+
+  .dt-moment__time {
+    padding-inline-end: 12px;
+    font-size: 0.95rem;
+  }
+
+  .dt-day__list::before,
+  .dt-day__list::after {
+    inset-inline-start: 3.6rem;
+  }
+
+  .dt-moment::before {
+    inset-inline-start: calc(3.6rem - 5px);
+  }
+
+  .dt-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dt-slots {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    max-width: 260px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dt-node,
+  .dt-ins__bars i,
+  .dt-slots i,
+  .dt-map__lines path {
+    transition: none;
+  }
+
+  .dt-map:not([data-seen]) .dt-node,
+  .dt-map:not([data-seen]) .dt-ins__bars i,
+  .dt-slots:not([data-seen]) i {
+    opacity: 1;
+    transform: none;
+  }
+
+  .dt-map[data-seen] .dt-map__lines path,
+  .dt-bridge__arrow {
+    animation: none;
+  }
+
+  .dt-map__lines path {
+    opacity: 1;
+  }
+
+  .dt-day__list::after {
+    animation: none;
+  }
+}
