@@ -209,7 +209,10 @@ export function ProductMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" className={className} aria-hidden focusable={false}>
       <rect x="2" y="2" width="16" height="16" rx="5" fill="currentColor" />
-      <path d="M6 10.5h8M6 7h8M6 14h4.5" stroke="#fff" strokeOpacity=".7" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="5.4" y="5.4" width="3.9" height="3.9" rx="1.1" fill="#fff" />
+      <rect x="10.7" y="5.4" width="3.9" height="3.9" rx="1.1" fill="#fff" fillOpacity=".32" />
+      <rect x="5.4" y="10.7" width="3.9" height="3.9" rx="1.1" fill="#fff" fillOpacity=".32" />
+      <rect x="10.7" y="10.7" width="3.9" height="3.9" rx="1.1" fill="#fff" fillOpacity=".32" />
     </svg>
   );
 }
