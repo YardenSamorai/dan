@@ -8,7 +8,7 @@
 .film {
   position: relative;
   height: calc((var(--film-length) + 1 + var(--film-outro, 0)) * 100svh);
-  background: #141418;
+  background: #1c1c1e;
   color: var(--ink);
 }
 
@@ -36,7 +36,7 @@
   position: absolute;
   inset: 0;
   z-index: 3;
-  background: #141418;
+  background: #1c1c1e;
   opacity: calc(var(--out, 0) * 0.55);
   pointer-events: none;
 }

@@ -446,13 +446,52 @@ function Bridge() {
 
 // ── The last word, after the live page ──────────────────────────────
 
-/** A week of slots filling up, drawn like the product mark. 0 stays open; the rest fill in the listed order. */
+/** A week of slots, drawn like the product mark. 0 is open, 1 booked, 2..5 the accent colours; they fill in the listed order. */
 const SLOTS = [1, 0, 3, 1, 0, 1, 2, 1, 1, 0, 1, 4, 0, 1, 1, 5, 1, 0, 1, 0, 1, 1, 3, 1];
 const SLOT_ORDER = [6, 0, 13, 3, 20, 8, 15, 22, 2, 10, 17, 5, 11, 23, 14, 18, 7, 21, 1, 9, 16, 4, 12, 19];
+const SLOT_COLS = 6;
+const SLOT_TICK_MS = 1100;
+/** Booked slots outnumber the coloured ones, the way a real week looks. */
+const RECOLOR = [1, 1, 1, 2, 3, 4, 5];
+
+type Slot = { id: number; at: number; fill: number };
+
+const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
+
+/** The slots keep trading places and changing colour for as long as the page is open (unless motion is off). */
+function useLiveSlots(on: boolean) {
+  const [slots, setSlots] = useState<Slot[]>(() => SLOTS.map((fill, i) => ({ id: i, at: i, fill })));
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    if (!on || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let n = 0;
+    const start = window.setTimeout(() => setLive(true), SLOTS.length * 70 + 700);
+    const id = window.setInterval(() => {
+      n++;
+      setSlots((cur) => {
+        const next = cur.map((s) => ({ ...s }));
+        const a = pick(next);
+        const b = pick(next.filter((s) => s.fill !== a.fill));
+        if (b) [a.at, b.at] = [b.at, a.at];
+        if (n % 2 === 0) {
+          const c = pick(next.filter((s) => s.fill > 0 && s !== a && s !== b));
+          if (c) c.fill = pick(RECOLOR.filter((f) => f !== c.fill));
+        }
+        return next;
+      });
+    }, SLOT_TICK_MS);
+    return () => {
+      window.clearTimeout(start);
+      window.clearInterval(id);
+    };
+  }, [on]);
+  return { slots, live };
+}
 
 export function DemoClosing() {
   const { t } = useI18n();
   const art = useSeen<HTMLDivElement>(0.4);
+  const { slots, live } = useLiveSlots(art.seen);
   return (
     <section className="dt-close" aria-labelledby="dt-close-title">
       <div className="dt-close__panel">
@@ -470,9 +509,13 @@ export function DemoClosing() {
             </Link>
           </div>
         </div>
-        <div ref={art.ref} className="dt-slots" data-seen={art.seen || undefined} aria-hidden>
-          {SLOTS.map((v, i) => (
-            <i key={i} data-fill={v || undefined} style={{ '--i': SLOT_ORDER.indexOf(i) } as CSSProperties} />
+        <div ref={art.ref} className="dt-slots" data-seen={art.seen || undefined} data-live={live || undefined} aria-hidden>
+          {slots.map((s) => (
+            <i
+              key={s.id}
+              data-fill={s.fill || undefined}
+              style={{ '--i': SLOT_ORDER.indexOf(s.id), '--x': s.at % SLOT_COLS, '--y': Math.floor(s.at / SLOT_COLS) } as CSSProperties}
+            />
           ))}
         </div>
       </div>
