@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8"><title>תבניות מייל ל־Supabase</title>
+<style>
+  body{margin:0;background:#f5f5f7;font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#1c1c1e}
+  main{max-width:1100px;margin:0 auto;padding:32px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(500px,1fr));gap:20px}
+  h1{grid-column:1/-1;margin:0;font-size:26px} .intro{grid-column:1/-1;margin:0;color:#3a3a3c}
+  .tpl{background:#fff;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  header{display:flex;justify-content:space-between;align-items:center;gap:8px} .where{direction:ltr;font-size:13px;color:#86868b}
+  .tag{font-size:12px;padding:2px 10px;border-radius:99px;background:#f0f0f2;color:#86868b} .tag.used{background:#1c1c1e;color:#fff}
+  .row{display:flex;align-items:center;gap:10px} label{font-size:12px;font-weight:600;color:#86868b;width:56px;direction:ltr;text-align:left}
+  code{flex:1;font:inherit;font-size:14px;unicode-bidi:plaintext;background:#f5f5f7;border-radius:8px;padding:6px 10px} .hint{flex:1;font-size:13px;color:#86868b}
+  button{font:inherit;font-size:13px;font-weight:600;border:0;border-radius:8px;padding:6px 12px;background:#1c1c1e;color:#fff;cursor:pointer}
+  button.done{background:#2e7d32}
+  textarea{display:none}
+  iframe{width:100%;height:600px;border:0;border-radius:12px;background:#f5f5f7}
+</style></head>
+<body><main>
+<h1>תבניות מייל ל־Supabase</h1>
+<p class="intro">Supabase › Authentication › Emails. לכל תבנית: מעתיקים את ה־Subject, מדביקים את ה־Body במצב Source, ושומרים. בתצוגה המקדימה כאן יש ערכים לדוגמה במקום הקוד והקישור.</p>
+
+<section class="tpl">
+  <header>
+    <span class="where">Authentication › <b>Confirm sign up</b></span>
+    <span class="tag ">לא בשימוש כרגע</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s0">אישור כתובת המייל שלך בתורנו</code><button data-copy="s0">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b0">העתקת ה־HTML</button></div>
+  <textarea id="b0" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;ברוכים הבאים לתורנו&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;נשאר רק לאשר שכתובת המייל הזו שלך.&lt;/p&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;&lt;td style=&quot;background:#1c1c1e;border-radius:12px&quot;&gt;&lt;a href=&quot;{{ .ConfirmationURL }}&quot; style=&quot;display:inline-block;padding:14px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:12px&quot;&gt;אישור המייל&lt;/a&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;אפשר גם להקליד את הקוד הזה:&lt;/p&gt;
+        &lt;div dir=&quot;ltr&quot; style=&quot;font-size:32px;letter-spacing:8px;font-weight:700;text-align:center;background:#f5f5f7;border-radius:12px;padding:18px 0;margin:0 0 24px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#1c1c1e&quot;&gt;{{ .Token }}&lt;/div&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא נרשמת לתורנו? אפשר להתעלם מהמייל הזה.&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Confirm your email for Tornu.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;ברוכים הבאים לתורנו&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;נשאר רק לאשר שכתובת המייל הזו שלך.&lt;/p&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;&lt;td style=&quot;background:#1c1c1e;border-radius:12px&quot;&gt;&lt;a href=&quot;#&quot; style=&quot;display:inline-block;padding:14px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:12px&quot;&gt;אישור המייל&lt;/a&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;אפשר גם להקליד את הקוד הזה:&lt;/p&gt;
+        &lt;div dir=&quot;ltr&quot; style=&quot;font-size:32px;letter-spacing:8px;font-weight:700;text-align:center;background:#f5f5f7;border-radius:12px;padding:18px 0;margin:0 0 24px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#1c1c1e&quot;&gt;482913&lt;/div&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא נרשמת לתורנו? אפשר להתעלם מהמייל הזה.&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Confirm your email for Tornu.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Authentication › <b>Invite user</b></span>
+    <span class="tag ">לא בשימוש כרגע</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s1">הוזמנת להצטרף לתורנו</code><button data-copy="s1">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b1">העתקת ה־HTML</button></div>
+  <textarea id="b1" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;הוזמנת להצטרף&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;קיבלת הזמנה לפתוח חשבון בתורנו, מערכת התורים והיומן של העסק.&lt;/p&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;&lt;td style=&quot;background:#1c1c1e;border-radius:12px&quot;&gt;&lt;a href=&quot;{{ .ConfirmationURL }}&quot; style=&quot;display:inline-block;padding:14px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:12px&quot;&gt;קבלת ההזמנה&lt;/a&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא ציפית להזמנה? אפשר להתעלם מהמייל הזה.&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;You have been invited to join Tornu.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;הוזמנת להצטרף&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;קיבלת הזמנה לפתוח חשבון בתורנו, מערכת התורים והיומן של העסק.&lt;/p&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;&lt;td style=&quot;background:#1c1c1e;border-radius:12px&quot;&gt;&lt;a href=&quot;#&quot; style=&quot;display:inline-block;padding:14px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:12px&quot;&gt;קבלת ההזמנה&lt;/a&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא ציפית להזמנה? אפשר להתעלם מהמייל הזה.&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;You have been invited to join Tornu.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Authentication › <b>Magic link or OTP</b></span>
+    <span class="tag ">לא בשימוש כרגע</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s2">קוד הכניסה שלך לתורנו: {{ .Token }}</code><button data-copy="s2">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b2">העתקת ה־HTML</button></div>
+  <textarea id="b2" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;כניסה לתורנו&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;זה קוד הכניסה שלך. הוא תקף לשעה ולשימוש אחד.&lt;/p&gt;
+        &lt;div dir=&quot;ltr&quot; style=&quot;font-size:32px;letter-spacing:8px;font-weight:700;text-align:center;background:#f5f5f7;border-radius:12px;padding:18px 0;margin:0 0 24px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#1c1c1e&quot;&gt;{{ .Token }}&lt;/div&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;או בלחיצה אחת:&lt;/p&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;&lt;td style=&quot;background:#1c1c1e;border-radius:12px&quot;&gt;&lt;a href=&quot;{{ .ConfirmationURL }}&quot; style=&quot;display:inline-block;padding:14px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:12px&quot;&gt;כניסה לחשבון&lt;/a&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא ניסית להיכנס? אפשר להתעלם מהמייל הזה. אף אחד לא נכנס בלי הקוד.&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Your Tornu sign-in code: {{ .Token }}&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;כניסה לתורנו&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;זה קוד הכניסה שלך. הוא תקף לשעה ולשימוש אחד.&lt;/p&gt;
+        &lt;div dir=&quot;ltr&quot; style=&quot;font-size:32px;letter-spacing:8px;font-weight:700;text-align:center;background:#f5f5f7;border-radius:12px;padding:18px 0;margin:0 0 24px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#1c1c1e&quot;&gt;482913&lt;/div&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;או בלחיצה אחת:&lt;/p&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;&lt;td style=&quot;background:#1c1c1e;border-radius:12px&quot;&gt;&lt;a href=&quot;#&quot; style=&quot;display:inline-block;padding:14px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:12px&quot;&gt;כניסה לחשבון&lt;/a&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא ניסית להיכנס? אפשר להתעלם מהמייל הזה. אף אחד לא נכנס בלי הקוד.&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Your Tornu sign-in code: 482913&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Authentication › <b>Change email address</b></span>
+    <span class="tag ">לא בשימוש כרגע</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s3">אישור כתובת המייל החדשה בתורנו</code><button data-copy="s3">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b3">העתקת ה־HTML</button></div>
+  <textarea id="b3" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;אישור החלפת מייל&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;ביקשת להחליף את כתובת המייל בחשבון מ־&lt;span dir=&quot;ltr&quot;&gt;{{ .Email }}&lt;/span&gt; ל־&lt;span dir=&quot;ltr&quot;&gt;{{ .NewEmail }}&lt;/span&gt;.&lt;/p&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;&lt;td style=&quot;background:#1c1c1e;border-radius:12px&quot;&gt;&lt;a href=&quot;{{ .ConfirmationURL }}&quot; style=&quot;display:inline-block;padding:14px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:12px&quot;&gt;אישור הכתובת החדשה&lt;/a&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;אפשר גם להקליד את הקוד הזה:&lt;/p&gt;
+        &lt;div dir=&quot;ltr&quot; style=&quot;font-size:32px;letter-spacing:8px;font-weight:700;text-align:center;background:#f5f5f7;border-radius:12px;padding:18px 0;margin:0 0 24px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#1c1c1e&quot;&gt;{{ .Token }}&lt;/div&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא ביקשת את השינוי? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;{{ .SiteURL }}/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Confirm your new email address for Tornu.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;אישור החלפת מייל&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;ביקשת להחליף את כתובת המייל בחשבון מ־&lt;span dir=&quot;ltr&quot;&gt;noa@example.com&lt;/span&gt; ל־&lt;span dir=&quot;ltr&quot;&gt;noa@studio.co.il&lt;/span&gt;.&lt;/p&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;&lt;td style=&quot;background:#1c1c1e;border-radius:12px&quot;&gt;&lt;a href=&quot;#&quot; style=&quot;display:inline-block;padding:14px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:12px&quot;&gt;אישור הכתובת החדשה&lt;/a&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;אפשר גם להקליד את הקוד הזה:&lt;/p&gt;
+        &lt;div dir=&quot;ltr&quot; style=&quot;font-size:32px;letter-spacing:8px;font-weight:700;text-align:center;background:#f5f5f7;border-radius:12px;padding:18px 0;margin:0 0 24px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#1c1c1e&quot;&gt;482913&lt;/div&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא ביקשת את השינוי? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;https://tornu.co.il/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Confirm your new email address for Tornu.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Authentication › <b>Reset password</b></span>
+    <span class="tag used">בשימוש היום</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s4">קוד איפוס הסיסמה שלך בתורנו: {{ .Token }}</code><button data-copy="s4">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b4">העתקת ה־HTML</button></div>
+  <textarea id="b4" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;איפוס סיסמה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;זה הקוד לאיפוס הסיסמה שלך. מקלידים אותו בדף האיפוס, והוא תקף לשעה.&lt;/p&gt;
+        &lt;div dir=&quot;ltr&quot; style=&quot;font-size:32px;letter-spacing:8px;font-weight:700;text-align:center;background:#f5f5f7;border-radius:12px;padding:18px 0;margin:0 0 24px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#1c1c1e&quot;&gt;{{ .Token }}&lt;/div&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא ביקשת לאפס סיסמה? אפשר להתעלם מהמייל הזה. הסיסמה שלך לא תשתנה.&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Your Tornu password reset code: {{ .Token }}&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;איפוס סיסמה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;זה הקוד לאיפוס הסיסמה שלך. מקלידים אותו בדף האיפוס, והוא תקף לשעה.&lt;/p&gt;
+        &lt;div dir=&quot;ltr&quot; style=&quot;font-size:32px;letter-spacing:8px;font-weight:700;text-align:center;background:#f5f5f7;border-radius:12px;padding:18px 0;margin:0 0 24px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#1c1c1e&quot;&gt;482913&lt;/div&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא ביקשת לאפס סיסמה? אפשר להתעלם מהמייל הזה. הסיסמה שלך לא תשתנה.&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Your Tornu password reset code: 482913&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Authentication › <b>Reauthentication</b></span>
+    <span class="tag ">לא בשימוש כרגע</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s5">קוד האימות שלך בתורנו: {{ .Token }}</code><button data-copy="s5">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b5">העתקת ה־HTML</button></div>
+  <textarea id="b5" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;אימות זהות&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;לפני פעולה רגישה בחשבון צריך לוודא שזה באמת אתם. זה הקוד:&lt;/p&gt;
+        &lt;div dir=&quot;ltr&quot; style=&quot;font-size:32px;letter-spacing:8px;font-weight:700;text-align:center;background:#f5f5f7;border-radius:12px;padding:18px 0;margin:0 0 24px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#1c1c1e&quot;&gt;{{ .Token }}&lt;/div&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא ביקשת קוד? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;{{ .SiteURL }}/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Your Tornu verification code: {{ .Token }}&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;אימות זהות&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;לפני פעולה רגישה בחשבון צריך לוודא שזה באמת אתם. זה הקוד:&lt;/p&gt;
+        &lt;div dir=&quot;ltr&quot; style=&quot;font-size:32px;letter-spacing:8px;font-weight:700;text-align:center;background:#f5f5f7;border-radius:12px;padding:18px 0;margin:0 0 24px;font-family:'SF Mono',Menlo,Consolas,monospace;color:#1c1c1e&quot;&gt;482913&lt;/div&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא ביקשת קוד? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;https://tornu.co.il/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Your Tornu verification code: 482913&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Security › <b>Password changed</b></span>
+    <span class="tag used">בשימוש היום</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s6">הסיסמה שלך בתורנו שונתה</code><button data-copy="s6">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b6">העתקת ה־HTML</button></div>
+  <textarea id="b6" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;הסיסמה שונתה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;הסיסמה של החשבון &lt;span dir=&quot;ltr&quot;&gt;{{ .Email }}&lt;/span&gt; שונתה עכשיו.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא שינית את הסיסמה? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;{{ .SiteURL }}/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Your Tornu password was changed.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;הסיסמה שונתה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;הסיסמה של החשבון &lt;span dir=&quot;ltr&quot;&gt;noa@example.com&lt;/span&gt; שונתה עכשיו.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא שינית את הסיסמה? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;https://tornu.co.il/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;Your Tornu password was changed.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Security › <b>Email address changed</b></span>
+    <span class="tag ">לא בשימוש כרגע</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s7">כתובת המייל בחשבון תורנו שונתה</code><button data-copy="s7">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b7">העתקת ה־HTML</button></div>
+  <textarea id="b7" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;כתובת המייל שונתה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;כתובת המייל של החשבון שלך בתורנו שונתה ל־&lt;span dir=&quot;ltr&quot;&gt;{{ .Email }}&lt;/span&gt;.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא שינית את הכתובת? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;{{ .SiteURL }}/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;The email address on your Tornu account was changed.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;כתובת המייל שונתה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;כתובת המייל של החשבון שלך בתורנו שונתה ל־&lt;span dir=&quot;ltr&quot;&gt;noa@example.com&lt;/span&gt;.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא שינית את הכתובת? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;https://tornu.co.il/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;The email address on your Tornu account was changed.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Security › <b>Phone number changed</b></span>
+    <span class="tag ">לא בשימוש כרגע</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s8">מספר הטלפון בחשבון תורנו שונה</code><button data-copy="s8">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b8">העתקת ה־HTML</button></div>
+  <textarea id="b8" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;מספר הטלפון שונה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;מספר הטלפון של החשבון &lt;span dir=&quot;ltr&quot;&gt;{{ .Email }}&lt;/span&gt; שונה.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא שינית את המספר? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;{{ .SiteURL }}/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;The phone number on your Tornu account was changed.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;מספר הטלפון שונה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;מספר הטלפון של החשבון &lt;span dir=&quot;ltr&quot;&gt;noa@example.com&lt;/span&gt; שונה.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא שינית את המספר? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;https://tornu.co.il/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;The phone number on your Tornu account was changed.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Security › <b>Identity linked</b></span>
+    <span class="tag used">בשימוש היום</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s9">שיטת כניסה חדשה חוברה לחשבון תורנו</code><button data-copy="s9">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b9">העתקת ה־HTML</button></div>
+  <textarea id="b9" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;שיטת כניסה חדשה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;לחשבון &lt;span dir=&quot;ltr&quot;&gt;{{ .Email }}&lt;/span&gt; חוברה שיטת כניסה חדשה, למשל חשבון Google.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא חיברת אותה? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;{{ .SiteURL }}/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;A new sign-in method was linked to your Tornu account.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;שיטת כניסה חדשה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;לחשבון &lt;span dir=&quot;ltr&quot;&gt;noa@example.com&lt;/span&gt; חוברה שיטת כניסה חדשה, למשל חשבון Google.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא חיברת אותה? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;https://tornu.co.il/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;A new sign-in method was linked to your Tornu account.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Security › <b>Identity unlinked</b></span>
+    <span class="tag ">לא בשימוש כרגע</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s10">שיטת כניסה הוסרה מחשבון תורנו</code><button data-copy="s10">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b10">העתקת ה־HTML</button></div>
+  <textarea id="b10" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;שיטת כניסה הוסרה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;מהחשבון &lt;span dir=&quot;ltr&quot;&gt;{{ .Email }}&lt;/span&gt; הוסרה שיטת כניסה.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא הסרת אותה? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;{{ .SiteURL }}/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;A sign-in method was removed from your Tornu account.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;שיטת כניסה הוסרה&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;מהחשבון &lt;span dir=&quot;ltr&quot;&gt;noa@example.com&lt;/span&gt; הוסרה שיטת כניסה.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא הסרת אותה? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;https://tornu.co.il/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;A sign-in method was removed from your Tornu account.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Security › <b>Multi-factor authentication method added</b></span>
+    <span class="tag ">לא בשימוש כרגע</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s11">אימות דו שלבי נוסף לחשבון תורנו</code><button data-copy="s11">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b11">העתקת ה־HTML</button></div>
+  <textarea id="b11" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;אימות דו שלבי נוסף&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;לחשבון &lt;span dir=&quot;ltr&quot;&gt;{{ .Email }}&lt;/span&gt; נוספה שיטת אימות דו שלבי.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא הוספת אותה? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;{{ .SiteURL }}/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;A two-step verification method was added to your Tornu account.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;אימות דו שלבי נוסף&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;לחשבון &lt;span dir=&quot;ltr&quot;&gt;noa@example.com&lt;/span&gt; נוספה שיטת אימות דו שלבי.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא הוספת אותה? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;https://tornu.co.il/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;A two-step verification method was added to your Tornu account.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+
+<section class="tpl">
+  <header>
+    <span class="where">Security › <b>Multi-factor authentication method removed</b></span>
+    <span class="tag ">לא בשימוש כרגע</span>
+  </header>
+  <div class="row"><label>Subject</label><code id="s12">אימות דו שלבי הוסר מחשבון תורנו</code><button data-copy="s12">העתקה</button></div>
+  <div class="row"><label>Body</label><span class="hint">להדביק במצב Source</span><button data-copy="b12">העתקת ה־HTML</button></div>
+  <textarea id="b12" readonly>&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;אימות דו שלבי הוסר&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;מהחשבון &lt;span dir=&quot;ltr&quot;&gt;{{ .Email }}&lt;/span&gt; הוסרה שיטת אימות דו שלבי.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא הסרת אותה? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;{{ .SiteURL }}/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;A two-step verification method was removed from your Tornu account.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+</textarea>
+  <iframe srcdoc="&lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif&quot;&gt;
+  &lt;tr&gt;&lt;td align=&quot;center&quot; style=&quot;padding:32px 16px&quot;&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;max-width:440px&quot;&gt;
+      &lt;tr&gt;&lt;td dir=&quot;rtl&quot; style=&quot;background:#ffffff;border-radius:16px;padding:32px 28px;text-align:right;color:#1c1c1e&quot;&gt;
+        &lt;table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; style=&quot;margin:0 0 24px&quot;&gt;&lt;tr&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle&quot;&gt;&lt;img src=&quot;https://tornu.co.il/email/logo.png&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;&quot; style=&quot;display:block;border:0;width:32px;height:32px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;width:10px&quot;&gt;&lt;/td&gt;
+          &lt;td style=&quot;padding:0;vertical-align:middle;font-size:17px;font-weight:700;color:#1c1c1e&quot;&gt;תורנו&lt;/td&gt;
+        &lt;/tr&gt;&lt;/table&gt;
+        &lt;h1 style=&quot;font-size:22px;line-height:1.3;margin:0 0 8px;font-weight:700;color:#1c1c1e&quot;&gt;אימות דו שלבי הוסר&lt;/h1&gt;
+        &lt;p style=&quot;font-size:15px;line-height:1.6;margin:0 0 20px;color:#3a3a3c&quot;&gt;מהחשבון &lt;span dir=&quot;ltr&quot;&gt;noa@example.com&lt;/span&gt; הוסרה שיטת אימות דו שלבי.&lt;/p&gt;
+        &lt;p style=&quot;font-size:13px;line-height:1.6;margin:0;color:#86868b&quot;&gt;לא הסרת אותה? כדאי לאפס את הסיסמה עכשיו ולפנות אלינו. &lt;a href=&quot;https://tornu.co.il/reset-password&quot; style=&quot;color:#1c1c1e&quot;&gt;לאיפוס הסיסמה&lt;/a&gt;&lt;/p&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td dir=&quot;ltr&quot; style=&quot;padding:16px 0 0;font-size:12px;line-height:1.6;color:#86868b;text-align:center&quot;&gt;A two-step verification method was removed from your Tornu account.&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+"></iframe>
+</section>
+</main>
+<script>
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-copy]');
+    if (!b) return;
+    const el = document.getElementById(b.dataset.copy);
+    await navigator.clipboard.writeText(el.value ?? el.textContent);
+    const label = b.textContent;
+    b.textContent = 'הועתק';
+    b.classList.add('done');
+    setTimeout(() => { b.textContent = label; b.classList.remove('done'); }, 1400);
+  });
+</script>
+</body></html>
