@@ -129,6 +129,12 @@ export const GlobeIcon = icon(
     <path d="M2 8h12M8 2c1.8 2 2.6 4 2.6 6S9.8 12 8 14C6.2 12 5.4 10 5.4 8S6.2 4 8 2z" />
   </>,
 );
+export const MailIcon = icon(
+  <>
+    <rect x="2" y="3.5" width="12" height="9" rx="1.5" />
+    <path d="m2.5 4.5 5.5 4.2 5.5-4.2" />
+  </>,
+);
 export const MessageIcon = icon(<path d="M2.5 3.5h11v7.5H6l-3.5 2.5z" />);
 export const LockIcon = icon(
   <>

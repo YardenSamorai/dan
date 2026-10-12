@@ -1,26 +1,23 @@
-import { useEffect, useRef, type InputHTMLAttributes, type ReactNode } from 'react';
+import { forwardRef, useEffect, useRef, type InputHTMLAttributes, type ReactNode } from 'react';
 
 /**
  * One row of the grouped sign-in fields: the label rests inside the row and rises when the
  * row is focused or filled. Needs a non-empty placeholder (" ") for :placeholder-shown.
  */
-export function AuthField({
-  id,
-  label,
-  trailing,
-  invalid,
-  ...input
-}: { id: string; label: string; trailing?: ReactNode; invalid?: boolean } & InputHTMLAttributes<HTMLInputElement>) {
+export const AuthField = forwardRef<HTMLInputElement, { id: string; label: string; trailing?: ReactNode; invalid?: boolean } & InputHTMLAttributes<HTMLInputElement>>(function AuthField(
+  { id, label, trailing, invalid, ...input },
+  ref,
+) {
   return (
     <div className="af" data-trailing={trailing ? true : undefined}>
-      <input id={id} className="af__input" placeholder=" " aria-invalid={invalid || undefined} {...input} />
+      <input ref={ref} id={id} className="af__input" placeholder=" " aria-invalid={invalid || undefined} {...input} />
       <label className="af__label" htmlFor={id}>
         {label}
       </label>
       {trailing}
     </div>
   );
-}
+});
 
 /** The fields share one panel, so a form reads as a single object. Each new `shake` value nudges it. */
 export function AuthFields({ children, shake = 0 }: { children: ReactNode; shake?: number }) {
