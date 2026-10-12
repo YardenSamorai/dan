@@ -20,9 +20,9 @@ export function MarketingLayout() {
         home="/"
         brand={<ProductWordmark />}
         nav={[
-          { to: '/#features', label: t('marketing.nav.features') },
-          { to: '/#how', label: t('marketing.nav.how') },
-          { to: '/book/demo-studio', label: t('marketing.nav.demo') },
+          { to: '/#features', label: t('marketing.nav.features'), hint: t('marketing.nav.featuresHint') },
+          { to: '/#how', label: t('marketing.nav.how'), hint: t('marketing.nav.howHint') },
+          { to: '/book/demo-studio', label: t('marketing.nav.demo'), hint: t('marketing.nav.demoHint') },
         ]}
         action={
           <>
@@ -39,7 +39,7 @@ export function MarketingLayout() {
             <Link to="/sign-up" className="btn btn--primary btn--lg btn--block">
               {t('marketing.cta.primary')}
             </Link>
-            <Link to={signedIn ? '/app' : '/sign-in'} className="muted">
+            <Link to={signedIn ? '/app' : '/sign-in'} className="btn btn--quiet btn--lg btn--block">
               {signedIn ? t('app.nav.dashboard') : t('marketing.nav.signIn')}
             </Link>
           </>
