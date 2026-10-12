@@ -501,7 +501,7 @@ export function DemoClosing() {
           </h2>
           <p className="dt-lede">{t('tour.close.body')}</p>
           <div className="dt-close__actions">
-            <Link to="/sign-up" className="btn btn--light btn--lg">
+            <Link to="/sign-up" className="btn btn--ink btn--lg">
               {t('marketing.cta.primary')}
             </Link>
             <Link to="/#features" className="dt-close__more">

@@ -2,8 +2,6 @@
 
 .demo-tour,
 .dt-close {
-  --dt-ink: #1c1c1e;
-  --dt-ink-2: #1d1d22;
   --dt-paper: #f6f5f2;
   --dt-line: rgba(20, 20, 24, 0.09);
   --dt-blue: #5b6cff;
@@ -71,24 +69,21 @@ html[lang='he'] .dt-display {
   text-wrap: pretty;
 }
 
-/* ── The system: a dark panel with the page at its centre ── */
+/* ── The system: a white panel with the page at its centre ── */
 
 .dt-system {
   position: relative;
   overflow: hidden;
   padding-block: clamp(72px, 10vw, 136px) clamp(64px, 8vw, 112px);
+  border: 1px solid var(--dt-line);
   border-radius: var(--dt-radius);
-  background: var(--dt-ink);
-  box-shadow: 0 -40px 80px -40px rgba(10, 10, 20, 0.45);
-  color: #f5f5f7;
+  background: #fff;
+  box-shadow: 0 -30px 70px -40px rgba(20, 20, 40, 0.22);
+  color: var(--ink);
 }
 
 .demo-tour:not([data-overlap]) .dt-system {
   border-radius: 0 0 var(--dt-radius) var(--dt-radius);
-}
-
-.dt-system .dt-lede {
-  color: rgba(245, 245, 247, 0.66);
 }
 
 .dt-system__head {
@@ -118,7 +113,7 @@ html[lang='he'] .dt-display {
 
 .dt-map__lines path {
   fill: none;
-  stroke: rgba(141, 152, 255, 0.5);
+  stroke: rgba(91, 108, 255, 0.45);
   stroke-width: 1.4;
   stroke-dasharray: 3 7;
   vector-effect: non-scaling-stroke;
@@ -150,7 +145,7 @@ html[lang='he'] .dt-display {
 .dt-map figcaption {
   font-size: var(--text-13);
   font-weight: 600;
-  color: rgba(245, 245, 247, 0.7);
+  color: var(--ink-3);
 }
 
 .dt-node {
@@ -200,10 +195,9 @@ html[lang='he'] .dt-display {
 .dt-node__card {
   padding: 16px;
   border-radius: 20px;
+  border: 1px solid var(--dt-line);
   background: #fff;
-  box-shadow:
-    0 30px 60px -30px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: 0 24px 48px -28px rgba(20, 20, 40, 0.28);
   color: var(--ink);
   font-size: 13px;
   line-height: 1.35;
@@ -217,9 +211,8 @@ html[lang='he'] .dt-display {
   background: #0b0b0d;
   box-shadow:
     inset 0 0 0 1.5px #34343a,
-    0 50px 90px -30px rgba(0, 0, 0, 0.75),
-    0 0 0 10px rgba(91, 108, 255, 0.06),
-    0 0 120px rgba(91, 108, 255, 0.22);
+    0 40px 80px -30px rgba(20, 20, 40, 0.4),
+    0 0 100px rgba(91, 108, 255, 0.12);
 }
 
 .dt-phone__screen {
@@ -618,7 +611,7 @@ html[lang='he'] .dt-display {
   gap: clamp(24px, 4vw, 56px);
   margin: 0;
   padding: clamp(32px, 4vw, 48px) 0 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--dt-line);
   list-style: none;
 }
 
@@ -629,18 +622,18 @@ html[lang='he'] .dt-display {
   height: 36px;
   margin-block-end: var(--s-4);
   border-radius: 11px;
-  background: rgba(91, 108, 255, 0.16);
-  color: #aab3ff;
+  background: rgba(91, 108, 255, 0.12);
+  color: #4453e0;
 }
 
 .dt-points li:nth-child(2) .dt-points__icon {
-  background: rgba(53, 199, 138, 0.15);
-  color: #7fe0b5;
+  background: rgba(53, 199, 138, 0.14);
+  color: #1f9a66;
 }
 
 .dt-points li:nth-child(3) .dt-points__icon {
-  background: rgba(139, 125, 255, 0.16);
-  color: #c2b9ff;
+  background: rgba(139, 125, 255, 0.14);
+  color: #6a5be0;
 }
 
 .dt-points h3 {
@@ -653,7 +646,7 @@ html[lang='he'] .dt-display {
   margin: 0;
   font-size: 0.95rem;
   line-height: 1.6;
-  color: rgba(245, 245, 247, 0.6);
+  color: var(--ink-3);
 }
 
 /* ── A day: a real sequence, so it reads as a timeline ── */
@@ -1075,13 +1068,11 @@ html[lang='he'] .dt-display {
   max-width: 1320px;
   margin-inline: auto;
   padding: clamp(40px, 7vw, 104px) clamp(24px, 6vw, 96px);
+  border: 1px solid var(--dt-line);
   border-radius: var(--dt-radius);
-  background: var(--dt-ink);
-  color: #f5f5f7;
-}
-
-.dt-close .dt-lede {
-  color: rgba(245, 245, 247, 0.66);
+  background: #fff;
+  box-shadow: 0 30px 70px -50px rgba(20, 20, 40, 0.3);
+  color: var(--ink);
 }
 
 .dt-close__actions {
@@ -1092,16 +1083,16 @@ html[lang='he'] .dt-display {
   margin-block-start: var(--s-8);
 }
 
-.dt-close .btn--light {
+.dt-close .btn--ink {
   transition:
     transform var(--t-press) var(--ease-out),
     box-shadow 240ms var(--ease-out);
 }
 
 @media (hover: hover) {
-  .dt-close .btn--light:hover {
+  .dt-close .btn--ink:hover {
     transform: translateY(-1px);
-    box-shadow: 0 16px 40px -12px rgba(91, 108, 255, 0.7);
+    box-shadow: 0 16px 36px -14px rgba(91, 108, 255, 0.75);
   }
 }
 
@@ -1111,12 +1102,12 @@ html[lang='he'] .dt-display {
   gap: 6px;
   min-height: 44px;
   font-weight: 600;
-  color: rgba(245, 245, 247, 0.8);
+  color: var(--ink-2);
   text-decoration: none;
 }
 
 .dt-close__more:hover {
-  color: #fff;
+  color: var(--ink);
   text-decoration: underline;
   text-decoration-color: var(--dt-blue);
   text-underline-offset: 4px;
@@ -1147,7 +1138,7 @@ html[lang='he'] .dt-display {
   width: 14.667%;
   aspect-ratio: 1;
   border-radius: 28%;
-  background: rgba(255, 255, 255, 0.07);
+  background: #f0f0f2;
   transform: translate(calc(var(--x) * 116.36% * var(--dir)), calc(var(--y) * 116.36%));
   transition:
     background-color 700ms var(--ease-out),
@@ -1161,12 +1152,12 @@ html[lang='he'] .dt-display {
 }
 
 .dt-slots[data-seen] i[data-fill] {
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--ink);
 }
 
 .dt-slots[data-seen] i[data-fill='2'] {
   background: var(--dt-blue);
-  box-shadow: 0 0 30px rgba(91, 108, 255, 0.55);
+  box-shadow: 0 10px 26px -8px rgba(91, 108, 255, 0.6);
 }
 
 .dt-slots[data-seen] i[data-fill='3'] {
