@@ -8,7 +8,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { devAuthenticator } from '../server/auth';
 import { handleIcs, handleRpc, type ApiDeps } from '../server/handler';
-import { dispatchMessages, SendError, type Sender, type Senders } from '../server/messaging';
+import { dispatchMessages, SendError, whatsappCloud, type Sender, type Senders } from '../server/messaging';
+import { WHATSAPP_TEMPLATES, whatsAppParams } from '../src/domain/whatsapp';
+import { internationalPhone } from '../src/lib/phone';
 import { FileStore } from '../server/store';
 import { availableSlots } from '../src/domain/scheduling';
 
@@ -399,9 +401,11 @@ try {
     check('nonsense intervals are dropped', junk.result?.result?.rebookAfterDays === undefined, junk);
     await call('workspace.call', [BIZ, 'saveService', [{ ...svc, rebookAfterDays: 28 }]], owner);
 
+    const wideDays = Array.from({ length: 40 }, (_, i) => new Date(Date.now() + (i + 2) * 86_400_000).toISOString().slice(0, 10));
     const bookAt = async (name: string, phone: string, fromDay: number) => {
-      for (const date of days.slice(fromDay)) {
-        for (const start of [600, 660, 720, 780, 840]) {
+      const live = (await call('workspace.tenant', [BIZ], owner)).result;
+      for (const date of wideDays.slice(fromDay)) {
+        for (const { start } of availableSlots(live, { serviceId: svcM.id, staffId: svcM.staffIds[0], date, online: true }).slice(0, 3)) {
           const r = await call('public.createBooking', [SLUG, { serviceId: svcM.id, addOnIds: [], staffId: svcM.staffIds[0], date, start, customer: { name, phone, email: '', locale: 'he' } }]);
           if (r.status === 200) return r.result;
         }
@@ -420,7 +424,7 @@ try {
     }
 
     const second = await bookAt('Again Test', '0509999999', 8);
-    await bookAt('Again Test', '0509999999', 10);
+    await bookAt('Again Test', '0509999999', second ? wideDays.indexOf(second.date) + 1 : 10);
     const again = (await store.snapshot({})).tenants[BIZ].outbox.find((m) => m.appointmentId === second?.id && m.kind === 'rebook');
     if (again) {
       await dispatchMessages(store, senders, { only: [BIZ], now: new Date(Date.parse(again.at) + 60_000) });
@@ -431,15 +435,15 @@ try {
     const t0 = (await call('workspace.tenant', [BIZ], owner)).result;
     const startDate = days[12];
     let series: any = null;
-    for (const date of days.slice(12)) {
-      for (const start of [600, 720, 840, 960]) {
+    for (const date of wideDays.slice(12)) {
+      for (const { start } of availableSlots(t0, { serviceId: svcM.id, staffId: svcM.staffIds[0], date, online: true }).slice(0, 4)) {
         series = await call('workspace.call', [BIZ, 'createAppointmentSeries', [{ serviceId: svcM.id, addOnIds: [], staffId: svcM.staffIds[0], date, start, customer: { name: 'Series Test', phone: '0501231234', locale: 'he' } }, { everyWeeks: 1, count: 4 }]], owner);
         if (series.status !== 409) break;
       }
-      if (series.status !== 409) break;
+      if (series && series.status !== 409) break;
     }
-    const r = series.result?.result;
-    if (series.status === 200) {
+    const r = series?.result?.result;
+    if (series?.status === 200) {
       check('series books every date or reports it', r.created.length + r.skipped.length === 4, r);
       const ids = new Set(r.created.map((a: any) => a.seriesId));
       check('series appointments share one series id', ids.size === 1 && !ids.has(undefined));
@@ -450,6 +454,59 @@ try {
     } else check('series created', false, { series, staff: t0.staff.length });
     const tooMany = await call('workspace.call', [BIZ, 'createAppointmentSeries', [{ serviceId: svcM.id, addOnIds: [], staffId: svcM.staffIds[0], date: startDate, start: 900, customer: { name: 'Series Test', phone: '0501231234', locale: 'he' } }, { everyWeeks: 1, count: 500 }]], owner);
     check('series length is capped', tooMany.status === 400, tooMany);
+  }
+
+  // WhatsApp templates and the Cloud API sender.
+  {
+    for (const [kind, tpl] of Object.entries(WHATSAPP_TEMPLATES)) {
+      for (const [locale, text] of Object.entries(tpl.text)) {
+        const used = [...text.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]);
+        const words = text.replace(/\{\{\w+\}\}/g, ' ').split(/\s+/).filter(Boolean).length;
+        const ok = !/^\s*\{\{/.test(text) && !/\}\}[\s.!:,]*$/.test(text) && !/\}\}\s*\{\{/.test(text) && used.join() === tpl.vars.join() && words >= 3 * used.length + 1 && !/[—–]|--/.test(text) && /^[a-z_]+$/.test(tpl.name);
+        check(`whatsapp template ${kind} (${locale}) follows Meta's rules`, ok, { used, words });
+      }
+    }
+    check('international number from a local one', internationalPhone('050-777-7777', 'Asia/Jerusalem') === '972507777777' && internationalPhone('+44 7700 900123', 'Asia/Jerusalem') === '447700900123' && internationalPhone('0507777777', 'Europe/Nowhere') === null);
+    check('empty name gets a greeting, not a blank', whatsAppParams('confirmation', 'he', { name: ' ', link: 'x' })[0].text === 'לך');
+
+    const store = deps.store;
+    const calls: { url: string; auth: string; body: any }[] = [];
+    let reply: () => Response = () => new Response(JSON.stringify({ messages: [{ id: 'wamid.1' }] }), { status: 200 });
+    const fakeFetch = (async (url: string, init: RequestInit) => {
+      calls.push({ url, auth: String((init.headers as Record<string, string>).authorization), body: JSON.parse(String(init.body)) });
+      return reply();
+    }) as unknown as typeof fetch;
+    const wa: Senders = { whatsapp: whatsappCloud('test-token', '1234567890', fakeFetch) };
+
+    const t0 = (await call('workspace.tenant', [BIZ], owner)).result;
+    const n = t0.business.notifications;
+    await call('workspace.call', [BIZ, 'updateBusiness', [{ notifications: { ...n, confirmation: { ...n.confirmation, enabled: true, channels: ['whatsapp'] }, cancellation: { ...n.cancellation, enabled: true, channels: ['whatsapp'] } } }]], owner);
+    let booked: any = null;
+    const live = (await call('workspace.tenant', [BIZ], owner)).result;
+    for (const date of days) {
+      const slot = availableSlots(live, { serviceId: svcM.id, staffId: svcM.staffIds[0], date, online: true })[0];
+      if (!slot) continue;
+      const r = await call('public.createBooking', [SLUG, { serviceId: svcM.id, addOnIds: [], staffId: svcM.staffIds[0], date, start: slot.start, customer: { name: 'יעל כהן', phone: '052-333-4444', email: '', locale: 'he' } }]);
+      if (r.status === 200) booked = r.result;
+      if (booked) break;
+    }
+    check('booking for whatsapp tests', !!booked);
+    if (booked) {
+      await dispatchMessages(store, wa, { only: [BIZ], origin: 'https://tornu.co.il' });
+      const sent = calls.find((c) => c.body.to === '972523334444');
+      const params = Object.fromEntries((sent?.body.template.components[0].parameters ?? []).map((p: any) => [p.parameter_name, p.text]));
+      check('whatsapp goes to the platform number endpoint with the token', !!sent && sent.url === 'https://graph.facebook.com/v26.0/1234567890/messages' && sent.auth === 'Bearer test-token', sent);
+      check('whatsapp sends the approved confirmation template in the customer’s language', sent?.body.type === 'template' && sent.body.template.name === 'booking_confirmation' && sent.body.template.language.code === 'he', sent?.body);
+      check('whatsapp fills in the appointment’s details', params.name === 'יעל' && !!params.business && !!params.date && !!params.time && params.link === `https://tornu.co.il/book/${SLUG}`, params);
+      const state = (await store.snapshot({})).tenants[BIZ].outbox.find((m) => m.appointmentId === booked.id && m.channel === 'whatsapp' && m.kind === 'confirmation');
+      check('whatsapp confirmation is marked sent', state?.state === 'sent', state);
+      reply = () => new Response(JSON.stringify({ error: { code: 132001, message: 'Template name does not exist in the translation' } }), { status: 404 });
+      await call('public.cancelBooking', [SLUG, booked.id]);
+      await dispatchMessages(store, wa, { only: [BIZ], origin: 'https://tornu.co.il' });
+      const cancelled = (await store.snapshot({})).tenants[BIZ].outbox.find((m) => m.appointmentId === booked.id && m.channel === 'whatsapp' && m.kind === 'cancellation');
+      check('an unapproved template fails without retrying', cancelled?.state === 'failed' && String(cancelled.error).includes('132001'), cancelled);
+    }
+    await call('workspace.call', [BIZ, 'updateBusiness', [{ notifications: n }]], owner);
   }
 
   const persisted = new FileStore(join(dir, 'db.json'));

@@ -37,12 +37,18 @@ export function cleanPhone(raw: string, code?: string): string | null {
 
 export const telHref = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
 
+/** International digits without the plus ("972501234567"), or null when the number can't be made international with confidence. */
+export function internationalPhone(phone: string, timeZone: string): string | null {
+  const raw = phone.replace(/[^\d+]/g, '');
+  if (raw.startsWith('+')) return raw.slice(1) || null;
+  if (raw.startsWith('00')) return raw.slice(2) || null;
+  const cc = CALLING_CODE[timeZone];
+  if (cc && raw.startsWith('0') && raw.length > 1) return `${cc}${raw.slice(1)}`;
+  return null;
+}
+
 /** wa.me link, or null when the number can't be made international with confidence. */
 export function whatsappHref(phone: string, timeZone: string): string | null {
-  const raw = phone.replace(/[^\d+]/g, '');
-  if (raw.startsWith('+')) return `https://wa.me/${raw.slice(1)}`;
-  if (raw.startsWith('00')) return `https://wa.me/${raw.slice(2)}`;
-  const cc = CALLING_CODE[timeZone];
-  if (cc && raw.startsWith('0')) return `https://wa.me/${cc}${raw.slice(1)}`;
-  return null;
+  const intl = internationalPhone(phone, timeZone);
+  return intl ? `https://wa.me/${intl}` : null;
 }

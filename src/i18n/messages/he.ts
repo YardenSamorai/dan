@@ -1665,6 +1665,8 @@ export const he: Messages = {
       template: 'נוסח',
       variables: 'משתנים: {vars}',
       previewIn: 'תצוגה מקדימה · {language}',
+      whatsappTitle: 'בוואטסאפ',
+      whatsappHint: 'וואטסאפ מאפשר לשלוח רק נוסח שאושר מראש, ולכן הלקוחות יקבלו שם את הנוסח הזה עם פרטי התור. הנוסח שכתבת למעלה נשלח בהודעת SMS ובאימייל.',
     },
     team: {
       lede: 'מי יכול להתחבר לעסק הזה.',

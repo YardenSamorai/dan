@@ -12,6 +12,7 @@ import { alertsOf, messageVars, notificationsOf, renderTemplate, TEMPLATE_VARS }
 import type { Permission } from '../../domain/permissions';
 import { businessNow, isUpcoming } from '../../domain/scheduling';
 import { isValidTimeZone } from '../../domain/time';
+import { renderWhatsApp, WHATSAPP_TEMPLATES } from '../../domain/whatsapp';
 import type { BookingPolicies, Business, Channel, Invite, NotificationSettings, OwnerAlerts, TemplateKind } from '../../domain/types';
 import { localeMeta, locales, type Locale } from '../../i18n/config';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -497,6 +498,19 @@ function NotificationsSection() {
                   })}
                 </div>
                 <p className="field__hint">{t('settings.notifications.variables', { vars: TEMPLATE_VARS.map((x) => `{${x}}`).join(' ') })}</p>
+                {cfg.channels.includes('whatsapp') && (
+                  <div className="field">
+                    <span className="field__label">{t('settings.notifications.whatsappTitle')}</span>
+                    <span className="field__hint">{t('settings.notifications.whatsappHint')}</span>
+                    <div className="field-row">
+                      {locales.map((l) => (
+                        <p key={l} className="preview-bubble" dir={localeMeta[l].dir} lang={l}>
+                          {sample ? renderWhatsApp(k, l, messageVars(state, sample, l)) : WHATSAPP_TEMPLATES[k].text[l]}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </section>

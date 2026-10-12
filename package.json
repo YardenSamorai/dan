@@ -11,6 +11,7 @@
     "test:insights": "esbuild qa/insights-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/insights-test.mjs --log-level=warning && node node_modules/.tmp/insights-test.mjs",
     "test:supabase": "esbuild qa/supabase-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/supabase-test.mjs --log-level=warning && node node_modules/.tmp/supabase-test.mjs",
     "db:setup": "esbuild scripts/db-setup.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/db-setup.mjs --log-level=warning && node node_modules/.tmp/db-setup.mjs",
+    "whatsapp:templates": "esbuild scripts/whatsapp-templates.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/whatsapp-templates.mjs --log-level=warning && node node_modules/.tmp/whatsapp-templates.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

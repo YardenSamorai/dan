@@ -1,7 +1,9 @@
-import { pickText } from '../src/i18n/config';
-import { bookingLink, isWaiting, KEEP_DONE_MS, LINK_PLACEHOLDER, MAX_ATTEMPTS, recipientOf, STALE_AFTER_MS } from '../src/domain/notifications';
+import { pickText, type Locale } from '../src/i18n/config';
+import { bookingLink, isWaiting, KEEP_DONE_MS, LINK_PLACEHOLDER, MAX_ATTEMPTS, messageVars, recipientOf, STALE_AFTER_MS } from '../src/domain/notifications';
 import { appointmentStart } from '../src/domain/scheduling';
-import type { Channel, OutboxMessage, TenantData } from '../src/domain/types';
+import { renderWhatsApp, WHATSAPP_LANGUAGE, WHATSAPP_TEMPLATES, whatsAppParams } from '../src/domain/whatsapp';
+import type { Channel, MessageKind, OutboxMessage, TemplateKind, TenantData } from '../src/domain/types';
+import { internationalPhone } from '../src/lib/phone';
 import { Conflict, type Store } from './store';
 
 /**
@@ -18,6 +20,8 @@ export interface OutgoingMessage {
   /** Email replies go to the business, not to us. */
   replyTo?: string;
   fromName: string;
+  /** For WhatsApp, which only sends Meta-approved wording: the template and its values. Missing for owner alerts. */
+  template?: { kind: TemplateKind; locale: Locale; params: { name: string; text: string }[] };
 }
 
 export interface Sender {
@@ -60,22 +64,68 @@ export function resendEmail(apiKey: string, from: string): Sender {
   };
 }
 
+export const GRAPH_API = 'https://graph.facebook.com/v26.0';
+
+/** Meta's throughput limits: worth trying again later. Any other 4xx (not on WhatsApp, template not approved, bad values) is final. */
+const WHATSAPP_THROTTLED = new Set([130429, 131056]);
+
+/**
+ * WhatsApp through Meta's own Cloud API: no middleman, Meta bills per delivered
+ * template. One platform number sends for every business; each message names
+ * the business. Only templates approved in WhatsApp Manager go out.
+ */
+export function whatsappCloud(token: string, phoneNumberId: string, fetchImpl: typeof fetch = fetch): Sender {
+  return {
+    async send(m) {
+      if (!m.template) throw new SendError('whatsapp: only appointment messages to customers have a template', false);
+      const tpl = WHATSAPP_TEMPLATES[m.template.kind];
+      const res = await fetchImpl(`${GRAPH_API}/${phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: m.to,
+          type: 'template',
+          template: {
+            name: tpl.name,
+            language: { policy: 'deterministic', code: WHATSAPP_LANGUAGE[m.template.locale] },
+            components: [{ type: 'body', parameters: m.template.params.map((p) => ({ type: 'text', parameter_name: p.name, text: p.text })) }],
+          },
+        }),
+      });
+      if (res.ok) return;
+      const text = await res.text().catch(() => '');
+      let code: number | undefined;
+      try {
+        code = (JSON.parse(text) as { error?: { code?: number } }).error?.code;
+      } catch {
+        /* not JSON */
+      }
+      const retry = res.status === 429 || res.status >= 500 || (!!code && WHATSAPP_THROTTLED.has(code));
+      throw new SendError(`whatsapp ${res.status}${code ? ` ${code}` : ''} ${text.slice(0, 160)}`, retry);
+    },
+  };
+}
+
 /** Development only: prints instead of sending, so the whole flow can be tried locally. */
 const logSender = (channel: Channel): Sender => ({
   async send(m) {
-    console.log(`[messages] ${channel} → ${m.to}: ${m.body}`);
+    console.log(`[messages] ${channel} → ${m.to}: ${m.template ? `[${WHATSAPP_TEMPLATES[m.template.kind].name}] ${renderWhatsApp(m.template.kind, m.template.locale, Object.fromEntries(m.template.params.map((p) => [p.name, p.text])))}` : m.body}`);
   },
 });
 
 /**
  * Providers from the environment:
- *   RESEND_API_KEY + MAIL_FROM   email
- *   MESSAGES_LOG=1               (development) print every channel to the console
- * SMS / WhatsApp: add a Sender here once a provider is chosen.
+ *   RESEND_API_KEY + MAIL_FROM                     email
+ *   WHATSAPP_TOKEN + WHATSAPP_PHONE_NUMBER_ID      WhatsApp (Meta Cloud API)
+ *   MESSAGES_LOG=1                                 (development) print every channel to the console
+ * SMS: add a Sender here once a provider is chosen.
  */
 export function sendersFromEnv(env: Env): Senders {
   const s: Senders = {};
   if (env.RESEND_API_KEY && env.MAIL_FROM) s.email = resendEmail(env.RESEND_API_KEY, env.MAIL_FROM);
+  if (env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID) s.whatsapp = whatsappCloud(env.WHATSAPP_TOKEN, env.WHATSAPP_PHONE_NUMBER_ID);
   if (env.MESSAGES_LOG === '1' && env.NODE_ENV !== 'production') for (const c of ['sms', 'whatsapp', 'email'] as const) s[c] ??= logSender(c);
   return s;
 }
@@ -107,17 +157,31 @@ function tooLate(t: TenantData, m: OutboxMessage, now: Date): string | null {
 /** An invitation to book again can still go out a few days late (say, after an outage). */
 const REBOOK_STALE_MS = 3 * 86_400_000;
 
+const isTemplateKind = (k: MessageKind): k is TemplateKind => k in WHATSAPP_TEMPLATES;
+
+/** The approved WhatsApp template and its values for a message to a customer; none for alerts to the business. */
+function whatsAppTemplateFor(t: TenantData, m: OutboxMessage, link: string): OutgoingMessage['template'] {
+  const a = t.appointments.find((x) => x.id === m.appointmentId);
+  if (m.to === 'owner' || !a || !isTemplateKind(m.kind)) return undefined;
+  const vars = { ...messageVars(t, a, m.locale), link };
+  return { kind: m.kind, locale: m.locale, params: whatsAppParams(m.kind, m.locale, vars) };
+}
+
 async function deliver(t: TenantData, m: OutboxMessage, sender: Sender, now: Date, origin: string | undefined): Promise<Outcome> {
   const doneAt = now.toISOString();
   const late = tooLate(t, m, now);
   if (late) return { state: 'skipped', doneAt, error: late };
-  const to = recipientOf(t, m);
-  if (!to) return { state: 'skipped', doneAt, error: 'no_recipient' };
+  const address = recipientOf(t, m);
+  if (!address) return { state: 'skipped', doneAt, error: 'no_recipient' };
+  const to = m.channel === 'whatsapp' ? internationalPhone(address, t.business.timezone) : address;
+  if (!to) return { state: 'skipped', doneAt, error: 'bad_number' };
   const business = pickText(t.business.name, m.locale);
-  const body = m.body.split(LINK_PLACEHOLDER).join(origin ? bookingLink(origin, t.business.slug) : '');
+  const link = origin ? bookingLink(origin, t.business.slug) : '';
+  const body = m.body.split(LINK_PLACEHOLDER).join(link);
+  const template = m.channel === 'whatsapp' ? whatsAppTemplateFor(t, m, link) : undefined;
   const attempts = (m.attempts ?? 0) + 1;
   try {
-    await sender.send({ to, body, subject: business, fromName: business, replyTo: m.to === 'owner' ? undefined : t.business.email || undefined });
+    await sender.send({ to, body, subject: business, fromName: business, replyTo: m.to === 'owner' ? undefined : t.business.email || undefined, template });
     return { state: 'sent', attempts, doneAt };
   } catch (e) {
     const retry = e instanceof SendError ? e.retry : true;

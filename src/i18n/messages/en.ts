@@ -1662,6 +1662,8 @@ export const en = {
       template: 'Message',
       variables: 'Variables: {vars}',
       previewIn: 'Preview · {language}',
+      whatsappTitle: 'On WhatsApp',
+      whatsappHint: 'WhatsApp only allows wording it approved in advance, so customers get this text with the appointment’s details. Your wording above goes out by SMS and email.',
     },
     team: {
       lede: 'People who can sign in to this workspace.',
