@@ -73,28 +73,31 @@ export function smsNumber(phone: string): string {
   return raw.replace(/^\+|^00/, '');
 }
 
+export const GLOBALSMS_API = 'https://api.itnewsletter.co.il/api/restApiSms';
+
 /**
- * SMS through Global SMS (globalsms.co.il), an Israeli gateway billed per message.
- * `sender` is what customers see: up to 11 English letters/digits (approved by
- * Global SMS) or a phone number. Every message already names the business.
+ * SMS through Global SMS (globalsms.co.il), an Israeli gateway billed per
+ * message (Hebrew: 70 characters a credit). `sender` is what customers see: a
+ * phone number verified in the Global SMS app, or up to 11 English letters
+ * pre-approved there. Every message already names the business.
+ *
+ * Global SMS only answers approved server IPs (otherwise 401/403), and the
+ * account must be strongly identified (KYC) for API access.
  */
 export function globalSms(apiKey: string, sender: string, fetchImpl: typeof fetch = fetch): Sender {
   return {
     async send(m) {
-      const res = await fetchImpl('https://api.globalsms.co.il/v1/send-sms', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json; charset=utf-8' },
-        body: JSON.stringify({ apiKey, sender, recipients: [smsNumber(m.to)], message: m.body, encoding: 'UTF-8' }),
-      });
-      const text = await res.text().catch(() => '');
+      const q = new URLSearchParams({ ApiKey: apiKey, txtOriginator: sender, destinations: smsNumber(m.to), txtSMSmessage: m.body, dteToDeliver: '', txtAddInf: '' });
+      const res = await fetchImpl(`${GLOBALSMS_API}/sendSmsToRecipients?${q}`, { method: 'GET' });
+      const text = (await res.text().catch(() => ''))
+        .replace(/<[^>]+>/g, '')
+        .trim()
+        .replace(/^"|"$/g, '');
+      if (res.status === 401 || res.status === 403) throw new SendError(`globalsms ${res.status}: this server's IP is not approved by Global SMS`, false);
       if (!res.ok) throw new SendError(`globalsms ${res.status} ${text.slice(0, 200)}`, res.status === 429 || res.status >= 500);
-      let reply: { success?: boolean; status?: string; error?: unknown } = {};
-      try {
-        reply = JSON.parse(text);
-      } catch {
-        /* not JSON: a 2xx is taken as accepted */
-      }
-      if (reply.success === false || reply.error || /^(error|fail)/i.test(String(reply.status ?? ''))) throw new SendError(`globalsms rejected ${text.slice(0, 200)}`, false);
+      // Success is the number of credits charged; anything else is one of their error strings.
+      if (/^\d+(\.\d+)?$/.test(text)) return;
+      throw new SendError(`globalsms: ${text.slice(0, 200) || 'empty reply'}`, /^system error$/i.test(text));
     },
   };
 }

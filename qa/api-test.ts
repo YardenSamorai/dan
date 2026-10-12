@@ -459,19 +459,25 @@ try {
   // SMS through Global SMS.
   {
     check('sms numbers in Israeli local form', smsNumber('+972 50-123-4567') === '0501234567' && smsNumber('050-123-4567') === '0501234567' && smsNumber('972501234567') === '0501234567' && smsNumber('+44 7700 900123') === '447700900123');
-    const sent: { url: string; init: RequestInit }[] = [];
-    let reply = () => new Response(JSON.stringify({ success: true }), { status: 200 });
-    const sms = globalSms('sms-key', 'Tornu', (async (url: string, init: RequestInit) => (sent.push({ url, init }), reply())) as unknown as typeof fetch);
+    const sent: string[] = [];
+    let reply = () => new Response('2', { status: 200 });
+    const sms = globalSms('sms-key', '0521234567', (async (url: string) => (sent.push(url), reply())) as unknown as typeof fetch);
     await sms.send({ to: '+972 52-333-4444', body: 'שלום יעל, התור נקבע', subject: '', fromName: 'Ten' });
-    const body = JSON.parse(String(sent[0]?.init.body));
-    check('sms goes to Global SMS with the key, sender and Hebrew text', sent[0]?.url === 'https://api.globalsms.co.il/v1/send-sms' && (sent[0].init.headers as Record<string, string>).authorization === 'Bearer sms-key' && body.sender === 'Tornu' && body.recipients[0] === '0523334444' && body.message === 'שלום יעל, התור נקבע' && body.encoding === 'UTF-8', body);
+    const url = new URL(sent[0] ?? 'http://x');
+    const q = Object.fromEntries(url.searchParams);
+    check('sms goes to Global SMS with the key, sender and Hebrew text', url.origin + url.pathname === 'https://api.itnewsletter.co.il/api/restApiSms/sendSmsToRecipients' && q.ApiKey === 'sms-key' && q.txtOriginator === '0521234567' && q.destinations === '0523334444' && q.txtSMSmessage === 'שלום יעל, התור נקבע', q);
     const err = async () => sms.send({ to: '0523334444', body: 'x', subject: '', fromName: 'Ten' }).then(() => null, (e: SendError) => e);
-    reply = () => new Response(JSON.stringify({ success: false, error: 'invalid sender' }), { status: 200 });
+    reply = () => new Response('Unapporved originator number', { status: 200 });
     const rejected = await err();
-    check('a refused sms fails without retrying', rejected instanceof SendError && !rejected.retry, rejected);
-    reply = () => new Response('busy', { status: 503 });
+    check('a refused sms fails without retrying', rejected instanceof SendError && !rejected.retry && rejected.message.includes('originator'), rejected);
+    reply = () => new Response('Forbidden', { status: 403 });
+    const blocked = await err();
+    check('an unapproved server IP is reported plainly', blocked instanceof SendError && !blocked.retry && blocked.message.includes('IP'), blocked);
+    reply = () => new Response('system error', { status: 200 });
     const busy = await err();
-    check('a gateway outage is retried', busy instanceof SendError && busy.retry, busy);
+    check('a gateway system error is retried', busy instanceof SendError && busy.retry, busy);
+    reply = () => new Response('<?xml version="1.0"?><string xmlns="http://tempuri.org/">1</string>', { status: 200 });
+    check('a credits count wrapped in XML counts as sent', (await err()) === null);
   }
 
   // WhatsApp templates and the Cloud API sender.
