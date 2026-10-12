@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useI18n } from '../../i18n/I18nProvider';
-import { CloseIcon } from '../ui/Icons';
+import { ChevronRight, CloseIcon } from '../ui/Icons';
 import { LocaleSwitch } from '../ui/bits';
 import '../../styles/public.css';
 
 export interface PublicNavItem {
   to: string;
   label: string;
+  /** One line under the label in the phone menu. */
+  hint?: string;
 }
 
 /**
@@ -55,14 +57,14 @@ export function PublicHeader({
     }
   }, [open]);
 
-  const link = (n: PublicNavItem, className: string, style?: React.CSSProperties) =>
+  const link = (n: PublicNavItem, className: string, children: ReactNode = n.label) =>
     n.to.startsWith('#') ? (
-      <a key={n.to} href={n.to} className={className} style={style} onClick={() => setOpen(false)}>
-        {n.label}
+      <a key={n.to} href={n.to} className={className} onClick={() => setOpen(false)}>
+        {children}
       </a>
     ) : (
-      <Link key={n.to} to={n.to} className={className} style={style}>
-        {n.label}
+      <Link key={n.to} to={n.to} className={className}>
+        {children}
       </Link>
     );
 
@@ -107,12 +109,28 @@ export function PublicHeader({
                 <span className="sr-only">{t('common.closeMenu')}</span>
               </button>
             </div>
-            <nav className="menu-sheet__nav container">
-              {nav.map((n, i) => link(n, 'menu-sheet__link display', { animationDelay: `${60 + i * 40}ms` }))}
+            <nav className="menu-sheet__nav container" aria-label={t('common.menu')}>
+              <ul>
+                {nav.map((n, i) => (
+                  <li key={n.to} style={{ animationDelay: `${40 + i * 45}ms` }}>
+                    {link(
+                      n,
+                      'menu-sheet__link',
+                      <>
+                        <span className="menu-sheet__text">
+                          <span className="menu-sheet__label">{n.label}</span>
+                          {n.hint && <span className="menu-sheet__hint">{n.hint}</span>}
+                        </span>
+                        <ChevronRight size={18} className="menu-sheet__chev" />
+                      </>,
+                    )}
+                  </li>
+                ))}
+              </ul>
             </nav>
             <div className="menu-sheet__foot container">
-              <LocaleSwitch />
               {sheetFoot}
+              <LocaleSwitch className="menu-sheet__locale" />
             </div>
           </>
         )}

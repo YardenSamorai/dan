@@ -118,7 +118,16 @@ export const he: Messages = {
   },
 
   marketing: {
-    nav: { features: 'מה יש במערכת', how: 'איך זה עובד', demo: 'הדגמה', signIn: 'כניסה', getStarted: 'להתחיל' },
+    nav: {
+      features: 'מה יש במערכת',
+      featuresHint: 'יומן, עמוד הזמנות, תזכורות וצוות',
+      how: 'איך זה עובד',
+      howHint: 'מההרשמה ועד התור הראשון',
+      demo: 'הדגמה',
+      demoHint: 'לקבוע תור בעמוד של עסק לדוגמה',
+      signIn: 'כניסה',
+      getStarted: 'להתחיל',
+    },
     cta: {
       primary: 'פתיחת עמוד לקביעת תורים',
       demo: 'לעמוד לדוגמה',

@@ -117,7 +117,16 @@ export const en = {
 
   // ── Marketing site ───────────────────────────────────────────────
   marketing: {
-    nav: { features: 'Features', how: 'How it works', demo: 'Demo', signIn: 'Sign in', getStarted: 'Get started' },
+    nav: {
+      features: 'Features',
+      featuresHint: 'Calendar, booking page, reminders and team',
+      how: 'How it works',
+      howHint: 'From sign-up to your first booking',
+      demo: 'Demo',
+      demoHint: 'Book on a sample business page',
+      signIn: 'Sign in',
+      getStarted: 'Get started',
+    },
     cta: {
       primary: 'Create your booking page',
       demo: 'View a demo booking page',
