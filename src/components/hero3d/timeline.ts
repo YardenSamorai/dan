@@ -116,7 +116,7 @@ export function domAt(p: number): Dom {
 export const CAL = { start: 480, end: 1140 };
 export const CAL_APPTS: { id: 'a' | 'mine' | 'b' | 'c' | 'd'; start: number; end: number; tone: string; mine?: boolean }[] = [
   { id: 'a', start: 540, end: 600, tone: '#c24d6b' },
-  { id: 'mine', start: 630, end: 690, tone: '#0f6b66', mine: true },
+  { id: 'mine', start: 630, end: 690, tone: '#1c1c1e', mine: true },
   { id: 'b', start: 720, end: 780, tone: '#8a63b8' },
   { id: 'c', start: 840, end: 885, tone: '#c9814a' },
   { id: 'd', start: 930, end: 990, tone: '#c24d6b' },

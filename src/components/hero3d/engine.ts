@@ -64,7 +64,7 @@ function screenSketch(rtl: boolean) {
   for (let i = 0; i < 6; i++) r(22 + i * (dw + 8), 120, dw, 48, i === 2 ? '#1c1c1e' : '#f4f4f2', 8);
   const sw = (640 - 44 - 3 * 8) / 4;
   for (let i = 0; i < 4; i++) r(22 + i * (sw + 8), 186, sw, 40, '#f4f4f2', 6);
-  r(640 - 22 - 120, 346, 120, 34, '#0f6b66', 17);
+  r(640 - 22 - 120, 346, 120, 34, '#1c1c1e', 17);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;

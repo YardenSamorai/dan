@@ -63,7 +63,7 @@ const TYPE_ICON: Record<BusinessType, string> = {
   other: '✨',
 };
 
-const CONFETTI = [ACCENTS.fig, ACCENTS.rose, ACCENTS.gold, ACCENTS.sage, ACCENTS.ocean, '#0f6b66', '#f2c14e', '#f4a6b8', '#9ad0c2'];
+const CONFETTI = [ACCENTS.fig, ACCENTS.rose, ACCENTS.gold, ACCENTS.sage, ACCENTS.ocean, '#1c1c1e', '#f2c14e', '#f4a6b8', '#9ad0c2'];
 
 function fresh(locale: Locale): Draft {
   const he = locale === 'he';

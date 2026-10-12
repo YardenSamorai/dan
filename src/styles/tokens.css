@@ -28,8 +28,8 @@
   --line: rgba(28, 28, 30, 0.08);
   --line-strong: rgba(28, 28, 30, 0.14);
 
-  /* ── Product accent: lagoon. 6.3:1 on white. ── */
-  --brand: #0f6b66;
+  /* ── Product accent: ink on white. Colour belongs to each business's own page. ── */
+  --brand: var(--ink);
   --accent: var(--brand);
 
   /* ── Semantic (appointment status, validation). Muted, never decorative. ── */

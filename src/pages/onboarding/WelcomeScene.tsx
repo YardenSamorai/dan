@@ -19,7 +19,7 @@ export function WelcomeScene({ focus }: { focus: number | null }) {
         const css = getComputedStyle(el);
         scene.current = createWelcomeScene(el, {
           rtl: dir === 'rtl',
-          accent: css.getPropertyValue('--accent').trim() || '#0f6b66',
+          accent: css.getPropertyValue('--accent').trim() || '#1c1c1e',
           font: css.fontFamily,
           reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
           text: {

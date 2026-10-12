@@ -38,7 +38,7 @@ export function AuthScene({ variant }: { variant: 'signIn' | 'signUp' }) {
         scene = createAuthScene(el, {
           text: JSON.parse(key) as AuthSceneText,
           rtl: dir === 'rtl',
-          accent: css.getPropertyValue('--accent').trim() || '#0f6b66',
+          accent: css.getPropertyValue('--accent').trim() || '#1c1c1e',
           font: css.fontFamily,
           displayFont: css.getPropertyValue('--font-display').trim() || css.fontFamily,
           reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
