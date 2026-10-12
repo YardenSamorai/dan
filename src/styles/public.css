@@ -542,10 +542,6 @@ html[lang='he'] .site-footer__h {
   }
 }
 
-.how {
-  background: var(--paper);
-}
-
 .how__steps {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
