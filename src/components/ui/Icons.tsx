@@ -31,6 +31,19 @@ export const ChevronLeft = icon(<path d="M10 3.5 5.5 8l4.5 4.5" />, { directiona
 export const ChevronRight = icon(<path d="M6 3.5 10.5 8 6 12.5" />, { directional: true });
 export const ChevronDown = icon(<path d="m4 6 4 4 4-4" />);
 export const CheckIcon = icon(<path d="m3.5 8.5 3 3 6-7" />);
+export const HourglassIcon = icon(
+  <>
+    <path d="M4 2.5h8M4 13.5h8" />
+    <path d="M5 2.5v1.2c0 1.4 3 2.7 3 4.3s-3 2.9-3 4.3v1.2M11 2.5v1.2c0 1.4-3 2.7-3 4.3s3 2.9 3 4.3v1.2" />
+  </>,
+);
+export const DoorIcon = icon(
+  <>
+    <path d="M2.5 13.5h11" />
+    <path d="M4.5 13.5V3a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 .5.5v10.5" />
+    <circle cx="9.5" cy="8.5" r="0.7" fill="currentColor" stroke="none" />
+  </>,
+);
 export const CloseIcon = icon(<path d="m4 4 8 8M12 4l-8 8" />);
 export const PlusIcon = icon(<path d="M8 3.5v9M3.5 8h9" />);
 export const MinusIcon = icon(<path d="M3.5 8h9" />);

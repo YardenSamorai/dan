@@ -1,11 +1,22 @@
 import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { Avatar, StatusBadge } from '../../components/ui/bits';
+import { BanIcon, CalendarIcon, DoorIcon, GlobeIcon, HomeIcon, HourglassIcon, LockIcon, SlidersIcon, TagIcon } from '../../components/ui/Icons';
 import { useI18n } from '../../i18n/I18nProvider';
 import type { MessageKey } from '../../i18n/messages';
 import { DesignVignette, InsightsVignette, SelfServeVignette } from './MoreVignettes';
 import { useLoop } from './useLoop';
 
-const DETAILS = ['availability', 'rules', 'staffTerms', 'buffers', 'shared', 'today', 'roles', 'block', 'bilingual'] as const;
+const DETAILS = [
+  ['availability', CalendarIcon],
+  ['rules', SlidersIcon],
+  ['staffTerms', TagIcon],
+  ['buffers', HourglassIcon],
+  ['shared', DoorIcon],
+  ['today', HomeIcon],
+  ['roles', LockIcon],
+  ['block', BanIcon],
+  ['bilingual', GlobeIcon],
+] as const;
 
 type ChapterId = 'bookingPage' | 'design' | 'calendar' | 'selfServe' | 'customers' | 'insights';
 
@@ -27,8 +38,11 @@ export function Showcase() {
       <div className="showcase__more">
         <h3 className="showcase__more-title">{t('marketing.showcase.more')}</h3>
         <ul>
-          {DETAILS.map((k) => (
+          {DETAILS.map(([k, Icon]) => (
             <li key={k}>
+              <span className="showcase__more-icon">
+                <Icon size={18} />
+              </span>
               <h4>{t(`marketing.features.${k}.title` as MessageKey)}</h4>
               <p>{t(`marketing.features.${k}.body` as MessageKey)}</p>
             </li>
