@@ -143,12 +143,12 @@
 }
 
 .btn--primary {
-  background: var(--accent);
+  background: var(--btn-primary);
   color: var(--white);
 }
 
 .btn--primary:active:not(:disabled) {
-  background: var(--accent-hover);
+  background: var(--btn-primary-hover);
 }
 
 .btn--ink {
@@ -203,7 +203,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .btn--primary:hover:not(:disabled) {
-    background: var(--accent-hover);
+    background: var(--btn-primary-hover);
   }
   .btn--ink:hover:not(:disabled) {
     background: #000;

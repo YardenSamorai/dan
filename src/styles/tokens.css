@@ -141,6 +141,17 @@
   --focus: 0 0 0 2px var(--white), 0 0 0 4px var(--accent);
 }
 
+/* The product's primary buttons are ink; inside a business's own scope they take its accent. */
+:root {
+  --btn-primary: var(--ink);
+  --btn-primary-hover: #000;
+}
+
+[data-accent] {
+  --btn-primary: var(--accent);
+  --btn-primary-hover: var(--accent-hover);
+}
+
 /* Curated tenant accents: all pass 4.5:1 against white for text and buttons. */
 [data-accent='fig'] { --accent: #6b2236; }
 [data-accent='rose'] { --accent: #9c3f5a; }
