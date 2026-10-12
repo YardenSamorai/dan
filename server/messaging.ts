@@ -64,6 +64,41 @@ export function resendEmail(apiKey: string, from: string): Sender {
   };
 }
 
+/** Israeli numbers the way Israeli SMS gateways expect them (0501234567); others as international digits. */
+export function smsNumber(phone: string): string {
+  const raw = phone.replace(/[^\d+]/g, '');
+  if (raw.startsWith('+972')) return `0${raw.slice(4)}`;
+  if (raw.startsWith('00972')) return `0${raw.slice(5)}`;
+  if (raw.startsWith('972') && raw.length === 12) return `0${raw.slice(3)}`;
+  return raw.replace(/^\+|^00/, '');
+}
+
+/**
+ * SMS through Global SMS (globalsms.co.il), an Israeli gateway billed per message.
+ * `sender` is what customers see: up to 11 English letters/digits (approved by
+ * Global SMS) or a phone number. Every message already names the business.
+ */
+export function globalSms(apiKey: string, sender: string, fetchImpl: typeof fetch = fetch): Sender {
+  return {
+    async send(m) {
+      const res = await fetchImpl('https://api.globalsms.co.il/v1/send-sms', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ apiKey, sender, recipients: [smsNumber(m.to)], message: m.body, encoding: 'UTF-8' }),
+      });
+      const text = await res.text().catch(() => '');
+      if (!res.ok) throw new SendError(`globalsms ${res.status} ${text.slice(0, 200)}`, res.status === 429 || res.status >= 500);
+      let reply: { success?: boolean; status?: string; error?: unknown } = {};
+      try {
+        reply = JSON.parse(text);
+      } catch {
+        /* not JSON: a 2xx is taken as accepted */
+      }
+      if (reply.success === false || reply.error || /^(error|fail)/i.test(String(reply.status ?? ''))) throw new SendError(`globalsms rejected ${text.slice(0, 200)}`, false);
+    },
+  };
+}
+
 export const GRAPH_API = 'https://graph.facebook.com/v26.0';
 
 /** Meta's throughput limits: worth trying again later. Any other 4xx (not on WhatsApp, template not approved, bad values) is final. */
@@ -118,13 +153,14 @@ const logSender = (channel: Channel): Sender => ({
 /**
  * Providers from the environment:
  *   RESEND_API_KEY + MAIL_FROM                     email
+ *   GLOBALSMS_API_KEY + GLOBALSMS_SENDER           SMS (Global SMS)
  *   WHATSAPP_TOKEN + WHATSAPP_PHONE_NUMBER_ID      WhatsApp (Meta Cloud API)
  *   MESSAGES_LOG=1                                 (development) print every channel to the console
- * SMS: add a Sender here once a provider is chosen.
  */
 export function sendersFromEnv(env: Env): Senders {
   const s: Senders = {};
   if (env.RESEND_API_KEY && env.MAIL_FROM) s.email = resendEmail(env.RESEND_API_KEY, env.MAIL_FROM);
+  if (env.GLOBALSMS_API_KEY && env.GLOBALSMS_SENDER) s.sms = globalSms(env.GLOBALSMS_API_KEY, env.GLOBALSMS_SENDER);
   if (env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID) s.whatsapp = whatsappCloud(env.WHATSAPP_TOKEN, env.WHATSAPP_PHONE_NUMBER_ID);
   if (env.MESSAGES_LOG === '1' && env.NODE_ENV !== 'production') for (const c of ['sms', 'whatsapp', 'email'] as const) s[c] ??= logSender(c);
   return s;

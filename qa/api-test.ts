@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { devAuthenticator } from '../server/auth';
 import { handleIcs, handleRpc, type ApiDeps } from '../server/handler';
-import { dispatchMessages, SendError, whatsappCloud, type Sender, type Senders } from '../server/messaging';
+import { dispatchMessages, globalSms, SendError, smsNumber, whatsappCloud, type Sender, type Senders } from '../server/messaging';
 import { WHATSAPP_TEMPLATES, whatsAppParams } from '../src/domain/whatsapp';
 import { internationalPhone } from '../src/lib/phone';
 import { FileStore } from '../server/store';
@@ -454,6 +454,24 @@ try {
     } else check('series created', false, { series, staff: t0.staff.length });
     const tooMany = await call('workspace.call', [BIZ, 'createAppointmentSeries', [{ serviceId: svcM.id, addOnIds: [], staffId: svcM.staffIds[0], date: startDate, start: 900, customer: { name: 'Series Test', phone: '0501231234', locale: 'he' } }, { everyWeeks: 1, count: 500 }]], owner);
     check('series length is capped', tooMany.status === 400, tooMany);
+  }
+
+  // SMS through Global SMS.
+  {
+    check('sms numbers in Israeli local form', smsNumber('+972 50-123-4567') === '0501234567' && smsNumber('050-123-4567') === '0501234567' && smsNumber('972501234567') === '0501234567' && smsNumber('+44 7700 900123') === '447700900123');
+    const sent: { url: string; init: RequestInit }[] = [];
+    let reply = () => new Response(JSON.stringify({ success: true }), { status: 200 });
+    const sms = globalSms('sms-key', 'Tornu', (async (url: string, init: RequestInit) => (sent.push({ url, init }), reply())) as unknown as typeof fetch);
+    await sms.send({ to: '+972 52-333-4444', body: 'שלום יעל, התור נקבע', subject: '', fromName: 'Ten' });
+    const body = JSON.parse(String(sent[0]?.init.body));
+    check('sms goes to Global SMS with the key, sender and Hebrew text', sent[0]?.url === 'https://api.globalsms.co.il/v1/send-sms' && (sent[0].init.headers as Record<string, string>).authorization === 'Bearer sms-key' && body.sender === 'Tornu' && body.recipients[0] === '0523334444' && body.message === 'שלום יעל, התור נקבע' && body.encoding === 'UTF-8', body);
+    const err = async () => sms.send({ to: '0523334444', body: 'x', subject: '', fromName: 'Ten' }).then(() => null, (e: SendError) => e);
+    reply = () => new Response(JSON.stringify({ success: false, error: 'invalid sender' }), { status: 200 });
+    const rejected = await err();
+    check('a refused sms fails without retrying', rejected instanceof SendError && !rejected.retry, rejected);
+    reply = () => new Response('busy', { status: 503 });
+    const busy = await err();
+    check('a gateway outage is retried', busy instanceof SendError && busy.retry, busy);
   }
 
   // WhatsApp templates and the Cloud API sender.
