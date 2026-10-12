@@ -1,6 +1,13 @@
 /* Phone: header, then the 3D stage as a band, then the form card riding up over its edge.
    Desktop: the form column on the reading start side, the stage filling the other. */
 .auth {
+  /* The sign-in pages' own accents. The scene reads these; the form uses blue for focus only. */
+  --auth-blue: #5b6cff;
+  --auth-mint: #35c78a;
+  --auth-amber: #f2b94b;
+  --auth-violet: #8b7dff;
+  --auth-ring: color-mix(in srgb, var(--auth-blue) 16%, transparent);
+  --focus: 0 0 0 2px var(--white), 0 0 0 4px var(--auth-blue);
   min-height: 100vh;
   min-height: 100svh;
   display: grid;
@@ -24,11 +31,33 @@
   margin-inline: 10px;
   overflow: hidden;
   border-radius: 28px;
-  /* A lit studio wall: brightest where the card floats, falling off to the corners. */
+  /* A lit studio wall: brightest where the card floats, falling off to the corners,
+     with the faintest cool wash so the white reads as light rather than grey. */
   background:
     radial-gradient(75% 60% at 50% 42%, #ffffff 0%, rgba(255, 255, 255, 0) 70%),
-    linear-gradient(180deg, #f4f4f2, #e9e9e6);
+    radial-gradient(60% 50% at 12% 8%, color-mix(in srgb, var(--auth-blue) 10%, transparent), transparent 72%),
+    radial-gradient(55% 45% at 92% 96%, color-mix(in srgb, var(--auth-violet) 9%, transparent), transparent 72%),
+    linear-gradient(180deg, #f4f4f4, #e9e9ec);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+/* One slow, soft light drifting behind the scene. */
+.auth__stage::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(32% 28% at 50% 50%, color-mix(in srgb, var(--auth-blue) 11%, transparent), transparent 70%);
+  animation: authDrift 22s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes authDrift {
+  from {
+    transform: translate3d(-14%, -10%, 0);
+  }
+  to {
+    transform: translate3d(12%, 14%, 0);
+  }
 }
 
 /* The bottom strip sits under the overlapping card, so the scene frames itself above it. */
@@ -124,6 +153,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .auth__stage::before,
   .auth__card > *,
   .auth__demo,
   .auth__error,
@@ -174,6 +204,8 @@ html[lang='he'] .auth__title {
 
 .auth__switch a:hover {
   text-decoration: underline;
+  text-decoration-color: var(--auth-blue);
+  text-decoration-thickness: 1.5px;
 }
 
 /* ── Grouped fields: one panel, hairlines between rows, labels that rise ── */
@@ -216,9 +248,21 @@ html[lang='he'] .auth__title {
 
 .af:focus-within {
   z-index: 1;
+  background: var(--white);
   box-shadow:
-    0 0 0 1.5px var(--accent),
-    0 0 0 5px var(--accent-glow);
+    0 0 0 1.5px var(--auth-blue),
+    0 0 0 5px var(--auth-ring),
+    0 8px 22px -12px color-mix(in srgb, var(--auth-blue) 45%, transparent);
+}
+
+.af:focus-within:not(:last-child) {
+  border-end-start-radius: 8px;
+  border-end-end-radius: 8px;
+}
+
+.af:focus-within:not(:first-child) {
+  border-start-start-radius: 8px;
+  border-start-end-radius: 8px;
 }
 
 .af:focus-within::before,
@@ -282,7 +326,7 @@ html[lang='he'] .auth__title {
 }
 
 .af__input:focus + .af__label {
-  color: var(--accent);
+  color: var(--auth-blue);
 }
 
 .af__input[aria-invalid='true'] + .af__label {
@@ -409,6 +453,7 @@ html[lang='he'] .auth__title {
 .auth__forgot:hover {
   color: var(--ink);
   text-decoration: underline;
+  text-decoration-color: var(--auth-blue);
 }
 
 .auth__hint {
@@ -446,14 +491,32 @@ html[lang='he'] .auth__title {
 }
 
 .auth__submit.btn--ink {
+  transition:
+    transform 180ms var(--ease-out),
+    box-shadow 280ms var(--ease-out),
+    background-color 180ms var(--ease-out);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     0 1px 2px rgba(20, 20, 24, 0.2),
     0 12px 26px -14px rgba(0, 0, 0, 0.55);
 }
 
+/* Stays dark; on hover it lifts a pixel and picks up a faint blue glow. */
+@media (hover: hover) {
+  .auth__submit.btn--ink:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 0 0 1px color-mix(in srgb, var(--auth-blue) 30%, transparent),
+      0 2px 4px rgba(20, 20, 24, 0.18),
+      0 8px 18px -8px color-mix(in srgb, var(--auth-blue) 40%, transparent),
+      0 20px 42px -16px color-mix(in srgb, var(--auth-blue) 75%, transparent);
+  }
+}
+
 .auth__submit:active:not(:disabled) {
   transform: scale(0.98);
+  transition-duration: 90ms;
 }
 
 .auth__google {
@@ -725,7 +788,8 @@ html[lang='he'] .auth__title {
 
 .code-input__box[data-active] {
   box-shadow:
-    0 0 0 2px var(--ink),
+    0 0 0 2px var(--auth-blue, var(--ink)),
+    0 0 0 6px var(--auth-ring, transparent),
     0 6px 16px -8px rgba(0, 0, 0, 0.3);
 }
 
@@ -734,7 +798,7 @@ html[lang='he'] .auth__title {
   width: 2px;
   height: 26px;
   border-radius: 1px;
-  background: var(--ink);
+  background: var(--auth-blue, var(--ink));
   animation: codeCaret 1s steps(1) infinite;
 }
 
