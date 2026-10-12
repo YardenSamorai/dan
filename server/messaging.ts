@@ -4,6 +4,7 @@ import { appointmentStart } from '../src/domain/scheduling';
 import { renderWhatsApp, WHATSAPP_LANGUAGE, WHATSAPP_TEMPLATES, whatsAppParams } from '../src/domain/whatsapp';
 import type { Channel, MessageKind, OutboxMessage, TemplateKind, TenantData } from '../src/domain/types';
 import { internationalPhone } from '../src/lib/phone';
+import { emailHtml } from './emailHtml';
 import { Conflict, type Store } from './store';
 
 /**
@@ -20,6 +21,10 @@ export interface OutgoingMessage {
   /** Email replies go to the business, not to us. */
   replyTo?: string;
   fromName: string;
+  /** Email layout: language, whether it's an alert to the business itself, and the site address its logo loads from. */
+  locale?: Locale;
+  toOwner?: boolean;
+  origin?: string;
   /** For WhatsApp, which only sends Meta-approved wording: the template and its values. Missing for owner alerts. */
   template?: { kind: TemplateKind; locale: Locale; params: { name: string; text: string }[] };
 }
@@ -54,6 +59,7 @@ export function resendEmail(apiKey: string, from: string): Sender {
           to: [m.to],
           subject: m.subject,
           text: m.body,
+          html: emailHtml({ body: m.body, locale: m.locale ?? 'he', from: m.toOwner ? { kind: 'product' } : { kind: 'business', name: m.fromName }, origin: m.origin }),
           ...(m.replyTo && { reply_to: m.replyTo }),
         }),
       });
@@ -220,7 +226,7 @@ async function deliver(t: TenantData, m: OutboxMessage, sender: Sender, now: Dat
   const template = m.channel === 'whatsapp' ? whatsAppTemplateFor(t, m, link) : undefined;
   const attempts = (m.attempts ?? 0) + 1;
   try {
-    await sender.send({ to, body, subject: business, fromName: business, replyTo: m.to === 'owner' ? undefined : t.business.email || undefined, template });
+    await sender.send({ to, body, subject: business, fromName: business, replyTo: m.to === 'owner' ? undefined : t.business.email || undefined, locale: m.locale, toOwner: m.to === 'owner', origin, template });
     return { state: 'sent', attempts, doneAt };
   } catch (e) {
     const retry = e instanceof SendError ? e.retry : true;
