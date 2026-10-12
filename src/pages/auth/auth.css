@@ -24,10 +24,11 @@
   margin-inline: 10px;
   overflow: hidden;
   border-radius: 28px;
+  /* A lit studio wall: brightest where the card floats, falling off to the corners. */
   background:
-    radial-gradient(70% 60% at 50% 45%, color-mix(in oklab, var(--accent) 16%, var(--porcelain)) 0%, transparent 72%),
-    linear-gradient(170deg, color-mix(in oklab, var(--accent) 7%, #fff), var(--porcelain));
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 10%, transparent);
+    radial-gradient(75% 60% at 50% 42%, #ffffff 0%, rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, #f4f4f2, #e9e9e6);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
 }
 
 /* The bottom strip sits under the overlapping card, so the scene frames itself above it. */

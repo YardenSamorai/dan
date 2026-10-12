@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { clamp01, disposeTree, easeOutBack, easeOutCubic, paint, pen } from '../onboarding/stageKit';
 
@@ -46,14 +45,18 @@ interface Opts {
 }
 
 const INK = '#1c1c1e';
-const MUTED = '#8a8a8e';
-const LINE = '#ecebe8';
+const MUTED = '#86868b';
+const LINE = '#ececee';
+const HAIRLINE = '#e3e3e6';
 
 // Calendar card, in texture pixels and scene units.
 const CW = 420;
 const CH = 520;
 const CAL = { w: 1.4, h: (1.4 * CH) / CW };
 const FACE = { w: CAL.w - 0.04, h: CAL.h - 0.04 };
+const CAL_R = 0.06;
+/** The face's corner in texture pixels, so it follows the card's edge inset by 0.02. */
+const FACE_R = ((CAL_R - 0.02) / FACE.w) * CW;
 const GRID = { top: 132, row: 92, rows: 4, gutter: 70, gap: 8 };
 const COL_W = (CW - GRID.gutter - 18 - GRID.gap) / 2;
 
@@ -65,12 +68,37 @@ const TOAST = { w: 1.12, h: (1.12 * TH) / TW };
 // Caption letters: a face and a stack of darker layers behind it that read as their depth.
 const PW = 840;
 const PH = 84;
-const PLATE = { w: 2.1, h: (2.1 * PH) / PW, depth: 0.034, layers: 12 };
+const PLATE = { w: 2.1, h: (2.1 * PH) / PW, depth: 0.016, layers: 8 };
 const CAPTION_Y = -1.1;
 
 /** Beats, in seconds. */
 const T = { cal: 0.9, items: 0.75, stagger: 0.2, arrive: 1.95, toast: 2.25, caption: 2.6 } as const;
 
+const easeOutQuint = (x: number) => 1 - (1 - x) ** 5;
+
+/**
+ * A thin slab with real rounded corners, centred on its depth. RoundedBoxGeometry caps the
+ * radius at half the thickness, so thin cards came out square behind their rounded faces.
+ */
+function slab(w: number, h: number, r: number, depth: number) {
+  const bevel = Math.min(0.004, depth / 4);
+  const x = w / 2 - bevel;
+  const y = h / 2 - bevel;
+  const k = Math.max(0.001, r - bevel);
+  const s = new THREE.Shape();
+  s.moveTo(-x + k, -y);
+  s.lineTo(x - k, -y);
+  s.quadraticCurveTo(x, -y, x, -y + k);
+  s.lineTo(x, y - k);
+  s.quadraticCurveTo(x, y, x - k, y);
+  s.lineTo(-x + k, y);
+  s.quadraticCurveTo(-x, y, -x, y - k);
+  s.lineTo(-x, -y + k);
+  s.quadraticCurveTo(-x, -y, -x + k, -y);
+  const g = new THREE.ExtrudeGeometry(s, { depth: depth - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 10 });
+  g.translate(0, 0, -depth / 2 + bevel);
+  return g;
+}
 const onFace = (px: number, py: number, z: number) => new THREE.Vector3((px / CW - 0.5) * FACE.w, (0.5 - py / CH) * FACE.h, z);
 const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
@@ -78,8 +106,9 @@ export function createAuthScene(host: HTMLElement, o: Opts): AuthScene {
   const { text, rtl, accent, font } = o;
   const { X, label, rect } = pen(rtl, font);
   const side = rtl ? -1 : 1;
-  const tones = [accent, new THREE.Color(accent).offsetHSL(0.09, -0.12, 0.1).getStyle()];
   const tint = (c: string, k = 0.86) => new THREE.Color(c).lerp(new THREE.Color('#ffffff'), k).getStyle();
+  // One accent and a quieter second: the team reads apart without a second hue.
+  const tones = [accent, tint(accent, 0.42)];
   const colX = (col: number) => GRID.gutter + col * (COL_W + GRID.gap);
   const yOf = (m: number) => GRID.top + ((m - text.firstHour) / 60) * GRID.row;
 
@@ -119,6 +148,9 @@ export function createAuthScene(host: HTMLElement, o: Opts): AuthScene {
 
   // ── Calendar face ─────────────────────────────────────────────────
   const calMat = surface(CW, CH, (g) => {
+    g.beginPath();
+    g.roundRect(0, 0, CW, CH, FACE_R);
+    g.clip();
     g.fillStyle = '#ffffff';
     g.fillRect(0, 0, CW, CH);
     label(g, text.day, 26, 38, 19, INK, 700, CW, CW - 52);
@@ -150,25 +182,32 @@ export function createAuthScene(host: HTMLElement, o: Opts): AuthScene {
   const chipFaces = text.items.map((it, i) => {
     const h = Math.max(40, yOf(it.end) - yOf(it.start) - 4);
     const fresh = i === last;
-    const c = tones[it.col];
+    // The booking that just arrived is the one solid block, whoever it's with.
+    const c = fresh ? accent : tones[it.col];
     return {
       h,
       mat: surface(COL_W, h, (g) => {
-        g.fillStyle = fresh ? c : tint(c);
         g.beginPath();
-        g.roundRect(0, 0, COL_W, h, 10);
+        g.roundRect(0.5, 0.5, COL_W - 1, h - 1, 9);
+        g.fillStyle = fresh ? c : '#ffffff';
         g.fill();
-        if (!fresh) rect(g, COL_W, 0, 0, 4, h, 2, c);
+        if (!fresh) {
+          g.strokeStyle = HAIRLINE;
+          g.lineWidth = 1;
+          g.stroke();
+          rect(g, COL_W, 5, 7, 3, h - 14, 1.5, c);
+        }
         const ink = fresh ? '#ffffff' : INK;
-        const sub = fresh ? 'rgba(255,255,255,0.82)' : 'rgba(28,28,30,0.6)';
+        const sub = fresh ? 'rgba(255,255,255,0.72)' : MUTED;
         g.font = `600 10.5px ${font}`;
         g.fillStyle = sub;
         g.textBaseline = 'middle';
         g.direction = 'ltr';
         g.textAlign = rtl ? 'right' : 'left';
-        g.fillText(`${hhmm(it.start)}–${hhmm(it.end)}`, rtl ? COL_W - 13 : 13, 15);
-        label(g, it.customer, 13, 33, 13, ink, 700, COL_W, COL_W - 24);
-        if (h >= 62) label(g, it.service, 13, 51, 11, sub, 500, COL_W, COL_W - 24);
+        const pad = fresh ? 13 : 16;
+        g.fillText(`${hhmm(it.start)}–${hhmm(it.end)}`, rtl ? COL_W - pad : pad, 16);
+        label(g, it.customer, pad, 34, 13, ink, 650, COL_W, COL_W - pad - 10);
+        if (h >= 62) label(g, it.service, pad, 52, 11, sub, 500, COL_W, COL_W - pad - 10);
       }),
     };
   });
@@ -219,8 +258,9 @@ export function createAuthScene(host: HTMLElement, o: Opts): AuthScene {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  // Neutral keeps white paper white; ACES greys it.
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = 1;
   Object.assign(renderer.domElement.style, { display: 'block', width: '100%', height: '100%' });
   host.appendChild(renderer.domElement);
 
@@ -228,36 +268,36 @@ export function createAuthScene(host: HTMLElement, o: Opts): AuthScene {
   const pmrem = new THREE.PMREMGenerator(renderer);
   const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environment = env;
-  scene.environmentIntensity = 0.55;
+  scene.environmentIntensity = 0.7;
 
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
-  const key = new THREE.DirectionalLight('#fff6ec', 2.2);
+  const key = new THREE.DirectionalLight('#ffffff', 1.6);
   key.position.set(-side * 2.5, 4, 3.5);
-  scene.add(key, new THREE.HemisphereLight('#ffffff', '#d9dedc', 0.9));
+  scene.add(key, new THREE.HemisphereLight('#ffffff', '#e4e4e7', 1.1));
 
-  // No floor: the scene floats in a soft pool of the accent's light, which swells when the booking lands.
-  const glowTex = paint(256, 256, (g) => {
-    const tone = new THREE.Color(accent);
-    const rgba = (a: number) => `rgba(${Math.round(tone.r * 255)},${Math.round(tone.g * 255)},${Math.round(tone.b * 255)},${a})`;
-    const r = g.createRadialGradient(128, 128, 0, 128, 128, 128);
-    r.addColorStop(0, rgba(0.3));
-    r.addColorStop(0.4, rgba(0.14));
-    r.addColorStop(0.75, rgba(0.04));
-    r.addColorStop(1, rgba(0));
-    g.fillStyle = r;
-    g.fillRect(0, 0, 256, 256);
+  // No floor: each card casts a soft, low shadow onto the air behind it, like a window over the desktop.
+  const shadowTex = paint(256, 256, (g) => {
+    // Only the blurred shadow lands on the canvas; the shape itself is drawn off to the side.
+    g.shadowColor = '#000';
+    g.shadowBlur = 40;
+    g.shadowOffsetX = 1000;
+    g.fillStyle = '#000';
+    g.beginPath();
+    g.roundRect(56 - 1000, 56, 144, 144, 24);
+    g.fill();
   }, 1);
-  const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 });
-  const glow = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 4.6), glowMat);
-  glow.position.set(0, -0.15, -1.4);
-  glow.renderOrder = -1;
-  scene.add(glow);
+  const shadowOf = (w: number, h: number, opacity: number) => {
+    const mat = new THREE.MeshBasicMaterial({ map: shadowTex, color: '#000000', transparent: true, depthWrite: false, toneMapped: false, opacity });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w * 1.78, h * 1.78), mat);
+    mesh.renderOrder = -1;
+    return { mesh, mat, opacity };
+  };
 
   // Floating below the card, turned a little toward the pointer.
   const caption = new THREE.Group();
   const plate = new THREE.PlaneGeometry(PLATE.w, PLATE.h);
-  const sideFrom = new THREE.Color('#7c7c81');
-  const sideTo = new THREE.Color('#c8c8cb');
+  const sideFrom = new THREE.Color('#9a9a9f');
+  const sideTo = new THREE.Color('#dcdcdf');
   const captionLayers = Array.from({ length: PLATE.layers }, (_, i) => {
     const mat = new THREE.MeshBasicMaterial({ toneMapped: false, transparent: true, depthWrite: false });
     mat.color.copy(sideFrom).lerp(sideTo, i / (PLATE.layers - 1));
@@ -276,23 +316,25 @@ export function createAuthScene(host: HTMLElement, o: Opts): AuthScene {
   const rig = new THREE.Group();
   scene.add(rig);
 
-  const paperMat = new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.55, clearcoat: 0.6, clearcoatRoughness: 0.25 });
+  const paperMat = new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.3 });
 
   const cal = new THREE.Group();
   const calFace = new THREE.Mesh(new THREE.PlaneGeometry(FACE.w, FACE.h), calMat);
   calFace.position.z = 0.0205;
-  cal.add(new THREE.Mesh(new RoundedBoxGeometry(CAL.w, CAL.h, 0.04, 4, 0.06), paperMat), calFace);
+  const calShadow = shadowOf(CAL.w, CAL.h, 0.3);
+  calShadow.mesh.position.set(0, -0.12, -0.2);
+  cal.add(calShadow.mesh, new THREE.Mesh(slab(CAL.w, CAL.h, CAL_R, 0.04), paperMat), calFace);
   rig.add(cal);
 
   const chips = text.items.map((it, i) => {
     const { h, mat: faceMat } = chipFaces[i];
     const size = { w: (COL_W / CW) * FACE.w, h: (h / CH) * FACE.h };
     const fresh = i === last;
-    const slabMat = new THREE.MeshPhysicalMaterial({ color: fresh ? tones[it.col] : tint(tones[it.col]), roughness: 0.5, clearcoat: 0.6, transparent: true });
+    const slabMat = new THREE.MeshPhysicalMaterial({ color: fresh ? accent : '#ffffff', roughness: fresh ? 0.32 : 0.45, clearcoat: 0.5, transparent: true });
     const group = new THREE.Group();
     const f = new THREE.Mesh(new THREE.PlaneGeometry(size.w - 0.008, size.h - 0.008), faceMat);
     f.position.z = 0.0085;
-    group.add(new THREE.Mesh(new RoundedBoxGeometry(size.w, size.h, 0.016, 3, 0.012), slabMat), f);
+    group.add(new THREE.Mesh(slab(size.w, size.h, (9 / CW) * FACE.w, 0.016), slabMat), f);
     const home = onFace(X(CW, colX(it.col), COL_W) + COL_W / 2, yOf(it.start) + 2 + h / 2, 0.03);
     cal.add(group);
     return { group, home, mats: [slabMat, faceMat], at: fresh ? T.arrive : T.items + i * T.stagger, fresh };
@@ -307,21 +349,10 @@ export function createAuthScene(host: HTMLElement, o: Opts): AuthScene {
   const toast = new THREE.Group();
   const toastFace = new THREE.Mesh(new THREE.PlaneGeometry(TOAST.w - 0.02, TOAST.h - 0.02), toastMat);
   toastFace.position.z = 0.0165;
-  toast.add(new THREE.Mesh(new RoundedBoxGeometry(TOAST.w, TOAST.h, 0.03, 4, 0.05), paperMat), toastFace);
+  const toastShadow = shadowOf(TOAST.w, TOAST.h, 0.24);
+  toastShadow.mesh.position.set(0, -0.05, -0.09);
+  toast.add(toastShadow.mesh, new THREE.Mesh(slab(TOAST.w, TOAST.h, (22 / TW) * TOAST.w, 0.03), paperMat), toastFace);
   rig.add(toast);
-
-  const orbMat = new THREE.MeshPhysicalMaterial({ color: accent, roughness: 0.25, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.1 });
-  const orbSoft = new THREE.MeshPhysicalMaterial({ color: tint(accent, 0.55), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.15 });
-  const orbs = [
-    { r: 0.11, m: orbMat, p: [side * 0.86, 0.78, -0.25], s: 0.9 },
-    { r: 0.07, m: orbSoft, p: [-side * 0.9, 0.95, -0.4], s: 1.3 },
-    { r: 0.16, m: orbSoft, p: [side * 0.95, -0.82, -0.5], s: 0.7 },
-  ].map(({ r, m, p, s }) => {
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 40, 24), m);
-    mesh.position.set(p[0], p[1], p[2]);
-    rig.add(mesh);
-    return { mesh, y: p[1], s };
-  });
 
   // ── Motion ────────────────────────────────────────────────────────
   const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
@@ -338,20 +369,21 @@ export function createAuthScene(host: HTMLElement, o: Opts): AuthScene {
     const k = o.reducedMotion ? 99 : t;
     const idle = o.reducedMotion ? 0 : 1;
 
-    const c = easeOutCubic(clamp01(k / T.cal));
-    cal.position.set(side * 0.06, -0.3 * (1 - c) + idle * Math.sin(t * 0.6) * 0.018, -0.2 * (1 - c));
-    cal.rotation.set(-0.1 + 0.15 * (1 - c), -side * (0.2 + 0.35 * (1 - c)), 0);
-    const swell = Math.exp(-(((k - T.arrive - 0.4) / 0.7) ** 2));
-    glowMat.opacity = c * (0.85 + 0.45 * swell);
-    glow.scale.setScalar(1 + 0.08 * swell + idle * Math.sin(t * 0.5) * 0.015);
+    const c = easeOutQuint(clamp01(k / T.cal));
+    cal.position.set(side * 0.06, -0.22 * (1 - c) + idle * Math.sin(t * 0.6) * 0.014, -0.25 * (1 - c));
+    cal.rotation.set(-0.08 + 0.12 * (1 - c), -side * (0.18 + 0.3 * (1 - c)), 0);
+    calShadow.mat.opacity = calShadow.opacity * c;
 
     for (const ch of chips) {
-      const p = clamp01((k - ch.at) / 0.55);
-      const e = easeOutBack(p);
+      const p = clamp01((k - ch.at) / (ch.fresh ? 0.75 : 0.6));
+      const e = ch.fresh ? easeOutBack(p) : easeOutQuint(p);
       ch.group.visible = p > 0;
-      ch.group.position.copy(ch.home).setZ(ch.home.z + (1 - e) * 0.4);
-      ch.group.scale.setScalar(Math.max(0.001, 0.82 + 0.18 * e));
-      ch.mats[0].opacity = ch.mats[1].opacity = clamp01(p / 0.3);
+      // The new booking drops into its slot from above; the rest settle onto the page.
+      ch.group.position.copy(ch.home);
+      ch.group.position.z += (1 - e) * (ch.fresh ? 0.45 : 0.16);
+      if (ch.fresh) ch.group.position.y += (1 - easeOutQuint(p)) * 0.12;
+      ch.group.scale.setScalar(Math.max(0.001, 0.94 + 0.06 * e));
+      ch.mats[0].opacity = ch.mats[1].opacity = clamp01(p / 0.35);
     }
 
     const r = clamp01((k - T.arrive - 0.2) / 0.8);
@@ -359,11 +391,15 @@ export function createAuthScene(host: HTMLElement, o: Opts): AuthScene {
     ring.scale.setScalar(0.5 + 1.4 * easeOutCubic(r));
     ringMat.opacity = 0.55 * (1 - r);
 
-    const q = clamp01((k - T.toast) / 0.6);
+    // The notification glides in from the outer edge and settles, like a banner on a phone.
+    const q = clamp01((k - T.toast) / 0.85);
+    const qe = easeOutQuint(q);
     toast.visible = q > 0;
-    toast.scale.setScalar(Math.max(0.001, 0.6 + 0.4 * easeOutBack(q)));
-    toast.position.set(-side * 0.5, -0.6 + idle * Math.sin(t * 0.9 + 0.8) * 0.025, 0.5);
-    toast.rotation.set(0.05, side * 0.14, -side * 0.02);
+    toast.scale.setScalar(0.96 + 0.04 * qe);
+    toast.position.set(-side * (0.5 + 0.35 * (1 - qe)), -0.6 + idle * Math.sin(t * 0.9 + 0.8) * 0.02, 0.5);
+    toast.rotation.set(0.05, side * (0.14 + 0.25 * (1 - qe)), -side * 0.02);
+    toastShadow.mat.opacity = toastShadow.opacity * qe;
+    toastMat.opacity = clamp01(q / 0.3);
 
     const cp = easeOutCubic(clamp01((k - T.caption) / 0.9));
     caption.visible = captionOn && cp > 0;
@@ -371,8 +407,6 @@ export function createAuthScene(host: HTMLElement, o: Opts): AuthScene {
     caption.rotation.set(0, pointer.x * 0.1, 0);
     captionMat.opacity = cp;
     for (const m of captionLayers) m.opacity = cp;
-
-    for (const orb of orbs) orb.mesh.position.y = orb.y + idle * Math.sin(t * orb.s + orb.y * 3) * 0.05;
 
     pointer.x += (pointer.tx - pointer.x) * 0.05;
     pointer.y += (pointer.ty - pointer.y) * 0.05;
@@ -398,7 +432,8 @@ export function createAuthScene(host: HTMLElement, o: Opts): AuthScene {
 
     // Device pixels per texture pixel at the card's depth, with headroom for the nearer notification.
     const perUnit = (h * dpr) / (2 * dist * half);
-    const d = Math.min(4, Math.max(0.75, Math.ceil(((perUnit * FACE.w) / CW) * 1.15 * 8) / 8));
+    // Headroom covers the nearer notification and the card turning toward the pointer.
+    const d = Math.min(4, Math.max(1, Math.ceil(((perUnit * FACE.w) / CW) * 1.5 * 8) / 8));
     if (Math.abs(d - density) / d > 0.12) repaint(d, renderer.capabilities.getMaxAnisotropy());
   }
 
