@@ -37,6 +37,7 @@ function api(env: Record<string, string>): Plugin {
           response.headers.forEach((v, k) => res.setHeader(k, v));
           res.end(Buffer.from(await response.arrayBuffer()));
         } catch (e) {
+          if (!(e instanceof Error && e.message === 'too_large')) console.error('[api]', e instanceof Error ? e.message : e);
           res.statusCode = e instanceof Error && e.message === 'too_large' ? 413 : 500;
           res.end(JSON.stringify({ error: res.statusCode === 413 ? 'too_large' : 'server' }));
         }
