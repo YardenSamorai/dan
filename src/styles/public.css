@@ -351,6 +351,15 @@ html[lang='he'] .site-footer__h {
   border-block-end: 1px solid var(--line);
 }
 
+.hours__row[data-today] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.hours:not(.hours--compact) .hours__row[data-today] {
+  border-block-end-color: var(--ink);
+}
+
 /* ── Mobile booking bar ─────────────────────────────────────────── */
 .book-bar {
   position: fixed;

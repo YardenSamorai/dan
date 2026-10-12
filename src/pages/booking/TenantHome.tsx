@@ -4,27 +4,42 @@ import { BusinessMark, ChevronLeft, ChevronRight, ClockIcon, CloseIcon, MessageI
 import { StaffAvatar } from '../../components/ui/bits';
 import type { PublicService } from '../../data';
 import { WEEKDAYS } from '../../domain/defaults';
+import { openState } from '../../domain/opening';
 import { termsRange } from '../../domain/scheduling';
-import { addDays } from '../../domain/time';
+import { addDays, weekdayOf } from '../../domain/time';
 import { galleryFlow } from '../../domain/page';
 import type { GalleryFlow, GalleryLayout, HeroLayout, ISODate, Minutes, PageSection, ServicesLayout } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
 import { blockId, SECTION_TITLE_KEYS, usePreviewEditing } from './pageBridge';
-import { usePublicTenant } from './TenantContext';
+import { usePublicTenant, type PublicTenant } from './TenantContext';
 
-function useNextOpening(): { serviceId: string; date: ISODate; start: Minutes } | null {
+type Opening = { serviceId: string; date: ISODate; start: Minutes };
+
+/** The first bookable time for a service in the next three weeks. */
+function findOpening(tenant: PublicTenant, service: PublicService): Opening | null {
+  const q = { serviceId: service.id, staffId: tenant.business.policies.allowAnyStaff || tenant.solo ? ('any' as const) : (service.staffIds[0] ?? 'any') };
+  for (let i = 0; i < 21; i++) {
+    const date = addDays(tenant.today, i);
+    const s = tenant.slots({ ...q, date })[0];
+    if (s) return { serviceId: service.id, date, start: s.start };
+  }
+  return null;
+}
+
+const openingHref = (base: string, o: Opening) => `${base}/new?service=${o.serviceId}&date=${o.date}&time=${o.start}`;
+
+function useNextOpening(): Opening | null {
   const tenant = usePublicTenant();
   return useMemo(() => {
     const service = tenant.business.services[0];
-    if (!service) return null;
-    const q = { serviceId: service.id, staffId: tenant.business.policies.allowAnyStaff || tenant.solo ? ('any' as const) : tenant.business.staff[0]?.id ?? 'any' };
-    for (let i = 0; i < 21; i++) {
-      const date = addDays(tenant.today, i);
-      const s = tenant.slots({ ...q, date })[0];
-      if (s) return { serviceId: service.id, date, start: s.start };
-    }
-    return null;
+    return service ? findOpening(tenant, service) : null;
   }, [tenant]);
+}
+
+/** "Today", "Tomorrow" or the date, the way the hero already says it. */
+function useOpeningDay() {
+  const { fmt } = useI18n();
+  return (o: Opening) => fmt.relativeDay(o.date) ?? fmt.date(o.date, 'medium');
 }
 
 export default function TenantHome() {
@@ -117,9 +132,15 @@ function Hero({ section: s }: { section: PageSection }) {
   const { t, tx, fmt } = useI18n();
   const { business, base } = usePublicTenant();
   const next = useNextOpening();
+  const day = useOpeningDay();
   const name = tx(business.name);
   const layout = (s.layout ?? 'centered') as HeroLayout;
   const cover = business.branding.coverUrl;
+  const address = tx(business.address);
+  const state = openState(business.hours, business.specialDays, business.timezone);
+  const status = state.open
+    ? t('tenant.hero.openUntil', { time: fmt.time(state.until) })
+    : state.next && t('tenant.hero.opensAt', { day: fmt.relativeDay(state.next.date) ?? fmt.weekday(weekdayOf(state.next.date)), time: fmt.time(state.next.start) });
 
   const intro = (
     <div className="pg-hero__intro">
@@ -134,17 +155,32 @@ function Hero({ section: s }: { section: PageSection }) {
           {t('common.book')}
         </Link>
         {next ? (
-          <Link to={`${base}/new?service=${next.serviceId}&date=${next.date}&time=${next.start}`} className="hero__opening">
+          <Link to={openingHref(base, next)} className="hero__opening">
             <span className="hero__opening-dot" aria-hidden />
             <span className="hero__opening-label">{t('tenant.hero.next')}</span>
             <span>
-              {fmt.relativeDay(next.date) ?? fmt.date(next.date, 'medium')} · <span className="tabular">{fmt.time(next.start)}</span>
+              {day(next)} · <span className="tabular">{fmt.time(next.start)}</span>
             </span>
           </Link>
         ) : (
           <span className="pg-hero__none">{t('tenant.hero.none')}</span>
         )}
       </div>
+      {(status || address) && (
+        <ul className="pg-hero__facts">
+          {status && (
+            <li>
+              <span className="pg-hero__status" data-open={state.open || undefined} aria-hidden />
+              {status}
+            </li>
+          )}
+          {address && (
+            <li>
+              <PinIcon size={14} /> {address}
+            </li>
+          )}
+        </ul>
+      )}
     </div>
   );
 
@@ -259,27 +295,55 @@ function ServiceRow({ service }: { service: PublicService }) {
   );
 }
 
-function ServiceCard({ service }: { service: PublicService }) {
-  const { t } = useI18n();
+/**
+ * The whole card books the service (its name link stretches over it); the
+ * next free time sits on top as its own link, straight to that slot.
+ */
+function ServiceCard({ service, opening }: { service: PublicService; opening?: Opening | null }) {
+  const { t, tx, fmt } = useI18n();
+  const { business, base } = usePublicTenant();
+  const day = useOpeningDay();
   const x = useServiceInfo(service);
+  const people = business.staff.length > 1 ? business.staff.filter((s) => service.staffIds.includes(s.id)) : [];
   return (
     <li className="svc-card">
-      <Link to={x.href} className="svc-card__link">
-        <span className="svc-card__media">
-          {service.imageUrl ? <img src={service.imageUrl} alt="" loading="lazy" /> : <span className="svc-card__initial">{x.name.slice(0, 1)}</span>}
-        </span>
-        <span className="svc-card__body">
-          <h3 className="svc-card__name">{x.name}</h3>
-          {(x.desc || x.who) && <span className="svc-card__desc">{[x.desc, x.who].filter(Boolean).join(' · ')}</span>}
-          <span className="svc-card__foot">
-            <span className="svc-card__meta">
-              <ClockIcon size={13} /> {x.duration}
-            </span>
-            <span className="svc-card__price tabular">{x.price}</span>
+      <span className="svc-card__media">
+        {service.imageUrl ? <img src={service.imageUrl} alt="" loading="lazy" /> : <span className="svc-card__initial">{x.name.slice(0, 1)}</span>}
+      </span>
+      <div className="svc-card__body">
+        <h3 className="svc-card__name">
+          <Link to={x.href} className="svc-card__link">
+            {x.name}
+          </Link>
+        </h3>
+        {x.desc && <p className="svc-card__desc">{x.desc}</p>}
+        <p className="svc-card__foot">
+          <span className="svc-card__meta">
+            <ClockIcon size={13} /> {x.duration}
           </span>
-          <span className="svc-card__cta">{t('tenant.services.book')}</span>
-        </span>
-      </Link>
+          <span className="svc-card__price tabular">{x.price}</span>
+        </p>
+        {people.length > 0 && (
+          <p className="svc-card__people">
+            <span className="svc-card__faces" aria-hidden>
+              {people.slice(0, 4).map((p) => (
+                <StaffAvatar key={p.id} staff={p} size="sm" />
+              ))}
+            </span>
+            {t('tenant.services.with', { names: fmt.list(people.map((p) => tx(p.name).split(' ')[0])) })}
+          </p>
+        )}
+        {opening ? (
+          <Link to={openingHref(base, opening)} className="svc-card__next" aria-label={t('tenant.services.nextLabel', { service: x.name, day: day(opening), time: fmt.time(opening.start) })}>
+            <span className="hero__opening-dot" aria-hidden />
+            <span>{t('tenant.services.next', { day: day(opening), time: fmt.time(opening.start) })}</span>
+          </Link>
+        ) : (
+          <span className="svc-card__cta" aria-hidden>
+            {t('tenant.services.book')}
+          </span>
+        )}
+      </div>
     </li>
   );
 }
@@ -342,19 +406,21 @@ function ServiceFeature({ service }: { service: PublicService }) {
   );
 }
 
-function ServiceGroup({ layout, items }: { layout: ServicesLayout; items: PublicService[] }) {
-  if (layout === 'carousel')
-    return (
+function ServiceGroup({ layout, items, openings }: { layout: ServicesLayout; items: PublicService[]; openings: Map<string, Opening | null> }) {
+  if (layout === 'carousel' || layout === 'cards') {
+    const cards = items.map((x) => <ServiceCard key={x.id} service={x} opening={openings.get(x.id)} />);
+    return layout === 'carousel' ? (
       <Scroller className="svc-scroll" count={items.length}>
-        {items.map((x) => (
-          <ServiceCard key={x.id} service={x} />
-        ))}
+        {cards}
       </Scroller>
+    ) : (
+      <ul className="svc-grid svc-grid--cards" data-count={Math.min(items.length, 4)}>
+        {cards}
+      </ul>
     );
+  }
   const [cls, Item] =
-    layout === 'cards'
-      ? ['svc-grid svc-grid--cards', ServiceCard]
-      : layout === 'tiles'
+    layout === 'tiles'
         ? ['svc-grid svc-grid--tiles', ServiceTile]
         : layout === 'menu'
           ? ['svc-menu', ServiceMenuItem]
@@ -370,24 +436,55 @@ function ServiceGroup({ layout, items }: { layout: ServicesLayout; items: Public
   );
 }
 
+/** Layouts that show services side by side: categories become filters over one grid instead of headings. */
+const FILTERED: ServicesLayout[] = ['cards', 'tiles', 'feature', 'carousel'];
+
 function Services({ section: s }: { section: PageSection }) {
   const { t, tx, fmt } = useI18n();
-  const { business } = usePublicTenant();
+  const tenant = usePublicTenant();
+  const { business } = tenant;
   const layout = (s.layout ?? 'list') as ServicesLayout;
+  const [only, setOnly] = useState<string | null>(null);
   const groups = useMemo(() => {
     const cats = business.categories.map((c) => ({ id: c.id, name: tx(c.name), items: business.services.filter((x) => x.categoryId === c.id) }));
     const rest = business.services.filter((x) => !x.categoryId || !business.categories.some((c) => c.id === x.categoryId));
-    return [...cats, { id: '_', name: '', items: rest }].filter((g) => g.items.length);
-  }, [business, tx]);
+    return [...cats, { id: '_', name: t('tenant.services.other'), items: rest }].filter((g) => g.items.length);
+  }, [business, tx, t]);
+  const ids = business.services.map((x) => x.id).join();
+  // Keyed on what changes availability, not on the tenant object, which the demo film rebuilds every frame.
+  const openings = useMemo(
+    () => new Map(layout === 'cards' || layout === 'carousel' ? business.services.map((x) => [x.id, findOpening(tenant, x)] as const) : []),
+    [tenant.slug, tenant.today, ids, layout, business.policies.allowAnyStaff],
+  );
+  const filters = FILTERED.includes(layout) && groups.length > 1;
+  const picked = filters ? groups.find((g) => g.id === only) : undefined;
   return (
     <Section section={s}>
       {groups.length === 0 && <p className="muted">{t('tenant.services.empty')}</p>}
-      {groups.map((g) => (
-        <div key={g.id} className="svc-cat">
-          {g.name && groups.length > 1 && <h3 className="svc-cat__title">{g.name}</h3>}
-          <ServiceGroup layout={layout} items={g.items} />
-        </div>
-      ))}
+      {filters ? (
+        <>
+          <div className="svc-filter" role="group" aria-label={t('tenant.services.filter')}>
+            <button type="button" className="chip" aria-pressed={!picked} onClick={() => setOnly(null)}>
+              {t('tenant.services.all')}
+            </button>
+            {groups.map((g) => (
+              <button key={g.id} type="button" className="chip" aria-pressed={picked?.id === g.id} onClick={() => setOnly(g.id)}>
+                {g.name}
+              </button>
+            ))}
+          </div>
+          <div className="svc-cat">
+            <ServiceGroup layout={layout} items={picked ? picked.items : groups.flatMap((g) => g.items)} openings={openings} />
+          </div>
+        </>
+      ) : (
+        groups.map((g) => (
+          <div key={g.id} className="svc-cat">
+            {g.id !== '_' && groups.length > 1 && <h3 className="svc-cat__title">{g.name}</h3>}
+            <ServiceGroup layout={layout} items={g.items} openings={openings} />
+          </div>
+        ))
+      )}
       {business.addOns.length > 0 && (
         <div className="svc-cat">
           <h3 className="svc-cat__title">{t('tenant.services.addOns')}</h3>
@@ -673,11 +770,12 @@ function Faq({ section: s, items }: { section: PageSection; items: NonNullable<P
 
 export function OpeningHours({ compact }: { compact?: boolean }) {
   const { t, fmt } = useI18n();
-  const { hours } = usePublicTenant().business;
+  const { business, today } = usePublicTenant();
+  const { hours } = business;
   return (
     <dl className={`hours${compact ? ' hours--compact' : ''}`}>
       {WEEKDAYS.map((wd) => (
-        <div key={wd} className="hours__row">
+        <div key={wd} className="hours__row" data-today={wd === weekdayOf(today) || undefined}>
           <dt>{fmt.weekday(wd, compact ? 'short' : 'long')}</dt>
           <dd className="tabular">{hours[wd].ranges.length ? hours[wd].ranges.map((r) => fmt.timeRange(r.start, r.end)).join(', ') : t('common.closed')}</dd>
         </div>

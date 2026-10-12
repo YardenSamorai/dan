@@ -12,7 +12,7 @@ import type { Locale } from '../../i18n/config';
  * Nothing outside the mock adapters imports this file.
  */
 
-export const SEED_VERSION = 8;
+export const SEED_VERSION = 9;
 export const DEMO_BUSINESS_IDS = ['biz_demo_studio', 'biz_lash_room'];
 const TZ = 'Asia/Jerusalem';
 
@@ -63,14 +63,26 @@ function tenStudio(today: string, createdAt: string): TenantData {
       theme: 'editorial',
       sections: [
         { id: 'hero', kind: 'hero', visible: true, layout: 'cover' },
-        { id: 'services', kind: 'services', visible: true, layout: 'list' },
-        { id: 'gallery', kind: 'gallery', visible: true, layout: 'grid', images: [1, 2, 3, 6, 5, 4].map((n) => `/demo/gallery-${n}.webp`) },
-        { id: 'team', kind: 'team', visible: true },
+        {
+          id: 'services',
+          kind: 'services',
+          visible: true,
+          layout: 'cards',
+          title: { en: 'Book a treatment', he: 'הטיפולים שלנו' },
+        },
+        {
+          id: 'gallery',
+          kind: 'gallery',
+          visible: true,
+          layout: 'masonry',
+          title: { en: 'From the studio', he: 'מהסטודיו' },
+          images: [7, 1, 8, 9, 2, 10, 5, 3, 6, 4].map((n) => `/demo/gallery-${n}.webp`),
+        },
         {
           id: 'about',
           kind: 'about',
           visible: true,
-          imageUrl: '/demo/gallery-4.webp',
+          imageUrl: '/demo/about-studio.webp',
           title: { en: 'A small studio, on purpose', he: 'סטודיו קטן, בכוונה' },
           body: {
             en: 'Four chairs, one long oak table and a window onto Shabazi Street. We keep the studio small so every appointment gets the time it needs.\nWe work only with gel, and we tell you honestly what will last on your nails.',
@@ -85,6 +97,42 @@ function tenStudio(today: string, createdAt: string): TenantData {
             { id: 'r1', title: { en: 'Shira K.', he: 'שירה כ.' }, body: { en: 'Three weeks and not a single chip. Booking took me under a minute.', he: 'שלושה שבועות ואף סדק. קבעתי את התור בפחות מדקה.' } },
             { id: 'r2', title: { en: 'Yael M.', he: 'יעל מ.' }, body: { en: 'Noa listened to what I wanted and talked me out of what wouldn’t work. Exactly right.', he: 'נועה הקשיבה למה שרציתי, והורידה אותי ממה שלא היה מחזיק. בדיוק נכון.' } },
             { id: 'r3', title: { en: 'Tamar F.', he: 'תמר פ.' }, body: { en: 'Quiet, clean and always on time. I can move my appointment myself when plans change.', he: 'שקט, נקי ותמיד בזמן. כשמשהו משתנה אני מזיזה את התור לבד.' } },
+            { id: 'r4', title: { en: 'Noga P.', he: 'נוגה פ.' }, body: { en: 'Lior rebuilt my nails after a bad set elsewhere. Two months later they’re finally strong.', he: 'ליאור בנתה לי מחדש את הציפורניים אחרי סט גרוע במקום אחר. חודשיים אחרי, הן סוף סוף חזקות.' } },
+            { id: 'r5', title: { en: 'Adi S.', he: 'עדי ש.' }, body: { en: 'I booked “whoever’s free first” at 8am and had a slot that same afternoon.', he: 'קבעתי ב־8 בבוקר עם "מי שפנויה ראשונה", וקיבלתי תור לאותו אחר צהריים.' } },
+            { id: 'r6', title: { en: 'Michal R.', he: 'מיכל ר.' }, body: { en: 'The reminder the day before saves me every time. Maya’s French is the finest I’ve had.', he: 'התזכורת יום לפני מצילה אותי כל פעם. הפרנץ׳ של מאיה הוא הכי עדין שהיה לי.' } },
+          ],
+        },
+        { id: 'team', kind: 'team', visible: true, title: { en: 'Who you’ll meet', he: 'מי תפגשו כאן' } },
+        {
+          id: 'faq',
+          kind: 'faq',
+          visible: true,
+          items: [
+            {
+              id: 'q1',
+              title: { en: 'How long does gel last?', he: 'כמה זמן ג׳ל מחזיק?' },
+              body: { en: 'Three to four weeks for most people. After that, book a refill rather than a new set: it’s quicker and kinder to your nails.', he: 'שלושה עד ארבעה שבועות אצל רוב האנשים. אחרי זה עדיף לקבוע מילוי ולא סט חדש: זה מהיר יותר ועדין יותר לציפורניים.' },
+            },
+            {
+              id: 'q2',
+              title: { en: 'Can I change or cancel my appointment?', he: 'אפשר לשנות או לבטל תור?' },
+              body: { en: 'Yes, from the link in your confirmation or from “My bookings” on this page. You can cancel up to 24 hours before and move it up to 12 hours before.', he: 'כן, דרך הקישור באישור או דרך "התורים שלי" בעמוד הזה. אפשר לבטל עד 24 שעות לפני, ולהזיז עד 12 שעות לפני.' },
+            },
+            {
+              id: 'q3',
+              title: { en: 'I have gel on from somewhere else. What do I book?', he: 'יש לי ג׳ל ממקום אחר. מה לקבוע?' },
+              body: { en: 'Book the treatment you want and add “Gel removal” as a separate appointment right before it, so we have time to take it off gently.', he: 'קבעו את הטיפול שאתם רוצים, והוסיפו "הסרת ג׳ל" כתור נפרד ממש לפניו, כדי שיהיה לנו זמן להסיר בעדינות.' },
+            },
+            {
+              id: 'q4',
+              title: { en: 'Do I have to choose someone from the team?', he: 'חייבים לבחור מטפלת?' },
+              body: { en: 'No. Choose “whoever’s free first” and you’ll see every open time across the team. Prices can differ a little between team members, and you always see the price before you book.', he: 'לא. בוחרים "מי שפנויה ראשונה" ורואים את כל השעות הפנויות בצוות. המחיר יכול להשתנות מעט בין המטפלות, ותמיד רואים אותו לפני שקובעים.' },
+            },
+            {
+              id: 'q5',
+              title: { en: 'How do I pay?', he: 'איך משלמים?' },
+              body: { en: 'At the studio, after your appointment: card, cash or Bit. Nothing is charged when you book.', he: 'בסטודיו, אחרי הטיפול: אשראי, מזומן או ביט. שום דבר לא נגבה בזמן הקביעה.' },
+            },
           ],
         },
         { id: 'info', kind: 'info', visible: true },
@@ -111,7 +159,6 @@ function tenStudio(today: string, createdAt: string): TenantData {
     bufferBefore: 0,
     ...s,
   });
-  const photo: Record<string, number> = { 'gel-manicure': 1, 'gel-refill': 6, 'french-gel': 2, 'builder-gel': 3, 'gel-pedicure': 5, removal: 4 };
   const services: Service[] = [
     svc({
       id: 'gel-manicure',
@@ -178,7 +225,7 @@ function tenStudio(today: string, createdAt: string): TenantData {
       bufferAfter: 5,
       staffIds: ALL,
     }),
-  ].map((s) => ({ ...s, imageUrl: `/demo/gallery-${photo[s.id]}.webp` }));
+  ].map((s) => ({ ...s, imageUrl: `/demo/svc-${s.id}.webp` }));
 
   const BIOS: Record<string, Staff['bio']> = {
     noa: { en: 'Opened the studio in 2016. Loves a clean, short almond.', he: 'פתחה את הסטודיו ב־2016. אוהבת שקד קצר ונקי.' },
