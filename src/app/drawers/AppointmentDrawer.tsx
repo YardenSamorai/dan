@@ -92,8 +92,8 @@ function Body({ a, L, onClose }: { a: Appointment; L: Lookup; onClose: () => voi
   const unconnected = info ? [...new Set(messages.filter((m) => isWaiting(m) && !connected.includes(m.channel)).map((m) => m.channel))] : [];
   const messageState = (m: OutboxMessage) => {
     const when = fmt.dateTime(new Date(m.doneAt ?? m.at));
-    if (m.state === 'sent') return t('appt.msgSent', { when });
-    if (m.state === 'failed') return t('appt.msgFailed');
+    if (m.state === 'sent') return m.delivery === 'read' ? t('appt.msgRead') : m.delivery === 'delivered' ? t('appt.msgDelivered') : t('appt.msgSent', { when });
+    if (m.state === 'failed') return messages.some((x) => x.fallbackFor === m.id) ? t('appt.msgFallback') : t('appt.msgFailed');
     if (m.state === 'skipped') return t(m.error === 'no_recipient' ? 'appt.msgNoRecipient' : 'appt.msgSkipped');
     if (m.state === 'scheduled') return t('appt.scheduled', { when });
     return connected.includes(m.channel) ? t('appt.msgSending') : t('appt.queued', { when });

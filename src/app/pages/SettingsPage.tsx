@@ -5,13 +5,14 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { AlertIcon, BusinessMark, ExternalIcon } from '../../components/ui/Icons';
 import { Switch } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
-import { CAPABILITIES } from '../../config/product';
+import { CAPABILITIES, MESSAGE_ALLOWANCE } from '../../config/product';
 import { ApiError, directory, INVITE_DAYS, platform, workspace, type MemberInfo } from '../../data';
 import { BUSINESS_TYPES, SLUG_PATTERN } from '../../domain/defaults';
 import { alertsOf, messageVars, notificationsOf, renderTemplate, TEMPLATE_VARS } from '../../domain/notifications';
 import type { Permission } from '../../domain/permissions';
 import { businessNow, isUpcoming } from '../../domain/scheduling';
 import { isValidTimeZone } from '../../domain/time';
+import { allowanceUsed } from '../../domain/usage';
 import { renderWhatsApp, WHATSAPP_TEMPLATES } from '../../domain/whatsapp';
 import type { BookingPolicies, Business, Channel, Invite, NotificationSettings, OwnerAlerts, TemplateKind } from '../../domain/types';
 import { localeMeta, locales, type Locale } from '../../i18n/config';
@@ -845,10 +846,12 @@ function FeedRow({ staffId, label }: { staffId: string | null; label: string }) 
 
 function BillingSection() {
   const { tenant } = useWorkspace();
-  const { t } = useI18n();
+  const { t, fmt } = useI18n();
   const month = businessNow(tenant).date.slice(0, 7);
   const bookings = tenant.appointments.filter((a) => a.createdAt.slice(0, 7) === month).length;
   const staff = tenant.staff.filter((s) => s.active).length;
+  const sent = tenant.business.usage?.[month];
+  const used = allowanceUsed(sent);
   return (
     <>
       <p className="page__lede">{t('settings.billing.lede')}</p>
@@ -869,6 +872,29 @@ function BillingSection() {
             <dt>{t('settings.billing.usage')}</dt>
             <dd>
               {t('settings.billing.usageStaff', { count: staff })} · {t('settings.billing.usageBookings', { count: bookings })}
+            </dd>
+          </div>
+          <div>
+            <dt>{t('settings.billing.messages')}</dt>
+            <dd className="settings__usage">
+              <span className="settings__counts">
+                {(['whatsapp', 'sms', 'email'] as const).map((c) => (
+                  <span key={c}>
+                    {t(`channel.${c}`)} <strong>{fmt.number(c === 'whatsapp' ? (sent?.whatsapp ?? 0) + (sent?.whatsappMarketing ?? 0) : (sent?.[c] ?? 0))}</strong>
+                  </span>
+                ))}
+              </span>
+              {MESSAGE_ALLOWANCE !== null && (
+                <>
+                  <span className="meter" role="meter" aria-valuemin={0} aria-valuemax={MESSAGE_ALLOWANCE} aria-valuenow={Math.min(used, MESSAGE_ALLOWANCE)} aria-label={t('settings.billing.messages')}>
+                    <i style={{ width: `${Math.min(100, (used / MESSAGE_ALLOWANCE) * 100)}%` }} />
+                  </span>
+                  <span className={used > MESSAGE_ALLOWANCE ? 'settings__usage-over' : 'muted'}>
+                    {used > MESSAGE_ALLOWANCE ? t('settings.billing.allowanceOver', { count: fmt.number(used - MESSAGE_ALLOWANCE) }) : t('settings.billing.allowance', { used: fmt.number(used), limit: fmt.number(MESSAGE_ALLOWANCE) })}
+                  </span>
+                </>
+              )}
+              <span className="field__hint">{t('settings.billing.allowanceHint')}</span>
             </dd>
           </div>
         </dl>

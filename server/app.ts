@@ -5,6 +5,7 @@ import { handleIcs, handleRpc, type ApiDeps } from './handler';
 import { channelsOf, dispatchMessages, sendersFromEnv, type Senders } from './messaging';
 import { FileStore } from './store';
 import { SupabaseStore, supabaseAuthenticator, type SupabaseConfig } from './supabase';
+import { handleWhatsAppWebhook } from './whatsappWebhook';
 
 type Env = Record<string, string | undefined>;
 
@@ -57,6 +58,7 @@ export function handle(req: Request, env: Env = process.env, waitUntil?: (p: Pro
   const d = (deps ??= build(env));
   const path = new URL(req.url).pathname;
   if (path === '/api/cron/messages') return handleCron(req, d, env);
+  if (path === '/api/whatsapp/webhook') return handleWhatsAppWebhook(req, d, env, waitUntil);
   if (path.startsWith('/api/ics/')) return handleIcs(req, d);
   const channels = channelsOf(d.senders);
   return handleRpc(req, d, {

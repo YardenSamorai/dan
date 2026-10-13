@@ -2639,6 +2639,22 @@ fieldset:disabled .field__input {
   color: var(--ink-3);
 }
 
+.settings__usage {
+  display: grid;
+  gap: var(--s-2);
+  max-inline-size: 26rem;
+}
+
+.settings__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-5);
+}
+
+.settings__usage-over {
+  color: var(--danger);
+}
+
 .settings__sub {
   margin-block-end: var(--s-2);
   font-size: 15px;

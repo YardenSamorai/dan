@@ -133,7 +133,7 @@ export function availabilityView(t: TenantData): TenantData {
   const from = businessNow(t).date;
   return {
     ...t,
-    business: { ...t.business, subscription: { status: 'not_configured', planId: null }, calendarFeeds: undefined, invites: undefined },
+    business: { ...t.business, subscription: { status: 'not_configured', planId: null }, calendarFeeds: undefined, invites: undefined, usage: undefined },
     staff: t.staff.map(({ userId: _userId, ...s }) => s),
     timeOff: t.timeOff.map(({ note: _note, ...x }) => x),
     blocks: t.blocks.map((b) => ({ ...b, label: '' })),

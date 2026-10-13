@@ -410,7 +410,7 @@ function createApi(ctx: TenantContext): WorkspaceApi {
       if (patch.slug && patch.slug !== t.business.slug && Object.values(getDb().tenants).some((x) => x.business.slug === patch.slug)) throw new ApiError('slug_taken');
       let out!: TenantData['business'];
       write((cur) => {
-        out = { ...cur.business, ...patch, id: B, calendarFeeds: cur.business.calendarFeeds, invites: cur.business.invites };
+        out = { ...cur.business, ...patch, id: B, calendarFeeds: cur.business.calendarFeeds, invites: cur.business.invites, usage: cur.business.usage };
         return { ...cur, business: out };
       });
       return out;
@@ -523,12 +523,12 @@ function createApi(ctx: TenantContext): WorkspaceApi {
  * the customers attached to them — the same filtering a server would apply.
  */
 export function scopeForRole(t: TenantData, ctx: TenantContext): TenantData {
-  if (can(ctx.role, 'calendar.all')) return can(ctx.role, 'staff.manage') ? t : { ...t, business: { ...t.business, invites: undefined } };
+  if (can(ctx.role, 'calendar.all')) return can(ctx.role, 'staff.manage') ? t : { ...t, business: { ...t.business, invites: undefined, usage: undefined } };
   const appointments = t.appointments.filter((a) => a.staffId === ctx.staffId);
   const customerIds = new Set(appointments.map((a) => a.customerId));
   return {
     ...t,
-    business: { ...t.business, invites: undefined, calendarFeeds: t.business.calendarFeeds?.filter((f) => f.staffId !== null && f.staffId === ctx.staffId) },
+    business: { ...t.business, invites: undefined, usage: undefined, calendarFeeds: t.business.calendarFeeds?.filter((f) => f.staffId !== null && f.staffId === ctx.staffId) },
     appointments,
     customers: t.customers.filter((c) => customerIds.has(c.id)),
     timeOff: t.timeOff.filter((x) => x.staffId === ctx.staffId),

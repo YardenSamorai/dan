@@ -170,6 +170,8 @@ export interface Business {
   invites?: Invite[];
   /** Getting-started checklist: steps the owner ticked by hand, and whether it's hidden. */
   setup?: { done: SetupStep[]; dismissed?: boolean };
+  /** Messages sent, by month in the business's timezone ("2026-10"). Written only by the server's dispatcher. */
+  usage?: Record<string, UsageCounts>;
 }
 
 export type SetupStep = 'page' | 'photos' | 'team' | 'publish' | 'calendar' | 'share' | 'firstBooking';
@@ -367,6 +369,22 @@ export interface OutboxMessage extends Owned {
   doneAt?: string;
   /** Short reason for failed / skipped. */
   error?: string;
+  /** The provider's id for the sent message (WhatsApp), to match its delivery reports. */
+  providerId?: string;
+  /** What the provider reported after sending (WhatsApp). */
+  delivery?: 'delivered' | 'read';
+  /** This SMS stands in for a WhatsApp message that couldn't be delivered: that message's id. */
+  fallbackFor?: string;
+}
+
+/** What went out in one month. WhatsApp marketing (book-again invitations) costs several times more than appointment messages. */
+export interface UsageCounts {
+  whatsapp?: number;
+  whatsappMarketing?: number;
+  sms?: number;
+  /** Gateway credits: a long SMS takes more than one. */
+  smsCredits?: number;
+  email?: number;
 }
 
 /** Messages to the customer use the owner's templates; alerts to the business use fixed wording. */

@@ -3,12 +3,15 @@
  *   npm run test:api
  * Exercises booking conflicts, role scoping and authorization in server/handler.ts.
  */
+import { createHmac } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { devAuthenticator } from '../server/auth';
 import { handleIcs, handleRpc, type ApiDeps } from '../server/handler';
-import { dispatchMessages, globalSms, SendError, smsNumber, whatsappCloud, type Sender, type Senders } from '../server/messaging';
+import { dispatchMessages, globalSms, parseMessageRef, SendError, smsNumber, whatsappCloud, type Sender, type Senders } from '../server/messaging';
+import { handleWhatsAppWebhook } from '../server/whatsappWebhook';
+import { usageMonth } from '../src/domain/usage';
 import { WHATSAPP_TEMPLATES, whatsAppParams } from '../src/domain/whatsapp';
 import { internationalPhone } from '../src/lib/phone';
 import { FileStore } from '../server/store';
@@ -522,13 +525,67 @@ try {
       check('whatsapp goes to the platform number endpoint with the token', !!sent && sent.url === 'https://graph.facebook.com/v26.0/1234567890/messages' && sent.auth === 'Bearer test-token', sent);
       check('whatsapp sends the approved confirmation template in the customer’s language', sent?.body.type === 'template' && sent.body.template.name === 'booking_confirmation' && sent.body.template.language.code === 'he', sent?.body);
       check('whatsapp fills in the appointment’s details', params.name === 'יעל' && !!params.business && !!params.date && !!params.time && params.link === `https://tornu.co.il/book/${SLUG}`, params);
-      const state = (await store.snapshot({})).tenants[BIZ].outbox.find((m) => m.appointmentId === booked.id && m.channel === 'whatsapp' && m.kind === 'confirmation');
+      const snap = await store.snapshot({});
+      const state = snap.tenants[BIZ].outbox.find((m) => m.appointmentId === booked.id && m.channel === 'whatsapp' && m.kind === 'confirmation');
       check('whatsapp confirmation is marked sent', state?.state === 'sent', state);
+      check('whatsapp keeps Meta’s message id', state?.providerId === 'wamid.1', state);
+      const ref = parseMessageRef(sent?.body.biz_opaque_callback_data);
+      check('whatsapp sends a ref back to its business and message', ref?.businessId === BIZ && ref.messageId === state?.id, sent?.body.biz_opaque_callback_data);
+      const month = usageMonth(new Date(), snap.tenants[BIZ].business.timezone);
+      const usage0 = snap.tenants[BIZ].business.usage?.[month]?.whatsapp ?? 0;
+      check('a sent whatsapp message is counted for the month', usage0 >= 1, snap.tenants[BIZ].business.usage);
+      const planted = await call('workspace.call', [BIZ, 'updateBusiness', [{ usage: { [month]: { whatsapp: 0 } } }]], owner);
+      check('settings save cannot rewrite usage', planted.result?.tenant.business.usage?.[month]?.whatsapp === usage0, planted.result?.tenant.business.usage);
+
+      // Delivery reports from Meta.
+      const smsOut: string[] = [];
+      const withSms: Senders = { ...wa, sms: { send: async (m) => void smsOut.push(m.body) } };
+      const hookEnv = { WHATSAPP_APP_SECRET: 'app-secret', WHATSAPP_VERIFY_TOKEN: 'verify-me', SITE_URL: 'https://tornu.co.il' };
+      const hook = (body: unknown, secret = 'app-secret') => {
+        const raw = JSON.stringify(body);
+        const sig = `sha256=${createHmac('sha256', secret).update(raw).digest('hex')}`;
+        return handleWhatsAppWebhook(new Request('http://test/api/whatsapp/webhook', { method: 'POST', headers: { 'x-hub-signature-256': sig }, body: raw }), { store, senders: withSms }, hookEnv);
+      };
+      const statusBody = (status: string, extra: object = {}) => ({ object: 'whatsapp_business_account', entry: [{ changes: [{ field: 'messages', value: { statuses: [{ id: 'wamid.1', status, biz_opaque_callback_data: sent?.body.biz_opaque_callback_data, ...extra }] } }] }] });
+      const outboxMsg = async () => (await store.snapshot({})).tenants[BIZ].outbox.find((m) => m.id === state?.id);
+
+      const verify = await handleWhatsAppWebhook(new Request('http://test/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=verify-me&hub.challenge=12345'), { store, senders: withSms }, hookEnv);
+      check('webhook answers Meta’s verification with the challenge', verify.status === 200 && (await verify.text()) === '12345');
+      const wrongToken = await handleWhatsAppWebhook(new Request('http://test/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=nope&hub.challenge=1'), { store, senders: withSms }, hookEnv);
+      check('webhook refuses a wrong verify token', wrongToken.status === 404);
+      const forged = await hook(statusBody('failed'), 'not-the-secret');
+      check('webhook refuses an unsigned report', forged.status === 401 && (await outboxMsg())?.state === 'sent');
+      const off = await handleWhatsAppWebhook(new Request('http://test/api/whatsapp/webhook', { method: 'POST', body: '{}' }), { store, senders: withSms }, {});
+      check('webhook doesn’t exist without an app secret', off.status === 404);
+
+      await hook(statusBody('delivered'));
+      check('a delivered report marks the message delivered', (await outboxMsg())?.delivery === 'delivered', await outboxMsg());
+      await hook(statusBody('read'));
+      await hook(statusBody('delivered'));
+      check('read stays read when a late delivered report arrives', (await outboxMsg())?.delivery === 'read', await outboxMsg());
+
+      await hook(statusBody('failed', { errors: [{ code: 131026, title: 'Message undeliverable' }] }));
+      const afterFail = await store.snapshot({});
+      const failedMsg = afterFail.tenants[BIZ].outbox.find((m) => m.id === state?.id);
+      const standIn = afterFail.tenants[BIZ].outbox.find((m) => m.fallbackFor === state?.id);
+      check('a failed report marks the message failed with the reason', failedMsg?.state === 'failed' && String(failedMsg.error).includes('131026'), failedMsg);
+      check('an undelivered whatsapp message is taken off the count', (afterFail.tenants[BIZ].business.usage?.[month]?.whatsapp ?? 0) === usage0 - 1, afterFail.tenants[BIZ].business.usage);
+      check('an undelivered whatsapp message goes out by SMS instead', standIn?.channel === 'sms' && standIn.state === 'sent' && smsOut.some((b) => b === standIn.body), { standIn, smsOut });
+      check('the SMS stand-in is counted', (afterFail.tenants[BIZ].business.usage?.[month]?.sms ?? 0) >= 1, afterFail.tenants[BIZ].business.usage);
+      const count = smsOut.length;
+      await hook(statusBody('failed', { errors: [{ code: 131026 }] }));
+      check('a repeated failed report sends no second SMS', smsOut.length === count && (await store.snapshot({})).tenants[BIZ].outbox.filter((m) => m.fallbackFor === state?.id).length === 1);
+      const stranger = await hook({ entry: [{ changes: [{ field: 'messages', value: { statuses: [{ id: 'wamid.x', status: 'failed', biz_opaque_callback_data: 'not ours' }] } }] }] });
+      check('reports that aren’t ours are ignored', stranger.status === 200);
+
       reply = () => new Response(JSON.stringify({ error: { code: 132001, message: 'Template name does not exist in the translation' } }), { status: 404 });
       await call('public.cancelBooking', [SLUG, booked.id]);
-      await dispatchMessages(store, wa, { only: [BIZ], origin: 'https://tornu.co.il' });
-      const cancelled = (await store.snapshot({})).tenants[BIZ].outbox.find((m) => m.appointmentId === booked.id && m.channel === 'whatsapp' && m.kind === 'cancellation');
+      await dispatchMessages(store, withSms, { only: [BIZ], origin: 'https://tornu.co.il' });
+      const after = (await store.snapshot({})).tenants[BIZ].outbox;
+      const cancelled = after.find((m) => m.appointmentId === booked.id && m.channel === 'whatsapp' && m.kind === 'cancellation');
       check('an unapproved template fails without retrying', cancelled?.state === 'failed' && String(cancelled.error).includes('132001'), cancelled);
+      const cancelSms = after.find((m) => m.fallbackFor === cancelled?.id);
+      check('a whatsapp message refused on sending goes out by SMS in the same pass', cancelSms?.state === 'sent', cancelSms);
     }
     await call('workspace.call', [BIZ, 'updateBusiness', [{ notifications: n }]], owner);
   }
