@@ -8,7 +8,7 @@ export interface PolicyDecision {
   reason?: 'past' | 'inactive' | 'window' | 'disabled';
 }
 
-type Booking = Pick<Appointment, 'date' | 'start' | 'duration' | 'status'>;
+type Booking = Pick<Appointment, 'date' | 'start' | 'duration' | 'status' | 'sessionId'>;
 
 function decide(a: Booking, enabled: boolean, hours: number, timeZone: string, now: Date): PolicyDecision {
   const deadline = new Date(appointmentStart(a, timeZone).getTime() - hours * 3_600_000);
@@ -20,5 +20,6 @@ function decide(a: Booking, enabled: boolean, hours: number, timeZone: string, n
 
 export const canCustomerCancel = (a: Booking, p: BookingPolicies, timeZone: string, now = new Date()) =>
   decide(a, p.customerCanCancel, p.cancelWindowHours, timeZone, now);
+/** A seat in a class can't move on its own: the customer cancels and joins another session. */
 export const canCustomerReschedule = (a: Booking, p: BookingPolicies, timeZone: string, now = new Date()) =>
-  decide(a, p.customerCanReschedule, p.rescheduleWindowHours, timeZone, now);
+  decide(a, p.customerCanReschedule && !a.sessionId, p.rescheduleWindowHours, timeZone, now);

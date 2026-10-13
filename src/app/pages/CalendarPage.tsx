@@ -12,9 +12,10 @@ import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, PlusIcon } from '../../components/ui/Icons';
 import { Segmented, StaffAvatar, StatusBadge, Switch } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
-import { businessHours, businessNow, checkSlot, exceptionOn, heldRange, occupiesTime, sharedAppointments, staffDay, termsIfMoved, type Conflict } from '../../domain/scheduling';
+import { participantsOf } from '../../domain/classes';
+import { businessHours, businessNow, checkSlot, exceptionOn, heldRange, occupiesTime, sessionsOf, sharedAppointments, staffDay, termsIfMoved, type Conflict } from '../../domain/scheduling';
 import { addDays, snap, startOfWeek, weekdayOf } from '../../domain/time';
-import type { Appointment, Block, ISODate, Minutes, Staff, TenantData, TimeOff, TimeRange } from '../../domain/types';
+import type { Appointment, Block, ClassSession, ISODate, Minutes, Staff, TenantData, TimeOff, TimeRange } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useAppUI } from '../AppUI';
 import { useLookup } from '../lookup';
@@ -42,7 +43,9 @@ interface Column {
   staffLanes: string[] | null;
   /** Label of a special-hours exception affecting this column. */
   special: string | null;
+  /** One-to-one appointments; seats in a class show on the class. */
   appointments: Appointment[];
+  sessions: ClassSession[];
 }
 
 interface Preview {
@@ -108,7 +111,7 @@ export default function CalendarPage() {
   const { t, tx, fmt } = useI18n();
   const toast = useToast();
   const conflictText = useConflictText();
-  const { openAppointment, newAppointment } = useAppUI();
+  const { openAppointment, openSession, newAppointment } = useAppUI();
   const { api, can, me, solo } = useWorkspace();
   const [params, setParams] = useSearchParams();
   const now = useBusinessNow(state);
@@ -138,7 +141,8 @@ export default function CalendarPage() {
 
   const columns = useMemo<Column[]>(() => {
     if (view === 'list') return [];
-    const live = (a: Appointment) => showCancelled || occupiesTime(a);
+    const live = (a: Appointment) => !a.sessionId && (showCancelled || occupiesTime(a));
+    const classes = sessionsOf(state).filter((s) => showCancelled || s.status === 'scheduled');
     const single = (st: Staff, d: ISODate, key: string): Column => {
       const sd = staffDay(state, st.id, d);
       const ex = sd.exception ?? exceptionOn(state, null, d);
@@ -156,6 +160,7 @@ export default function CalendarPage() {
         staffLanes: null,
         special: ex ? ex.label || t('calendar.special') : null,
         appointments: state.appointments.filter((a) => a.staffId === st.id && a.date === d && live(a)).sort((a, b) => a.start - b.start),
+        sessions: classes.filter((s) => s.staffId === st.id && s.date === d),
       };
     };
     if (view === 'day') return shown.map((st) => single(st, date, st.id));
@@ -164,6 +169,7 @@ export default function CalendarPage() {
     const ids = new Set(shown.map((s) => s.id));
     return days.map((d) => {
       const appointments = state.appointments.filter((a) => a.date === d && ids.has(a.staffId) && live(a)).sort((a, b) => a.start - b.start);
+      const sessions = classes.filter((s) => s.date === d && ids.has(s.staffId));
       return {
         key: d,
         date: d,
@@ -175,12 +181,15 @@ export default function CalendarPage() {
         held: [],
         timeOff: null,
         away: state.timeOff.filter((x) => ids.has(x.staffId) && x.from <= d && d <= x.to),
-        staffLanes: shown.filter((s) => staffDay(state, s.id, d).shift.length > 0 || appointments.some((a) => a.staffId === s.id)).map((s) => s.id),
+        staffLanes: shown
+          .filter((s) => staffDay(state, s.id, d).shift.length > 0 || appointments.some((a) => a.staffId === s.id) || sessions.some((x) => x.staffId === s.id))
+          .map((s) => s.id),
         special: (() => {
           const ex = exceptionOn(state, null, d);
           return ex ? ex.label || t('calendar.special') : null;
         })(),
         appointments,
+        sessions,
       };
     });
   }, [state, view, shown, date, weekStart, showCancelled, t, tx, L.services]);
@@ -191,7 +200,7 @@ export default function CalendarPage() {
     let b = -Infinity;
     const days = view === 'day' ? [date] : Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
     for (const d of days) for (const r of businessHours(state, d)) (a = Math.min(a, r.start)), (b = Math.max(b, r.end));
-    for (const c of columns) for (const x of c.appointments) (a = Math.min(a, x.start)), (b = Math.max(b, x.start + x.duration));
+    for (const c of columns) for (const x of [...c.appointments, ...c.sessions]) (a = Math.min(a, x.start)), (b = Math.max(b, x.start + x.duration));
     if (!isFinite(a)) (a = 9 * 60), (b = 20 * 60);
     return [Math.max(0, Math.floor(a / 60) * 60 - 60), Math.min(24 * 60, Math.ceil(b / 60) * 60 + 60)];
   }, [state, columns, view, date, weekStart]);
@@ -205,7 +214,7 @@ export default function CalendarPage() {
     const el = scrollRef.current;
     if (!el) return;
     const showsToday = columns.some((c) => c.date === now.today);
-    const first = Math.min(...columns.flatMap((c) => c.appointments.map((a) => a.start)), hi);
+    const first = Math.min(...columns.flatMap((c) => [...c.appointments, ...c.sessions].map((a) => a.start)), hi);
     const target = showsToday ? now.minute - 90 : first - 45;
     el.scrollTop = Math.max(0, y(Math.max(lo, target)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -427,7 +436,7 @@ export default function CalendarPage() {
 
           {columns.map((c, ci) => {
             const lanes = layoutLanes(
-              c.appointments.map((a) => {
+              [...c.appointments, ...c.sessions].map((a) => {
                 const s = L.services.get(a.serviceId);
                 return { id: a.id, start: a.start - (s?.bufferBefore ?? 0), end: a.start + a.duration + (s?.bufferAfter ?? 0) };
               }),
@@ -534,6 +543,50 @@ export default function CalendarPage() {
                   );
                 })}
 
+                {c.sessions.map((s) => {
+                  const st = L.staff.get(s.staffId);
+                  const lane = lanes.get(s.id) ?? { lane: 0, lanes: 1 };
+                  const service = L.services.get(s.serviceId);
+                  const live = s.status === 'scheduled';
+                  const before = live ? service?.bufferBefore ?? 0 : 0;
+                  const buffer = live ? service?.bufferAfter ?? 0 : 0;
+                  const h = s.duration * ppm;
+                  const taken = participantsOf(state, s.id).length;
+                  const compact = h < 34;
+                  const seats = t('classes.seats', { taken, capacity: s.capacity });
+                  const label = [fmt.timeRange(s.start, s.start + s.duration), tx(service?.name), t('classes.booked', { taken, capacity: s.capacity }), solo ? '' : tx(st?.name), live ? '' : t('classes.cancelled')]
+                    .filter(Boolean)
+                    .join(', ');
+                  return (
+                    <div
+                      key={s.id}
+                      className="cal-slot"
+                      data-inactive={!live || undefined}
+                      style={
+                        {
+                          top: y(s.start - before),
+                          height: h + (before + buffer) * ppm,
+                          insetInlineStart: `calc(${(lane.lane / lane.lanes) * 100}% + 2px)`,
+                          width: `calc(${100 / lane.lanes}% - 6px)`,
+                          '--tone': st?.color,
+                        } as CSSProperties
+                      }
+                    >
+                      {before > 0 && <span className="cal-buffer cal-buffer--before" style={{ height: before * ppm }} aria-hidden />}
+                      <button type="button" className="cal-appt cal-class" data-status={live ? 'confirmed' : 'cancelled'} data-full={taken >= s.capacity || undefined} data-compact={compact} style={{ height: h }} aria-label={label} onClick={() => openSession(s.id)}>
+                        <span className="cal-class__head">
+                          <span className="cal-appt__time ltr">{compact || c.staffLanes ? fmt.time(s.start) : fmt.timeRange(s.start, s.start + s.duration)}</span>
+                          <span className="cal-class__seats tabular" aria-hidden>
+                            {seats}
+                          </span>
+                        </span>
+                        <span className="cal-appt__name">{tx(service?.name)}</span>
+                      </button>
+                      {buffer > 0 && <span className="cal-buffer" style={{ height: buffer * ppm }} aria-hidden />}
+                    </div>
+                  );
+                })}
+
                 {preview && preview.col === ci && (() => {
                   const a = state.appointments.find((x) => x.id === preview.id)!;
                   const tone = preview.conflict ? (isSoftConflict(preview.conflict) ? 'warn' : 'danger') : 'ok';
@@ -575,15 +628,16 @@ function Agenda({ from, staffIds, showCancelled, showStaff, today, nowMin }: { f
   const L = useLookup();
   const { state } = L;
   const { t, tx, fmt } = useI18n();
-  const { openAppointment, newAppointment } = useAppUI();
+  const { openAppointment, openSession, newAppointment } = useAppUI();
   const { can } = useWorkspace();
   const days = Array.from({ length: 7 }, (_, i) => addDays(from, i));
   return (
     <div className="agenda">
       {days.map((d) => {
         const items = state.appointments
-          .filter((a) => a.date === d && staffIds.has(a.staffId) && (showCancelled || occupiesTime(a)))
+          .filter((a) => a.date === d && !a.sessionId && staffIds.has(a.staffId) && (showCancelled || occupiesTime(a)))
           .sort((a, b) => a.start - b.start);
+        const classes = sessionsOf(state).filter((s) => s.date === d && staffIds.has(s.staffId) && (showCancelled || s.status === 'scheduled'));
         const blocks = state.blocks.filter((b) => b.date === d && (b.staffId === null || staffIds.has(b.staffId)));
         const closed = businessHours(state, d).length === 0;
         const ex = exceptionOn(state, null, d);
@@ -601,13 +655,40 @@ function Agenda({ from, staffIds, showCancelled, showStaff, today, nowMin }: { f
                 </button>
               )}
             </header>
-            {items.length === 0 && blocks.length === 0 ? (
+            {items.length === 0 && blocks.length === 0 && classes.length === 0 ? (
               <p className="agenda__empty muted">{closed ? t('calendar.closed') : t('calendar.emptyDay')}</p>
             ) : (
               <div className="list">
-                {[...blocks.map((b) => ({ at: b.start, b, a: null })), ...items.map((a) => ({ at: a.start, a, b: null }))]
+                {[
+                  ...blocks.map((b) => ({ at: b.start, b, a: null, s: null })),
+                  ...items.map((a) => ({ at: a.start, a, b: null, s: null })),
+                  ...classes.map((s) => ({ at: s.start, s, a: null, b: null })),
+                ]
                   .sort((x, y) => x.at - y.at)
-                  .map(({ a, b }) => (b ? (
+                  .map(({ a, b, s }) => (s ? (() => {
+                  const st = L.staff.get(s.staffId);
+                  const taken = participantsOf(state, s.id).length;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className="list__row agenda__class"
+                      onClick={() => openSession(s.id)}
+                      data-past={(d < today || (d === today && s.start + s.duration <= nowMin)) || undefined}
+                      data-inactive={s.status !== 'scheduled' || undefined}
+                      style={{ '--tone': st?.color } as CSSProperties}
+                    >
+                      <span className="list__time tabular">{fmt.time(s.start)}</span>
+                      <div className="list__main">
+                        <span className="list__title">{tx(L.services.get(s.serviceId)?.name)}</span>
+                        <span className="list__sub">{[t('classes.booked', { taken, capacity: s.capacity }), fmt.duration(s.duration), showStaff ? tx(st?.name) : null].filter(Boolean).join(' · ')}</span>
+                      </div>
+                      <span className="badge" data-status={s.status === 'cancelled' ? 'cancelled' : taken >= s.capacity ? 'pending' : 'confirmed'}>
+                        {s.status === 'cancelled' ? t('classes.cancelled') : taken >= s.capacity ? t('classes.full') : t('classes.spotsLeft', { count: s.capacity - taken })}
+                      </span>
+                    </button>
+                  );
+                })() : b ? (
                   <div key={b.id} className="list__row agenda__block" data-kind={b.kind}>
                     <span className="list__time tabular">{fmt.time(b.start)}</span>
                     <div className="list__main">

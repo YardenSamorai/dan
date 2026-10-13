@@ -5,7 +5,7 @@ import { StaffAvatar } from '../../components/ui/bits';
 import type { PublicService } from '../../data';
 import { WEEKDAYS } from '../../domain/defaults';
 import { openState } from '../../domain/opening';
-import { termsRange } from '../../domain/scheduling';
+import { isClass, termsRange } from '../../domain/scheduling';
 import { addDays, weekdayOf } from '../../domain/time';
 import { galleryFlow } from '../../domain/page';
 import type { GalleryFlow, GalleryLayout, HeroLayout, ISODate, Minutes, PageSection, ServicesLayout } from '../../domain/types';
@@ -13,10 +13,14 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { blockId, SECTION_TITLE_KEYS, usePreviewEditing } from './pageBridge';
 import { usePublicTenant, type PublicTenant } from './TenantContext';
 
-type Opening = { serviceId: string; date: ISODate; start: Minutes };
+type Opening = { serviceId: string; date: ISODate; start: Minutes; sessionId?: string };
 
 /** The first bookable time for a service in the next three weeks. */
 function findOpening(tenant: PublicTenant, service: PublicService): Opening | null {
+  if (isClass(service)) {
+    const s = tenant.sessions(service.id, 21).find((x) => !x.block);
+    return s ? { serviceId: service.id, date: s.date, start: s.start, sessionId: s.id } : null;
+  }
   const q = { serviceId: service.id, staffId: tenant.business.policies.allowAnyStaff || tenant.solo ? ('any' as const) : (service.staffIds[0] ?? 'any') };
   for (let i = 0; i < 21; i++) {
     const date = addDays(tenant.today, i);
@@ -26,7 +30,8 @@ function findOpening(tenant: PublicTenant, service: PublicService): Opening | nu
   return null;
 }
 
-const openingHref = (base: string, o: Opening) => `${base}/new?service=${o.serviceId}&date=${o.date}&time=${o.start}`;
+const openingHref = (base: string, o: Opening) =>
+  o.sessionId ? `${base}/new?service=${o.serviceId}&session=${o.sessionId}` : `${base}/new?service=${o.serviceId}&date=${o.date}&time=${o.start}`;
 
 function useNextOpening(): Opening | null {
   const tenant = usePublicTenant();
@@ -269,7 +274,11 @@ function useServiceInfo(service: PublicService) {
   return {
     name: tx(service.name),
     desc: tx(service.description),
-    who: business.staff.length > 1 && names.length < business.staff.length ? t('tenant.services.with', { names: fmt.list(names) }) : '',
+    who: isClass(service)
+      ? t('booking.classes.groupLabel')
+      : business.staff.length > 1 && names.length < business.staff.length
+        ? t('tenant.services.with', { names: fmt.list(names) })
+        : '',
     duration: fmt.durationRange(r.duration),
     price: fmt.moneyRange(r.price),
     href: `${base}/new?service=${service.id}`,

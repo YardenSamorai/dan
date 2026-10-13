@@ -1,5 +1,5 @@
 import { addDays, atMinutes, diffDays, intersectRanges, mergeRanges, overlaps, subtractRanges, weekdayOf, zonedInstant, zonedNow } from './time';
-import type { Appointment, Block, ISODate, Minutes, ScheduleException, Service, Staff, TenantData, TimeOff, TimeRange } from './types';
+import type { Appointment, Block, ClassSession, ISODate, Minutes, ScheduleException, Service, Staff, TenantData, TimeOff, TimeRange } from './types';
 
 /**
  * The availability engine. Pure functions over ONE tenant's data — the same
@@ -14,6 +14,12 @@ import type { Appointment, Block, ISODate, Minutes, ScheduleException, Service, 
 export const ACTIVE_STATUSES = new Set<Appointment['status']>(['pending', 'confirmed', 'arrived', 'completed']);
 export const occupiesTime = (a: Appointment) => ACTIVE_STATUSES.has(a.status);
 
+/** A group class: people join sessions instead of picking a free time. */
+export const isClass = (s?: Pick<Service, 'capacity'>) => (s?.capacity ?? 0) >= 2;
+export const sessionsOf = (state: TenantData): ClassSession[] => state.sessions ?? [];
+/** Sessions that still take place. */
+export const liveSessions = (state: TenantData) => sessionsOf(state).filter((s) => s.status === 'scheduled');
+
 export interface StaffDay {
   staff: Staff;
   date: ISODate;
@@ -24,7 +30,9 @@ export interface StaffDay {
   timeOff: TimeOff | null;
   /** Special-day override in effect for this person (staff-level wins over business-level). */
   exception: ScheduleException | null;
+  /** One-to-one appointments; seats in a session are represented by the session. */
   appointments: Appointment[];
+  sessions: ClassSession[];
 }
 
 export function timeOffOn(state: TenantData, staffId: string, date: ISODate): TimeOff | null {
@@ -62,7 +70,8 @@ export function staffDay(state: TenantData, staffId: string, date: ISODate): Sta
     blocks: state.blocks.filter((b) => b.date === date && (b.staffId === staffId || b.staffId === null)),
     timeOff,
     exception: own ?? exceptionOn(state, null, date),
-    appointments: state.appointments.filter((a) => a.staffId === staffId && a.date === date).sort((a, b) => a.start - b.start),
+    appointments: state.appointments.filter((a) => a.staffId === staffId && a.date === date && !a.sessionId).sort((a, b) => a.start - b.start),
+    sessions: liveSessions(state).filter((s) => s.staffId === staffId && s.date === date).sort((a, b) => a.start - b.start),
   };
 }
 
@@ -73,8 +82,8 @@ function buffersOf(state: TenantData, serviceId?: string) {
   return { before: s?.bufferBefore ?? 0, after: s?.bufferAfter ?? 0 };
 }
 
-/** Time an appointment holds on the calendar, including the service's buffers. */
-export function heldRange(state: TenantData, a: Appointment): TimeRange {
+/** Time an appointment (or a session) holds on the calendar, including the service's buffers. */
+export function heldRange(state: TenantData, a: Pick<Appointment, 'serviceId' | 'start' | 'duration'>): TimeRange {
   const b = buffersOf(state, a.serviceId);
   return { start: a.start - b.before, end: a.start + a.duration + b.after };
 }
@@ -88,25 +97,38 @@ export const blocksAll = (state: TenantData, serviceId?: string) => !!(serviceId
 export function sharedAppointments(state: TenantData, staffId: string, date: ISODate, serviceId?: string, excludeAppointmentId?: string): Appointment[] {
   const all = blocksAll(state, serviceId);
   return state.appointments.filter(
-    (a) => a.date === date && a.staffId !== staffId && a.id !== excludeAppointmentId && occupiesTime(a) && (all || blocksAll(state, a.serviceId)),
+    (a) => a.date === date && a.staffId !== staffId && a.id !== excludeAppointmentId && !a.sessionId && occupiesTime(a) && (all || blocksAll(state, a.serviceId)),
   );
 }
 
-function busyRanges(state: TenantData, d: StaffDay, excludeAppointmentId?: string, serviceId?: string): TimeRange[] {
+/** The same for other people's sessions. */
+function sharedSessions(state: TenantData, staffId: string, date: ISODate, serviceId?: string, excludeSessionId?: string): ClassSession[] {
+  const all = blocksAll(state, serviceId);
+  return liveSessions(state).filter((s) => s.date === date && s.staffId !== staffId && s.id !== excludeSessionId && (all || blocksAll(state, s.serviceId)));
+}
+
+interface Excluding {
+  appointmentId?: string;
+  sessionId?: string;
+}
+
+function busyRanges(state: TenantData, d: StaffDay, serviceId?: string, skip: Excluding = {}): TimeRange[] {
   return [
     ...d.breaks,
     ...d.blocks,
-    ...d.appointments.filter((a) => a.id !== excludeAppointmentId && occupiesTime(a)).map((a) => heldRange(state, a)),
-    ...sharedAppointments(state, d.staff.id, d.date, serviceId, excludeAppointmentId).map((a) => heldRange(state, a)),
+    ...d.appointments.filter((a) => a.id !== skip.appointmentId && occupiesTime(a)).map((a) => heldRange(state, a)),
+    ...d.sessions.filter((s) => s.id !== skip.sessionId).map((s) => heldRange(state, s)),
+    ...sharedAppointments(state, d.staff.id, d.date, serviceId, skip.appointmentId).map((a) => heldRange(state, a)),
+    ...sharedSessions(state, d.staff.id, d.date, serviceId, skip.sessionId).map((s) => heldRange(state, s)),
   ];
 }
 
 export function freeRanges(state: TenantData, staffId: string, date: ISODate, excludeAppointmentId?: string): TimeRange[] {
   const d = staffDay(state, staffId, date);
-  return subtractRanges(d.shift, busyRanges(state, d, excludeAppointmentId));
+  return subtractRanges(d.shift, busyRanges(state, d, undefined, { appointmentId: excludeAppointmentId }));
 }
 
-export type ConflictKind = 'closed' | 'not_working' | 'time_off' | 'outside_shift' | 'break' | 'block' | 'overlap' | 'shared' | 'not_qualified';
+export type ConflictKind = 'closed' | 'not_working' | 'time_off' | 'outside_shift' | 'break' | 'block' | 'overlap' | 'session' | 'shared' | 'not_qualified';
 
 export interface Conflict {
   kind: ConflictKind;
@@ -122,6 +144,8 @@ export interface SlotCheck {
   duration: Minutes;
   serviceId?: string;
   excludeAppointmentId?: string;
+  /** When moving a session, its own time doesn't block it. */
+  excludeSessionId?: string;
 }
 
 /**
@@ -146,8 +170,12 @@ export function checkSlot(state: TenantData, q: SlotCheck): Conflict | null {
   if (bl) return { kind: 'block', refId: bl.id };
   const clash = d.appointments.find((a) => a.id !== q.excludeAppointmentId && occupiesTime(a) && overlaps(heldRange(state, a), held));
   if (clash) return { kind: 'overlap', refId: clash.id };
+  const session = d.sessions.find((s) => s.id !== q.excludeSessionId && overlaps(heldRange(state, s), held));
+  if (session) return { kind: 'session', refId: session.id };
   const shared = sharedAppointments(state, q.staffId, q.date, q.serviceId, q.excludeAppointmentId).find((a) => overlaps(heldRange(state, a), held));
   if (shared) return { kind: 'shared', refId: shared.id };
+  const sharedSession = sharedSessions(state, q.staffId, q.date, q.serviceId, q.excludeSessionId).find((s) => overlaps(heldRange(state, s), held));
+  if (sharedSession) return { kind: 'session', refId: sharedSession.id };
   return null;
 }
 
@@ -219,7 +247,7 @@ export const businessNow = (state: TenantData, now = new Date()) => zonedNow(sta
 
 export function availableSlots(state: TenantData, q: SlotQuery): Slot[] {
   const service = serviceOf(state, q.serviceId);
-  if (!service) return [];
+  if (!service || isClass(service)) return [];
   const { policies } = state.business;
   const here = businessNow(state, q.now);
   if (q.date < here.date) return [];
@@ -239,7 +267,7 @@ export function availableSlots(state: TenantData, q: SlotQuery): Slot[] {
     const d = staffDay(state, staffId, q.date);
     if (!d.shift.length) continue;
     const duration = bookingDuration(state, q.serviceId, q.addOnIds, staffId);
-    const busy = busyRanges(state, d, q.excludeAppointmentId, q.serviceId);
+    const busy = busyRanges(state, d, q.serviceId, { appointmentId: q.excludeAppointmentId });
     for (const r of d.shift) {
       for (let t = Math.ceil(r.start / step) * step; t + duration <= r.end; t += step) {
         if (t < earliest) continue;
@@ -257,7 +285,8 @@ export function availableSlots(state: TenantData, q: SlotQuery): Slot[] {
 /** For "any available": the least-booked qualified person that day. */
 export function pickStaff(state: TenantData, date: ISODate, candidates: string[]): string {
   const load = (id: string) =>
-    state.appointments.filter((a) => a.staffId === id && a.date === date && occupiesTime(a)).reduce((m, a) => m + a.duration, 0);
+    state.appointments.filter((a) => a.staffId === id && a.date === date && !a.sessionId && occupiesTime(a)).reduce((m, a) => m + a.duration, 0) +
+    liveSessions(state).filter((s) => s.staffId === id && s.date === date).reduce((m, s) => m + s.duration, 0);
   return [...candidates].sort((a, b) => load(a) - load(b) || a.localeCompare(b))[0];
 }
 

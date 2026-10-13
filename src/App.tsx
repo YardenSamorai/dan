@@ -16,6 +16,7 @@ const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
 const TenantHome = lazy(() => import('./pages/booking/TenantHome'));
 const BookFlowPage = lazy(() => import('./pages/booking/BookFlowPage'));
 const ConfirmedPage = lazy(() => import('./pages/booking/ConfirmedPage'));
+const ClassLinkPage = lazy(() => import('./pages/booking/ClassLinkPage'));
 const MyBookingsPage = lazy(() => import('./pages/booking/MyBookingsPage'));
 const ManageBookingPage = lazy(() => import('./pages/booking/ManageBookingPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
@@ -91,6 +92,7 @@ export function App() {
             <Route path="onboarding" element={<OnboardingPage />} />
             <Route path="book/:businessSlug" element={<TenantScope />}>
               <Route path="new" element={<BookFlowPage />} />
+              <Route path="class/:sessionId" element={<ClassLinkPage />} />
               <Route element={<TenantChrome />}>
                 <Route index element={<TenantHome />} />
                 <Route path="confirmed/:id" element={<ConfirmedPage />} />

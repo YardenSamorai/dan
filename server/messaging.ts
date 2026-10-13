@@ -1,6 +1,7 @@
 import { pickText, type Locale } from '../src/i18n/config';
-import { bookingLink, isWaiting, KEEP_DONE_MS, LINK_PLACEHOLDER, MAX_ATTEMPTS, messageVars, recipientOf, STALE_AFTER_MS } from '../src/domain/notifications';
-import { appointmentStart } from '../src/domain/scheduling';
+import { bookingLink, isWaiting, KEEP_DONE_MS, LINK_PLACEHOLDER, MAX_ATTEMPTS, messageLink, messageVars, recipientOf, STALE_AFTER_MS } from '../src/domain/notifications';
+import { joinBlock, messageSubject, participantsOf } from '../src/domain/classes';
+import { appointmentStart, sessionsOf } from '../src/domain/scheduling';
 import { addUsage, usageKey, usageMonth } from '../src/domain/usage';
 import { renderWhatsApp, WHATSAPP_LANGUAGE, WHATSAPP_TEMPLATES, whatsAppParams } from '../src/domain/whatsapp';
 import type { Channel, MessageKind, OutboxMessage, TemplateKind, TenantData, UsageCounts } from '../src/domain/types';
@@ -218,8 +219,14 @@ function smsFallback(outbox: OutboxMessage[], m: OutboxMessage, at: string): Out
 
 /** Why a waiting message shouldn't go out any more, if it shouldn't. */
 function tooLate(t: TenantData, m: OutboxMessage, now: Date): string | null {
-  const a = t.appointments.find((x) => x.id === m.appointmentId);
+  const a = messageSubject(t, m);
   if (!a) return 'no_appointment';
+  if (m.kind === 'spotOpen') {
+    const session = sessionsOf(t).find((s) => s.id === a.sessionId);
+    if (!session || joinBlock(t, session, true, now)) return 'not_needed';
+    if (participantsOf(t, session.id).some((p) => p.customerId === a.customerId)) return 'already_booked';
+    return now.getTime() - Date.parse(m.at) > STALE_AFTER_MS ? 'too_late' : null;
+  }
   if (m.kind === 'reminder') {
     if (a.status === 'cancelled' || a.status === 'no_show' || a.status === 'completed') return 'not_needed';
     if (appointmentStart(a, t.business.timezone) <= now) return 'too_late';
@@ -243,9 +250,9 @@ const isTemplateKind = (k: MessageKind): k is TemplateKind => k in WHATSAPP_TEMP
 
 /** The approved WhatsApp template and its values for a message to a customer; none for alerts to the business. */
 function whatsAppTemplateFor(t: TenantData, m: OutboxMessage, link: string): OutgoingMessage['template'] {
-  const a = t.appointments.find((x) => x.id === m.appointmentId);
+  const a = messageSubject(t, m);
   if (m.to === 'owner' || !a || !isTemplateKind(m.kind)) return undefined;
-  const vars = { ...messageVars(t, a, m.locale), link };
+  const vars = { ...messageVars(t, a, m.locale, m.kind), link };
   return { kind: m.kind, locale: m.locale, params: whatsAppParams(m.kind, m.locale, vars) };
 }
 
@@ -258,7 +265,8 @@ async function deliver(t: TenantData, m: OutboxMessage, sender: Sender, now: Dat
   const to = m.channel === 'whatsapp' ? internationalPhone(address, t.business.timezone) : address;
   if (!to) return { state: 'skipped', doneAt, error: 'bad_number' };
   const business = pickText(t.business.name, m.locale);
-  const link = origin ? bookingLink(origin, t.business.slug) : '';
+  const subject = messageSubject(t, m);
+  const link = !origin ? '' : subject ? messageLink(origin, t, subject, m.kind) : bookingLink(origin, t.business.slug);
   const body = m.body.split(LINK_PLACEHOLDER).join(link);
   const template = m.channel === 'whatsapp' ? whatsAppTemplateFor(t, m, link) : undefined;
   const attempts = (m.attempts ?? 0) + 1;

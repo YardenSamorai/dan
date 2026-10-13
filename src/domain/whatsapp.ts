@@ -73,6 +73,15 @@ export const WHATSAPP_TEMPLATES: Record<TemplateKind, WhatsAppTemplate> = {
       en: 'Hi {{name}}, it’s been a while since your last visit to {{business}}.\nIf you’re ready for another {{service}}, you can book in a few taps on the booking page: {{link}}\nWe’d love to see you again!',
     },
   },
+  spotOpen: {
+    name: 'class_spot_open',
+    category: 'UTILITY',
+    vars: BODY,
+    text: {
+      he: 'שלום {{name}}, נרשמת לרשימת ההמתנה ב{{business}}, ועכשיו התפנה מקום.\nהשיעור: {{service}}, ב{{date}} בשעה {{time}}.\nהמקום שמור למי שנרשם ראשון, דרך העמוד: {{link}}\nאם כבר לא מתאים לך, אפשר להתעלם מההודעה.',
+      en: 'Hi {{name}}, you joined the waitlist at {{business}}, and a spot just opened.\nClass: {{service}}, on {{date}} at {{time}}.\nThe spot goes to whoever books first, on the page: {{link}}\nIf it no longer suits you, you can ignore this message.',
+    },
+  },
 };
 
 /** WhatsApp rejects empty values, and every customer is greeted by name; this stands in when there's none. */

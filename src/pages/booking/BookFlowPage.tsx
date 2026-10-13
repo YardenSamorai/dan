@@ -4,9 +4,9 @@ import { SlotPicker } from '../../components/booking/SlotPicker';
 import { ArrowBackIcon, CheckIcon, ClockIcon, CloseIcon } from '../../components/ui/Icons';
 import { BusinessWordmark, StaffAvatar } from '../../components/ui/bits';
 import { storageKey } from '../../config/product';
-import { ApiError, publicBooking } from '../../data';
+import { ApiError, publicBooking, type PublicSession } from '../../data';
 import { rememberBooking } from '../../data/mine';
-import { termsRange } from '../../domain/scheduling';
+import { isClass, termsRange } from '../../domain/scheduling';
 import type { ISODate, Minutes } from '../../domain/types';
 import { useI18n, type I18n } from '../../i18n/I18nProvider';
 import { usePublicTenant, type PublicTenant } from './TenantContext';
@@ -19,6 +19,8 @@ interface Draft {
   staffId: string;
   date?: ISODate;
   start?: Minutes;
+  /** Group class services pick a session instead of a time. */
+  sessionId?: string;
   name: string;
   phone: string;
   email: string;
@@ -49,9 +51,22 @@ function validate(d: Draft, requireEmail: boolean, t: I18n['t']): Errors {
 
 type Span = [number, number];
 
+function chosenSession(tenant: PublicTenant, d: Draft): PublicSession | undefined {
+  const s = d.serviceId ? tenant.service(d.serviceId) : undefined;
+  if (!s || !isClass(s) || !d.sessionId) return undefined;
+  return tenant.sessions(s.id).find((x) => x.id === d.sessionId);
+}
+
 /** Until a specific person is chosen, duration and price span everyone who could take it. */
 function totals(tenant: PublicTenant, d: Draft) {
   const s = d.serviceId ? tenant.service(d.serviceId) : undefined;
+  const session = chosenSession(tenant, d);
+  if (s && isClass(s)) {
+    const r = termsRange(s);
+    const duration: Span = session ? [session.duration, session.duration] : r.duration;
+    const price: Span = session ? [session.price, session.price] : r.price;
+    return { service: s, base: price, duration, price };
+  }
   const extras = d.addOnIds.map((id) => tenant.addOn(id)).filter((a) => !!a);
   const xd = extras.reduce((m, a) => m + a!.duration, 0);
   const xp = extras.reduce((m, a) => m + a!.price, 0);
@@ -75,8 +90,6 @@ export default function BookFlowPage() {
 
   const soloId = tenant.solo ? business.staff[0]?.id ?? '' : null;
   const anyAllowed = business.policies.allowAnyStaff;
-  const steps: StepKey[] = soloId !== null ? ['service', 'time', 'details', 'review'] : ['service', 'staff', 'time', 'details', 'review'];
-  const idx = (k: StepKey) => steps.indexOf(k);
 
   const [draft, setDraft] = useState<Draft>(() => {
     const d = loadDraft(slug, soloId ?? (anyAllowed ? 'any' : ''));
@@ -84,11 +97,16 @@ export default function BookFlowPage() {
     const staff = params.get('staff');
     const date = params.get('date');
     const time = params.get('time');
+    const session = params.get('session');
     if (d.serviceId && !tenant.service(d.serviceId)) d.serviceId = undefined;
     if (service && tenant.service(service)) {
-      if (service !== d.serviceId) d.addOnIds = [];
+      if (service !== d.serviceId) {
+        d.addOnIds = [];
+        d.sessionId = undefined;
+      }
       d.serviceId = service;
     }
+    if (session) d.sessionId = session;
     if (soloId !== null) d.staffId = soloId;
     else if (staff && ((staff === 'any' && anyAllowed) || tenant.staff(staff))) d.staffId = staff;
     else if (d.staffId === 'any' && !anyAllowed) d.staffId = '';
@@ -99,12 +117,20 @@ export default function BookFlowPage() {
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [waited, setWaited] = useState<{ position: number; session: PublicSession } | null>(null);
 
-  const staffChosen = draft.staffId !== '';
+  const cls = isClass(draft.serviceId ? tenant.service(draft.serviceId) : undefined);
+  const steps: StepKey[] = soloId !== null || cls ? ['service', 'time', 'details', 'review'] : ['service', 'staff', 'time', 'details', 'review'];
+  const idx = (k: StepKey) => steps.indexOf(k);
+  const session = chosenSession(tenant, draft);
+  const waiting = session?.block === 'full';
+
+  const staffChosen = cls || draft.staffId !== '';
   const timeOk = useMemo(() => {
+    if (cls) return !!session && (!session.block || session.block === 'full');
     if (!draft.serviceId || !staffChosen || !draft.date || draft.start === undefined) return false;
     return tenant.slots({ serviceId: draft.serviceId, addOnIds: draft.addOnIds, staffId: draft.staffId, date: draft.date }).some((x) => x.start === draft.start);
-  }, [tenant, draft.serviceId, draft.addOnIds, draft.staffId, draft.date, draft.start, staffChosen]);
+  }, [tenant, cls, session, draft.serviceId, draft.addOnIds, draft.staffId, draft.date, draft.start, staffChosen]);
 
   const detailsOk = Object.keys(validate(draft, business.policies.requireEmail, t)).length === 0;
   const maxStep = !draft.serviceId ? 0 : !staffChosen ? idx('staff') : !timeOk ? idx('time') : !detailsOk ? idx('details') : idx('review');
@@ -151,7 +177,42 @@ export default function BookFlowPage() {
   const canContinue = key === 'service' ? !!draft.serviceId : key === 'staff' ? staffChosen : key === 'time' ? timeOk : true;
   const manual = business.policies.confirmationMode === 'manual';
 
+  const customer = () => ({ name: draft.name.trim(), phone: draft.phone.trim(), email: draft.email.trim() || undefined, note: draft.note.trim(), locale });
+
+  const join = async () => {
+    if (!session) return;
+    setSubmitting(true);
+    setNotice(null);
+    const input = { sessionId: session.id, customer: customer() };
+    try {
+      if (waiting) {
+        const r = await publicBooking.joinWaitlist(slug, input);
+        sessionStorage.removeItem(draftKey(slug));
+        setSubmitting(false);
+        setWaited({ position: r.position, session });
+        window.scrollTo(0, 0);
+        return;
+      }
+      const b = await publicBooking.joinSession(slug, input);
+      rememberBooking(slug, b.id);
+      sessionStorage.removeItem(draftKey(slug));
+      navigate(`${base}/confirmed/${b.id}`, { replace: true });
+    } catch (e) {
+      setSubmitting(false);
+      const code = e instanceof ApiError ? e.code : '';
+      if (code === 'slot_taken') setNotice(t('booking.classes.justFilled'));
+      else if (code === 'invalid' && waiting) setNotice(t('booking.classes.spotOpened'));
+      else if (code === 'exists') setNotice(t('booking.classes.exists'));
+      else if (code === 'policy') {
+        setNotice(t('booking.classes.closedNotice'));
+        goTo(idx('time'));
+      } else if (code === 'blocked') setNotice(t('booking.blocked'));
+      else setNotice(t('common.unknownError'));
+    }
+  };
+
   const submit = async () => {
+    if (cls) return join();
     if (!draft.serviceId || !draft.date || draft.start === undefined) return;
     setSubmitting(true);
     try {
@@ -161,7 +222,7 @@ export default function BookFlowPage() {
         staffId: draft.staffId,
         date: draft.date,
         start: draft.start,
-        customer: { name: draft.name.trim(), phone: draft.phone.trim(), email: draft.email.trim() || undefined, note: draft.note.trim(), locale },
+        customer: customer(),
       });
       rememberBooking(slug, b.id);
       sessionStorage.removeItem(draftKey(slug));
@@ -194,8 +255,14 @@ export default function BookFlowPage() {
   };
 
   const { service, duration, price } = totals(tenant, draft);
-  const hint = key === 'service' ? t('booking.summary.empty') : key === 'time' ? t('booking.time.pickDay') : '';
-  const ctaLabel = key === 'review' ? (submitting ? t('booking.review.confirming') : t(manual ? 'booking.review.request' : 'booking.review.confirm')) : t('common.continue');
+  const hint = key === 'service' ? t('booking.summary.empty') : key === 'time' ? t(cls ? 'booking.classes.pick' : 'booking.time.pickDay') : '';
+  const ctaLabel =
+    key === 'review'
+      ? submitting
+        ? t('booking.review.confirming')
+        : t(waiting ? 'booking.classes.joinWaitlist' : manual ? 'booking.review.request' : cls ? 'booking.classes.join' : 'booking.review.confirm')
+      : t('common.continue');
+  const pickedTime = cls ? (session && timeOk ? session.start : undefined) : draft.date && draft.start !== undefined && timeOk ? draft.start : undefined;
 
   const cta = (className = '') => (
     <button type="button" className={`btn btn--primary btn--lg ${className}`} onClick={next} aria-disabled={!canContinue || submitting} aria-describedby={!canContinue ? 'cta-hint' : undefined}>
@@ -204,13 +271,31 @@ export default function BookFlowPage() {
     </button>
   );
 
+  const logo = (
+    <Link to={base} className="booking__logo">
+      <BusinessWordmark name={tx(business.name)} logoUrl={business.branding.logoUrl} hideMark={business.branding.hideLogo} />
+    </Link>
+  );
+
+  if (waited)
+    return (
+      <div className="booking">
+        <header className="booking__bar">
+          <div className="booking__bar-inner">{logo}</div>
+        </header>
+        <div className="booking__body">
+          <main className="booking__main" id="main">
+            <WaitlistDone position={waited.position} session={waited.session} />
+          </main>
+        </div>
+      </div>
+    );
+
   return (
     <div className="booking">
       <header className="booking__bar">
         <div className="booking__bar-inner">
-          <Link to={base} className="booking__logo">
-            <BusinessWordmark name={tx(business.name)} logoUrl={business.branding.logoUrl} hideMark={business.branding.hideLogo} />
-          </Link>
+          {logo}
           <nav className="progress" aria-label={t('booking.title')}>
             <ol>
               {steps.map((k, i) => (
@@ -255,14 +340,15 @@ export default function BookFlowPage() {
           <div key={step} className="booking__step">
             {key === 'service' && <StepService draft={draft} update={update} />}
             {key === 'staff' && <StepStaff draft={draft} update={update} onPick={() => goTo(idx('time'))} />}
-            {key === 'time' && service && (
+            {key === 'time' && service && cls && <StepClass draft={draft} update={update} onPick={() => goTo(idx('details'))} />}
+            {key === 'time' && service && !cls && (
               <>
                 <StepTitle>{t('booking.time.title')}</StepTitle>
                 <SlotPicker serviceId={service.id} addOnIds={draft.addOnIds} staffId={draft.staffId} date={draft.date} start={draft.start} onChange={(v) => update({ date: v.date, start: v.start })} />
               </>
             )}
             {key === 'details' && <StepDetails draft={draft} update={update} errors={errors} requireEmail={business.policies.requireEmail} />}
-            {key === 'review' && <StepReview draft={draft} goTo={goTo} staffStep={soloId === null ? idx('staff') : -1} timeStep={idx('time')} detailsStep={idx('details')} />}
+            {key === 'review' && <StepReview draft={draft} goTo={goTo} staffStep={soloId === null ? (cls ? idx('time') : idx('staff')) : -1} timeStep={idx('time')} detailsStep={idx('details')} />}
           </div>
         </main>
 
@@ -286,7 +372,7 @@ export default function BookFlowPage() {
               <strong className="tabular">{fmt.moneyRange(price)}</strong>
               <span className="tabular">
                 {fmt.durationRange(duration)}
-                {draft.date && draft.start !== undefined && timeOk ? ` · ${fmt.time(draft.start)}` : ''}
+                {pickedTime !== undefined ? ` · ${fmt.time(pickedTime)}` : ''}
               </span>
             </>
           ) : (
@@ -296,6 +382,97 @@ export default function BookFlowPage() {
         {cta()}
       </div>
     </div>
+  );
+}
+
+function WaitlistDone({ position, session }: { position: number; session: PublicSession }) {
+  const { t, tx, fmt } = useI18n();
+  const tenant = usePublicTenant();
+  const service = tenant.service(session.serviceId);
+  return (
+    <div className="waitlist-done">
+      <span className="waitlist-done__mark" aria-hidden="true">
+        <CheckIcon size={20} />
+      </span>
+      <StepTitle lede={t('booking.classes.done.body', { service: tx(service?.name), when: `${fmt.date(session.date, 'medium')} · ${fmt.time(session.start)}` })}>
+        {t('booking.classes.done.title')}
+      </StepTitle>
+      <p className="waitlist-done__pos">{t('booking.classes.done.position', { position: fmt.number(position) })}</p>
+      <p className="muted">{t('booking.classes.done.how')}</p>
+      <Link to={tenant.base} className="btn btn--ghost">
+        {t('confirmed.back', { business: tx(tenant.business.name) })}
+      </Link>
+    </div>
+  );
+}
+
+function StepClass({ draft, update, onPick }: StepProps & { onPick: () => void }) {
+  const { t, tx, fmt } = useI18n();
+  const tenant = usePublicTenant();
+  const days = useMemo(() => {
+    const out: { date: ISODate; items: PublicSession[] }[] = [];
+    for (const s of tenant.sessions(draft.serviceId!)) {
+      if (s.block === 'cancelled' || s.block === 'past') continue;
+      const last = out.at(-1);
+      if (last?.date === s.date) last.items.push(s);
+      else out.push({ date: s.date, items: [s] });
+    }
+    return out;
+  }, [tenant, draft.serviceId]);
+
+  const status = (s: PublicSession) =>
+    s.block === 'full'
+      ? t('booking.classes.fullWait')
+      : s.block === 'closed'
+        ? t('booking.classes.closed')
+        : s.block === 'too_far'
+          ? t('booking.classes.notYet')
+          : t('booking.classes.spotsLeft', { count: s.seatsLeft });
+
+  return (
+    <>
+      <StepTitle lede={t('booking.time.timezone', { zone: fmt.zoneName() })}>{t('booking.classes.title')}</StepTitle>
+      {!days.length && <p className="muted">{t('booking.classes.none')}</p>}
+      {days.map((d) => (
+        <fieldset key={d.date} className="choice-group">
+          <legend className="choice-group__legend">{fmt.relativeDay(d.date) ?? fmt.date(d.date, 'full')}</legend>
+          {d.items.map((s) => {
+            const selected = draft.sessionId === s.id;
+            const off = s.block === 'closed' || s.block === 'too_far';
+            const staff = tenant.solo ? undefined : tenant.staff(s.staffId);
+            return (
+              <label key={s.id} className="choice" data-selected={selected} data-off={off || undefined}>
+                <input
+                  type="radio"
+                  name="session"
+                  className="sr-only"
+                  checked={selected}
+                  disabled={off}
+                  onChange={() => {
+                    update({ sessionId: s.id });
+                    onPick();
+                  }}
+                  onClick={() => selected && onPick()}
+                />
+                <span className="choice__main">
+                  <span className="choice__title tabular">{fmt.timeRange(s.start, s.start + s.duration)}</span>
+                  {staff && <span className="choice__desc">{t('booking.classes.with', { name: tx(staff.name) })}</span>}
+                </span>
+                <span className="choice__side">
+                  <span className="choice__price tabular">{fmt.money(s.price)}</span>
+                  <span className="choice__meta" data-full={s.block === 'full' || undefined}>
+                    {status(s)}
+                  </span>
+                </span>
+                <span className="choice__tick" aria-hidden="true">
+                  <CheckIcon size={12} />
+                </span>
+              </label>
+            );
+          })}
+        </fieldset>
+      ))}
+    </>
   );
 }
 
@@ -335,10 +512,10 @@ function StepService({ draft, update }: StepProps) {
             const r = termsRange(s);
             return (
               <label key={s.id} className="choice" data-selected={selected}>
-                <input type="radio" name="service" className="sr-only" checked={selected} onChange={() => update({ serviceId: s.id, addOnIds: selected ? draft.addOnIds : [], start: undefined })} />
+                <input type="radio" name="service" className="sr-only" checked={selected} onChange={() => update({ serviceId: s.id, addOnIds: selected ? draft.addOnIds : [], start: undefined, sessionId: undefined })} />
                 <span className="choice__main">
                   <span className="choice__title">{tx(s.name)}</span>
-                  {tx(s.description) && <span className="choice__desc">{tx(s.description)}</span>}
+                  {(tx(s.description) || isClass(s)) && <span className="choice__desc">{[isClass(s) ? t('booking.classes.groupLabel') : '', tx(s.description)].filter(Boolean).join(' · ')}</span>}
                 </span>
                 <span className="choice__side">
                   <span className="choice__price tabular">{fmt.moneyRange(r.price)}</span>
@@ -354,7 +531,7 @@ function StepService({ draft, update }: StepProps) {
           })}
         </fieldset>
       ))}
-      {draft.serviceId && business.addOns.length > 0 && (
+      {draft.serviceId && business.addOns.length > 0 && !isClass(business.services.find((s) => s.id === draft.serviceId)) && (
         <fieldset className="choice-group">
           <legend className="choice-group__legend">{t('booking.service.addOnsTitle')}</legend>
           <p className="muted choice-group__hint">{t('booking.service.addOnsHint')}</p>
@@ -513,16 +690,19 @@ function StepReview({ draft, goTo, staffStep, timeStep, detailsStep }: { draft: 
   const tenant = usePublicTenant();
   const p = tenant.business.policies;
   const service = tenant.service(draft.serviceId!)!;
-  const staff = tenant.staff(draft.staffId);
+  const session = chosenSession(tenant, draft);
+  const staff = tenant.staff(session ? session.staffId : draft.staffId);
+  const when = session ? { date: session.date, start: session.start } : { date: draft.date!, start: draft.start! };
+  const waiting = session?.block === 'full';
   const rows: [string, string, number][] = [
     [t('booking.steps.service'), [tx(service.name), ...draft.addOnIds.map((id) => tx(tenant.addOn(id)?.name))].join(' + '), 0],
     ...(staffStep >= 0 ? ([[t('booking.steps.staff'), staff ? tx(staff.name) : t('booking.summary.staffAny'), staffStep]] as [string, string, number][]) : []),
-    [t('booking.steps.time'), `${fmt.date(draft.date!)} · ${fmt.time(draft.start!)}`, timeStep],
+    [t('booking.steps.time'), `${fmt.date(when.date)} · ${fmt.time(when.start)}`, timeStep],
     [t('booking.steps.details'), [draft.name, draft.phone, draft.email].filter(Boolean).join(' · '), detailsStep],
   ];
   return (
     <>
-      <StepTitle>{t('booking.review.title')}</StepTitle>
+      <StepTitle lede={waiting ? t('booking.classes.fullLede') : undefined}>{t(waiting ? 'booking.classes.waitTitle' : 'booking.review.title')}</StepTitle>
       <dl className="review">
         {rows.map(([label, value, step]) => (
           <div key={label} className="review__row">
@@ -535,12 +715,18 @@ function StepReview({ draft, goTo, staffStep, timeStep, detailsStep }: { draft: 
           </div>
         ))}
       </dl>
-      {p.customerCanCancel && (
-        <p className="review__policy">
-          <ClockIcon /> {t('booking.review.policy', { hours: t('units.hoursLong', { count: p.cancelWindowHours }) })}
-        </p>
+      {waiting ? (
+        <p className="review__policy">{t('booking.classes.done.how')}</p>
+      ) : (
+        <>
+          {p.customerCanCancel && (
+            <p className="review__policy">
+              <ClockIcon /> {t(session ? 'booking.classes.policy' : 'booking.review.policy', { hours: t('units.hoursLong', { count: p.cancelWindowHours }) })}
+            </p>
+          )}
+          {p.confirmationMode === 'manual' && <p className="review__policy">{t('booking.review.manual')}</p>}
+        </>
       )}
-      {p.confirmationMode === 'manual' && <p className="review__policy">{t('booking.review.manual')}</p>}
     </>
   );
 }
@@ -550,8 +736,12 @@ function Summary({ draft }: { draft: Draft }) {
   const tenant = usePublicTenant();
   const { service, base, duration, price } = totals(tenant, draft);
   if (!service) return <p className="summary__empty muted">{t('booking.summary.empty')}</p>;
-  const staff = tenant.staff(draft.staffId);
-  const addOns = draft.addOnIds.map((id) => tenant.addOn(id)).filter((a) => !!a);
+  const cls = isClass(service);
+  const session = chosenSession(tenant, draft);
+  const staff = tenant.staff(session ? session.staffId : draft.staffId);
+  const start = cls ? session?.start : draft.date ? draft.start : undefined;
+  const date = cls ? session?.date : draft.date;
+  const addOns = cls ? [] : draft.addOnIds.map((id) => tenant.addOn(id)).filter((a) => !!a);
   return (
     <div className="summary">
       <p className="summary__eyebrow">{t('booking.summary.title')}</p>
@@ -568,19 +758,25 @@ function Summary({ draft }: { draft: Draft }) {
         ))}
       </ul>
       <dl className="summary__meta">
-        {!tenant.solo && draft.staffId && (
+        {!tenant.solo && (cls ? !!session : !!draft.staffId) && (
           <div>
             <dt>{t('booking.steps.staff')}</dt>
             <dd>{staff ? tx(staff.name) : t('booking.summary.staffAny')}</dd>
           </div>
         )}
-        {draft.date && draft.start !== undefined && (
+        {date && start !== undefined && (
           <div>
             <dt>{t('booking.steps.time')}</dt>
             <dd>
-              {fmt.date(draft.date, 'medium')} ·{' '}
-              <span className="tabular">{duration[0] === duration[1] ? fmt.timeRange(draft.start, draft.start + duration[0]) : fmt.time(draft.start)}</span>
+              {fmt.date(date, 'medium')} ·{' '}
+              <span className="tabular">{duration[0] === duration[1] ? fmt.timeRange(start, start + duration[0]) : fmt.time(start)}</span>
             </dd>
+          </div>
+        )}
+        {session?.block === 'full' && (
+          <div>
+            <dt>{t('booking.classes.seats')}</dt>
+            <dd>{t('booking.classes.fullWait')}</dd>
           </div>
         )}
         <div>

@@ -3,9 +3,10 @@ import { useMemo, type ReactNode } from 'react';
 import { AlertIcon, BanIcon, CalendarIcon, ChartIcon, CheckIcon, ChevronRight, ClockIcon, MessageIcon, PhoneIcon, PlusIcon, TagIcon, UserIcon } from '../../components/ui/Icons';
 import { StaffAvatar, StatusBadge } from '../../components/ui/bits';
 import { periodSpans, quickTotals } from '../../domain/insights';
-import { businessNow, freeRanges, occupiesTime, staffDay } from '../../domain/scheduling';
+import { participantsOf } from '../../domain/classes';
+import { businessNow, freeRanges, liveSessions, occupiesTime, staffDay } from '../../domain/scheduling';
 import { addDays } from '../../domain/time';
-import type { Appointment, ISODate, Minutes } from '../../domain/types';
+import type { Appointment, ClassSession, ISODate, Minutes } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
 import { telHref, whatsappHref } from '../../lib/phone';
 import { useAppUI } from '../AppUI';
@@ -22,13 +23,14 @@ export default function Dashboard() {
   const { state } = L;
   const { can, me, solo, session } = useWorkspace();
   const { t, tx, fmt } = useI18n();
-  const { openAppointment, newAppointment, newCustomer } = useAppUI();
+  const { openAppointment, openSession, newAppointment, newCustomer } = useAppUI();
   const now = new Date();
   const { date: today, minutes: nowMin } = businessNow(state, now);
   const allCalendar = can('calendar.all');
   const people = allCalendar ? state.staff.filter((s) => s.active) : me ? [me] : [];
 
   const todays = state.appointments.filter((a) => a.date === today).sort((a, b) => a.start - b.start);
+  const todayClasses = liveSessions(state).filter((s) => s.date === today);
   const live = todays.filter(occupiesTime);
   const remaining = live.filter((a) => a.start + a.duration > nowMin && a.status !== 'completed');
   const current = remaining.find((a) => a.start <= nowMin);
@@ -103,11 +105,17 @@ export default function Dashboard() {
               </Link>
             </div>
             <div className="panel">
-              {todays.length ? (
+              {todays.length || todayClasses.length ? (
                 <div className="list">
-                  {todays.map((a) => (
-                    <AgendaRow key={a.id} a={a} past={a.start + a.duration <= nowMin} showStaff={allCalendar && !solo} onOpen={() => openAppointment(a.id)} />
-                  ))}
+                  {[...todays.filter((a) => !a.sessionId).map((a) => ({ at: a.start, a, s: null })), ...todayClasses.map((s) => ({ at: s.start, s, a: null }))]
+                    .sort((x, y) => x.at - y.at)
+                    .map(({ a, s }) =>
+                      s ? (
+                        <ClassRow key={s.id} s={s} past={s.start + s.duration <= nowMin} showStaff={allCalendar && !solo} onOpen={() => openSession(s.id)} />
+                      ) : (
+                        <AgendaRow key={a!.id} a={a!} past={a!.start + a!.duration <= nowMin} showStaff={allCalendar && !solo} onOpen={() => openAppointment(a!.id)} />
+                      ),
+                    )}
                 </div>
               ) : (
                 <p className="empty">{t('calendar.emptyDay')}</p>
@@ -325,6 +333,30 @@ function AgendaRow({ a, past, showStaff, onOpen }: { a: Appointment; past: boole
         </span>
       </div>
       {a.status !== 'confirmed' && <StatusBadge status={a.status} />}
+      {showStaff && staff && <StaffAvatar staff={staff} size="sm" />}
+    </button>
+  );
+}
+
+function ClassRow({ s, past, showStaff, onOpen }: { s: ClassSession; past: boolean; showStaff: boolean; onOpen: () => void }) {
+  const L = useLookup();
+  const { t, tx, fmt } = useI18n();
+  const staff = L.staff.get(s.staffId);
+  const taken = participantsOf(L.state, s.id).length;
+  return (
+    <button type="button" className="list__row" onClick={onOpen} data-past={past || undefined}>
+      <span className="list__time tabular">{fmt.time(s.start)}</span>
+      <div className="list__main">
+        <span className="list__title">{tx(L.services.get(s.serviceId)?.name)}</span>
+        <span className="list__sub">
+          {t('classes.booked', { taken, capacity: s.capacity })} · {fmt.duration(s.duration)}
+        </span>
+      </div>
+      {taken >= s.capacity && (
+        <span className="badge" data-status="pending">
+          {t('classes.full')}
+        </span>
+      )}
       {showStaff && staff && <StaffAvatar staff={staff} size="sm" />}
     </button>
   );

@@ -592,6 +592,143 @@ try {
     await call('workspace.call', [BIZ, 'updateBusiness', [{ notifications: n }]], owner);
   }
 
+  // Group classes: sessions with seats, a waitlist and seat offers.
+  {
+    const store = deps.store;
+    const live = (await call('workspace.tenant', [BIZ], owner)).result;
+    const base = live.services.find((s: any) => s.id === svcM.id);
+    const teacher = base.staffIds[0];
+    const other = live.staff.find((s: any) => s.active && s.id !== teacher);
+    const cls = { ...base, id: 'svc_test_class', name: { he: 'פילאטיס', en: 'Pilates' }, capacity: 3, rebookAfterDays: undefined, staffIds: [teacher, ...(other ? [other.id] : [])] };
+    const savedCls = await call('workspace.call', [BIZ, 'saveService', [cls]], owner);
+    check('a service with 3 seats is a class', savedCls.result?.result?.capacity === 3, savedCls);
+    const notes = (await call('workspace.tenant', [BIZ], owner)).result.business.notifications;
+    await call('workspace.call', [BIZ, 'updateBusiness', [{ notifications: { ...notes, spotOpen: { enabled: true, channels: ['sms'] } } }]], owner);
+
+    const wide = Array.from({ length: 40 }, (_, i) => new Date(Date.now() + (i + 2) * 86_400_000).toISOString().slice(0, 10));
+    let opened: any = null;
+    for (const date of wide.slice(18)) {
+      for (const { start } of availableSlots(live, { serviceId: base.id, staffId: teacher, date, online: true }).slice(0, 3)) {
+        const r = await call('workspace.call', [BIZ, 'createSessions', [{ serviceId: cls.id, staffId: teacher, date, start }, { everyWeeks: 1, count: 3 }]], owner);
+        if (r.status === 200) opened = r.result.result;
+        if (opened) break;
+      }
+      if (opened) break;
+    }
+    check('owner opens a weekly class series', opened?.created.length >= 2 && new Set(opened.created.map((s: any) => s.seriesId)).size === 1, opened);
+    const [s1, s2] = opened?.created ?? [];
+    if (s1 && s2) {
+      check('a session takes its capacity from the class', s1.capacity === 3 && s1.waitlist.length === 0);
+      const overlap = await call('workspace.call', [BIZ, 'createSessions', [{ serviceId: cls.id, staffId: teacher, date: s1.date, start: s1.start }]], owner);
+      check('two sessions at once for one person → slot_taken', overlap.status === 409 && overlap.error === 'slot_taken', overlap);
+      const personal = await call('public.createBooking', [SLUG, { serviceId: base.id, addOnIds: [], staffId: teacher, date: s1.date, start: s1.start, customer: { name: 'Clash Test', phone: '0504440000', locale: 'he' } }]);
+      check('a session blocks personal bookings at its time', personal.status === 409, personal);
+      const asSlot = await call('public.createBooking', [SLUG, { serviceId: cls.id, addOnIds: [], staffId: teacher, date: s1.date, start: s1.start, customer: { name: 'Slot Test', phone: '0504440001', locale: 'he' } }]);
+      check('a class cannot be booked as a private time', asSlot.status === 400, asSlot);
+
+      const pub = (await call('public.business', [SLUG])).result;
+      check('booking page knows the class size', pub.business.services.find((s: any) => s.id === cls.id)?.capacity === 3);
+      check('booking page sees the sessions', pub.availability.sessions.some((s: any) => s.id === s1.id));
+
+      const join = (n: number, sessionId = s1.id) => call('public.joinSession', [SLUG, { sessionId, customer: { name: `Class ${n}`, phone: `05055500${String(n).padStart(2, '0')}`, locale: 'he' } }]);
+      const race = await Promise.all([1, 2, 3, 4].map((n) => join(n)));
+      const won = race.filter((r) => r.status === 200);
+      check('4 people race for 3 seats → exactly 3 get in', won.length === 3 && race.filter((r) => r.error === 'slot_taken').length === 1, race.map((r) => r.status));
+      check('a seat is a booking in that session', won.every((r) => r.result.sessionId === s1.id && r.result.start === s1.start));
+
+      const twice1 = await join(5, s2.id);
+      const twice2 = await join(5, s2.id);
+      check('the same phone twice in a session → exists', twice1.status === 200 && twice2.status === 409 && twice2.error === 'exists', [twice1.status, twice2]);
+      const notFull = await call('public.joinWaitlist', [SLUG, { sessionId: s2.id, customer: { name: 'Early', phone: '0505550099', locale: 'he' } }]);
+      check('no waitlist while seats are free', notFull.status === 400, notFull);
+
+      const wait = (n: number) => call('public.joinWaitlist', [SLUG, { sessionId: s1.id, customer: { name: `Waiting ${n}`, phone: `05066600${n}0`, locale: 'he' } }]);
+      const w1 = await wait(1);
+      const w2 = await wait(2);
+      const w1again = await wait(1);
+      check('waitlist gives places in order', w1.result?.position === 1 && w2.result?.position === 2, [w1, w2]);
+      check('joining the waitlist twice keeps the first place', w1again.result?.position === 1, w1again);
+      const pubWait = (await call('public.business', [SLUG])).result.availability.sessions.find((s: any) => s.id === s1.id);
+      check('booking page sees how many wait, never who', pubWait?.waitlist.length === 2 && pubWait.waitlist.every((w: any) => !w.customerId && !w.id));
+
+      const move = await call('public.rescheduleBooking', [SLUG, won[0].result.id, { date: s2.date, start: s2.start }]);
+      check('a seat cannot be moved by the customer', move.status === 400 && move.error === 'policy', move);
+      const shrink = await call('workspace.call', [BIZ, 'updateSession', [s1.id, { capacity: 2 }]], owner);
+      check('capacity cannot drop below the seats taken', shrink.status === 400, shrink);
+
+      await call('public.cancelBooking', [SLUG, won[0].result.id]);
+      let t = (await store.snapshot({})).tenants[BIZ];
+      const ss1 = t.sessions!.find((s) => s.id === s1.id)!;
+      const offers = t.outbox.filter((m) => m.kind === 'spotOpen' && ss1.waitlist.some((w) => w.id === m.appointmentId));
+      check('a freed seat is offered to everyone waiting', offers.length === 2 && ss1.waitlist.every((w) => !!w.offeredAt), offers.map((m) => m.appointmentId));
+      outbox.length = 0;
+      await dispatchMessages(store, senders, { only: [BIZ], origin: 'https://tornu.co.il' });
+      const offerSms = outbox.filter((m) => m.channel === 'sms' && m.body.includes(`/book/${SLUG}/class/${s1.id}`));
+      check('the offer goes to each waiting person with a link to the session', offerSms.length === 2 && new Set(offerSms.map((m) => m.to)).size === 2, outbox);
+
+      const taken = await call('public.joinSession', [SLUG, { sessionId: s1.id, customer: { name: 'Waiting 2', phone: '0506660020', locale: 'he' } }]);
+      t = (await store.snapshot({})).tenants[BIZ];
+      const after = t.sessions!.find((s) => s.id === s1.id)!;
+      check('first to join gets the seat and leaves the waitlist', taken.status === 200 && after.waitlist.length === 1, after.waitlist);
+      check('when the session fills again, the rest will hear about the next seat', after.waitlist.every((w) => !w.offeredAt), after.waitlist);
+
+      await call('workspace.call', [BIZ, 'cancelAppointment', [won[1].result.id]], owner);
+      await join(9);
+      outbox.length = 0;
+      await dispatchMessages(store, senders, { only: [BIZ], origin: 'https://tornu.co.il' });
+      t = (await store.snapshot({})).tenants[BIZ];
+      const stale = t.outbox.filter((m) => m.kind === 'spotOpen' && m.appointmentId === after.waitlist[0].id).at(-1);
+      check('an offer for a seat already taken is not sent', stale?.state === 'skipped' && stale.error === 'not_needed', stale);
+
+      const added = await call('workspace.call', [BIZ, 'addParticipant', [s2.id, { name: 'Walk In', phone: '0507770001', locale: 'he' }]], owner);
+      check('the team adds someone to a session', added.status === 200 && added.result.result.sessionId === s2.id, added);
+      const noPrivate = await call('workspace.call', [BIZ, 'rescheduleAppointment', [added.result?.result?.id, { date: s2.date, start: s2.start + 60 }]], owner);
+      check('a seat is moved with its session, not alone', noPrivate.status === 400, noPrivate);
+      const moved = await call('workspace.call', [BIZ, 'updateSession', [s2.id, { start: s2.start + 30, force: true }]], owner);
+      t = (await store.snapshot({})).tenants[BIZ];
+      const seats2 = t.appointments.filter((a) => a.sessionId === s2.id && a.status !== 'cancelled');
+      if (moved.status === 200) {
+        check('moving a session moves everyone in it', seats2.length === 2 && seats2.every((a) => a.start === s2.start + 30));
+        check('everyone in a moved session is told', seats2.every((a) => t.outbox.some((m) => m.appointmentId === a.id && m.kind === 'reschedule')));
+      } else check('session moved half an hour', moved.status === 409, moved);
+
+      if (other) {
+        let theirs: any = null;
+        for (const start of [s1.start, s1.start + 120, s1.start - 120, s1.start + 240]) {
+          theirs = await call('workspace.call', [BIZ, 'createSessions', [{ serviceId: cls.id, staffId: other.id, date: s1.date, start, force: true }]], owner);
+          if (theirs.status === 200) break;
+        }
+        const theirId = theirs.result?.result?.created[0]?.id;
+        const staffT = (await call('workspace.tenant', [BIZ], staff)).result;
+        check('staff see only their own sessions', (staffT.sessions ?? []).every((s: any) => s.staffId === mayaStaffId));
+        check('a session can be opened for another instructor', !!theirId, theirs);
+        const notMine = [theirId, s2.id].find((id) => staffT.sessions?.every((s: any) => s.id !== id));
+        const meddle = await call('workspace.call', [BIZ, 'cancelSessions', [notMine, 'one']], staff);
+        check('staff cannot cancel someone else’s session → 403', meddle.status === 403, meddle);
+        if (other.id === mayaStaffId) check('staff see their own sessions', staffT.sessions?.some((s: any) => s.id === theirId));
+      }
+      const foreign = await call('workspace.call', ['biz_demo_shira', 'addParticipant', [s1.id, { name: 'X', phone: '0500000000', locale: 'he' }]], owner);
+      check('a session cannot be reached through another business', foreign.status === 403 || foreign.status === 404, foreign);
+      const crossSlug = await call('public.joinSession', ['shira-nails', { sessionId: s1.id, customer: { name: 'Cross', phone: '0500000001', locale: 'he' } }]);
+      check('a session cannot be joined from another booking page → 404', crossSlug.status === 404, crossSlug);
+
+      const allKey = (await call('workspace.call', [BIZ, 'calendarFeed', [null]], owner)).result?.result;
+      const feed = await handleIcs(new Request(`http://test/api/ics/${SLUG}/${allKey}.ics`), deps);
+      const feedText = await feed.text();
+      check('the calendar feed shows each session once with its seats', feedText.includes(`UID:${s1.id}@`) && feedText.includes('3/3'));
+
+      const ended = await call('workspace.call', [BIZ, 'cancelSessions', [s1.id, 'following', 'Studio closed']], owner);
+      t = (await store.snapshot({})).tenants[BIZ];
+      const series = t.sessions!.filter((s) => s.seriesId === s1.seriesId);
+      check('cancelling “this and following” ends the rest of the series', ended.result?.result === series.length && series.every((s) => s.status === 'cancelled'), ended);
+      const seats = t.appointments.filter((a) => series.some((s) => s.id === a.sessionId));
+      check('everyone in a cancelled session is cancelled and told', seats.every((a) => a.status === 'cancelled' || a.status === 'no_show') && seats.filter((a) => a.cancellation?.reason === 'Studio closed').every((a) => t.outbox.some((m) => m.appointmentId === a.id && m.kind === 'cancellation')));
+      const late = await join(10, s2.id);
+      check('a cancelled session cannot be joined', late.status === 400 && late.error === 'policy', late);
+    }
+    await call('workspace.call', [BIZ, 'updateBusiness', [{ notifications: notes }]], owner);
+  }
+
   const persisted = new FileStore(join(dir, 'db.json'));
   const reread = await persisted.snapshot();
   check('changes are written to disk', reread.tenants[BIZ].business.phone === '03-000-0000');

@@ -1,5 +1,6 @@
 import { pickText, type Locale } from '../i18n/config';
-import { appointmentEnd, appointmentStart } from './scheduling';
+import { appointmentEnd, appointmentStart, liveSessions } from './scheduling';
+import { participantsOf } from './classes';
 import type { TenantData } from './types';
 
 /** How far back a subscribed calendar keeps past appointments. */
@@ -46,8 +47,29 @@ export function buildIcs(t: TenantData, staffId: string | null, locale: Locale, 
     'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
     'X-PUBLISHED-TTL:PT1H',
   ];
+  const where = pickText(b.address, locale);
+  for (const s of liveSessions(t)) {
+    if (staffId && s.staffId !== staffId) continue;
+    const end = appointmentEnd(s, b.timezone);
+    if (end < from) continue;
+    const people = participantsOf(t, s.id).map((a) => t.customers.find((c) => c.id === a.customerId)?.name ?? '');
+    const service = pickText(t.services.find((x) => x.id === s.serviceId)?.name, locale);
+    const staff = pickText(t.staff.find((x) => x.id === s.staffId)?.name, locale);
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${s.id}@${b.slug}`,
+      `DTSTAMP:${stamp(new Date(s.createdAt))}`,
+      `DTSTART:${stamp(appointmentStart(s, b.timezone))}`,
+      `DTEND:${stamp(end)}`,
+      `SUMMARY:${text(`${service} · ${people.length}/${s.capacity}`)}`,
+      `DESCRIPTION:${text([staffId ? '' : staff, s.note, ...people].filter(Boolean).join('\n'))}`,
+      'STATUS:CONFIRMED',
+    );
+    if (where) lines.push(`LOCATION:${text(where)}`);
+    lines.push('END:VEVENT');
+  }
   for (const a of t.appointments) {
-    if (a.status === 'cancelled' || (staffId && a.staffId !== staffId)) continue;
+    if (a.status === 'cancelled' || a.sessionId || (staffId && a.staffId !== staffId)) continue;
     const end = appointmentEnd(a, b.timezone);
     if (end < from) continue;
     const customer = t.customers.find((c) => c.id === a.customerId);
@@ -64,7 +86,6 @@ export function buildIcs(t: TenantData, staffId: string | null, locale: Locale, 
       `DESCRIPTION:${text(details)}`,
       `STATUS:${a.status === 'pending' ? 'TENTATIVE' : 'CONFIRMED'}`,
     );
-    const where = pickText(b.address, locale);
     if (where) lines.push(`LOCATION:${text(where)}`);
     lines.push('END:VEVENT');
   }

@@ -10,7 +10,7 @@ import { ApiError, directory, INVITE_DAYS, platform, workspace, type MemberInfo 
 import { BUSINESS_TYPES, SLUG_PATTERN } from '../../domain/defaults';
 import { alertsOf, messageVars, notificationsOf, renderTemplate, TEMPLATE_VARS } from '../../domain/notifications';
 import type { Permission } from '../../domain/permissions';
-import { businessNow, isUpcoming } from '../../domain/scheduling';
+import { businessNow, isClass, isUpcoming } from '../../domain/scheduling';
 import { isValidTimeZone } from '../../domain/time';
 import { allowanceUsed } from '../../domain/usage';
 import { renderWhatsApp, WHATSAPP_TEMPLATES } from '../../domain/whatsapp';
@@ -33,7 +33,7 @@ const SECTIONS: { id: Section; needs: Permission; previewOnly?: boolean }[] = [
   { id: 'account', needs: 'billing.manage' },
   { id: 'data', needs: 'demo.reset', previewOnly: true },
 ];
-const KINDS: TemplateKind[] = ['confirmation', 'reminder', 'reschedule', 'cancellation', 'rebook'];
+const KINDS: TemplateKind[] = ['confirmation', 'reminder', 'reschedule', 'cancellation', 'rebook', 'spotOpen'];
 const CHANNELS: Channel[] = ['whatsapp', 'sms', 'email'];
 const CURRENCIES = ['ILS', 'USD', 'EUR', 'GBP', 'AUD', 'CAD'];
 const ZONES = ['Asia/Jerusalem', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Australia/Sydney'];
@@ -434,7 +434,7 @@ function NotificationsSection() {
       )}
       <OwnerAlertsPanel />
       <p className="page__lede">{t('settings.notifications.lede')}</p>
-      {KINDS.map((k) => {
+      {KINDS.filter((k) => k !== 'spotOpen' || state.services.some(isClass)).map((k) => {
         const cfg = v[k];
         const setCfg = (patch: Partial<typeof cfg>) => d.set({ ...v, [k]: { ...cfg, ...patch } });
         return (

@@ -4,9 +4,24 @@ import { alertsOf, notificationsOf, renderMessage, renderOwnerAlert } from '../.
 import { locales } from '../../i18n/config';
 import { callingCode, cleanPhone, phoneKey } from '../../lib/phone';
 import { can, type Permission } from '../../domain/permissions';
-import { appointmentStart, availableSlots, bookingDuration, bookingPrice, checkSlot, pickStaff, termsIfMoved } from '../../domain/scheduling';
-import type { Actor, Appointment, AppointmentEvent, Customer, Invite, OutboxMessage, OwnerAlertKind, Service, TemplateKind, TenantData } from '../../domain/types';
-import { ApiError, INVITE_DAYS, REPEAT_LIMITS, type CustomerInput, type MemberInfo, type SeriesResult, type StudioBookingInput, type TenantContext, type WorkspaceApi, type WorkspaceData } from '../contracts';
+import { appointmentStart, availableSlots, bookingDuration, bookingPrice, checkSlot, isClass, pickStaff, sessionsOf, termsFor, termsIfMoved } from '../../domain/scheduling';
+import { joinBlock, offerSubject, participantsOf, seatsLeft } from '../../domain/classes';
+import type { Actor, Appointment, AppointmentEvent, ClassSession, Customer, Invite, OutboxMessage, OwnerAlertKind, Service, TemplateKind, TenantData } from '../../domain/types';
+import {
+  ApiError,
+  CAPACITY_LIMIT,
+  INVITE_DAYS,
+  REPEAT_LIMITS,
+  type CustomerInput,
+  type MemberInfo,
+  type RepeatInput,
+  type SeriesResult,
+  type SessionSeriesResult,
+  type StudioBookingInput,
+  type TenantContext,
+  type WorkspaceApi,
+  type WorkspaceData,
+} from '../contracts';
 import { addDays } from '../../domain/time';
 import { DEMO_BUSINESS_IDS, makeCode } from '../demo/seed';
 import { getDb, latency, mutateDb, mutateTenant, mutateTenantIfStored, resetDemoData, uid, useMockDb, type MockDatabase } from './db';
@@ -108,10 +123,53 @@ export function patchAppointmentIn(businessId: string, id: string, fn: (a: Appoi
     out = { ...fn(a, t), updatedAt: nowISO() };
     const next = { ...t, appointments: t.appointments.map((x) => (x.id === id ? out : x)) };
     const withCustomer = kinds.length ? { ...next, outbox: withMessages(next, out, kinds) } : next;
-    return alert ? withOwnerAlert(withCustomer, out, alert) : withCustomer;
+    const withAlert = alert ? withOwnerAlert(withCustomer, out, alert) : withCustomer;
+    return out.sessionId ? withSeatOffers(withAlert, out.sessionId) : withAlert;
   });
   return out;
 }
+
+// ── Class sessions ───────────────────────────────────────────────────
+
+const replaceSession = (t: TenantData, s: ClassSession): TenantData => ({ ...t, sessions: sessionsOf(t).map((x) => (x.id === s.id ? s : x)) });
+
+/**
+ * A seat is free and people are waiting: tell everyone not told yet. Whoever
+ * joins first gets it. Nothing happens while the session is full or closed
+ * to online sign-up.
+ */
+export function withSeatOffers(t: TenantData, sessionId: string): TenantData {
+  const s = sessionsOf(t).find((x) => x.id === sessionId);
+  if (!s || !notificationsOf(t.business).spotOpen.enabled || joinBlock(t, s, true)) return t;
+  const seated = new Set(participantsOf(t, s.id).map((a) => a.customerId));
+  const told = s.waitlist.filter((w) => !w.offeredAt && !seated.has(w.customerId));
+  if (!told.length) return t;
+  const at = nowISO();
+  const messages = told.flatMap((w) => queueMessages(t, offerSubject(s, w.id, w.customerId, w.at), 'spotOpen'));
+  const waitlist = s.waitlist.map((w) => (told.includes(w) ? { ...w, offeredAt: at } : w));
+  return { ...replaceSession(t, { ...s, waitlist }), outbox: [...t.outbox, ...messages] };
+}
+
+/** After someone takes a seat: they leave the waitlist, and once the session is full the rest will hear about the next opening. */
+export function afterJoin(t: TenantData, sessionId: string, customerId: string): TenantData {
+  const s = sessionsOf(t).find((x) => x.id === sessionId);
+  if (!s) return t;
+  const full = seatsLeft(t, s) === 0;
+  const waitlist = s.waitlist.filter((w) => w.customerId !== customerId).map((w) => (full && w.offeredAt ? { ...w, offeredAt: undefined } : w));
+  return replaceSession(t, { ...s, waitlist });
+}
+
+/** A seat in `s`; date, time, person and price come from the session. */
+export function newSeat(t: TenantData, s: ClassSession, customerId: string, fields: Pick<Appointment, 'status' | 'source' | 'note'>, by: Actor): Appointment {
+  return {
+    ...newAppointment(t, { customerId, staffId: s.staffId, serviceId: s.serviceId, addOnIds: [], date: s.date, start: s.start, anyStaff: false, ...fields }, by),
+    duration: s.duration,
+    price: s.price,
+    sessionId: s.id,
+  };
+}
+
+export const hasSeat = (t: TenantData, sessionId: string, customerId: string) => participantsOf(t, sessionId).some((a) => a.customerId === customerId);
 
 export function newAppointment(t: TenantData, fields: Pick<Appointment, 'customerId' | 'staffId' | 'serviceId' | 'addOnIds' | 'date' | 'start' | 'status' | 'source' | 'anyStaff' | 'note'>, by: Actor): Appointment {
   return {
@@ -170,6 +228,22 @@ function cleanTerms(s: Service): Service['staffTerms'] {
 
 const upsert = <T extends { id: string }>(list: T[], item: T) => (list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item]);
 
+function checkRepeat(repeat: RepeatInput) {
+  const everyWeeks = Math.round(Number(repeat.everyWeeks));
+  const count = Math.round(Number(repeat.count));
+  if (!(everyWeeks >= 1 && everyWeeks <= REPEAT_LIMITS.everyWeeks && count >= 2 && count <= REPEAT_LIMITS.count)) throw new ApiError('invalid');
+  return { everyWeeks, count };
+}
+
+function cleanCapacity(n: unknown): number {
+  const c = Math.round(Number(n));
+  if (!(c >= 1 && c <= CAPACITY_LIMIT)) throw new ApiError('invalid');
+  return c;
+}
+
+const isTime = (date: unknown, start: unknown) => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isInteger(start) && (start as number) >= 0 && (start as number) < 1440;
+const cleanText = (s: unknown) => (typeof s === 'string' ? s.trim().slice(0, 500) || undefined : undefined);
+
 function createApi(ctx: TenantContext): WorkspaceApi {
   const B = ctx.businessId;
   const write = (fn: (t: TenantData) => TenantData) => mutateTenant(B, fn);
@@ -178,6 +252,7 @@ function createApi(ctx: TenantContext): WorkspaceApi {
     const t = authorize(ctx, 'appointments.manage');
     const staffChoice = can(ctx.role, 'calendar.all') ? input.staffId : ctx.staffId;
     if (!staffChoice) throw new ApiError('forbidden');
+    if (isClass(t.services.find((s) => s.id === input.serviceId))) throw new ApiError('invalid');
     const slot = availableSlots(t, { ...input, staffId: staffChoice }).find((x) => x.start === input.start);
     const staffId = staffChoice === 'any' ? pickStaff(t, input.date, slot?.staffIds ?? t.staff.filter((s) => s.active).map((s) => s.id)) : staffChoice;
     const duration = bookingDuration(t, input.serviceId, input.addOnIds, staffId);
@@ -210,9 +285,7 @@ function createApi(ctx: TenantContext): WorkspaceApi {
 
     async createAppointmentSeries(input, repeat) {
       await latency(300);
-      const everyWeeks = Math.round(Number(repeat.everyWeeks));
-      const count = Math.round(Number(repeat.count));
-      if (!(everyWeeks >= 1 && everyWeeks <= REPEAT_LIMITS.everyWeeks && count >= 2 && count <= REPEAT_LIMITS.count)) throw new ApiError('invalid');
+      const { everyWeeks, count } = checkRepeat(repeat);
       const id = uid('ser');
       const first = book(input, { id, first: true });
       const created = [first];
@@ -232,6 +305,7 @@ function createApi(ctx: TenantContext): WorkspaceApi {
     async rescheduleAppointment(id, input) {
       await latency(120);
       const { t, a } = authorizeAppointment(ctx, id);
+      if (a.sessionId) throw new ApiError('invalid');
       const staffId = input.staffId ?? a.staffId;
       if (staffId !== a.staffId && !can(ctx.role, 'calendar.all')) throw new ApiError('forbidden');
       const terms = termsIfMoved(t, a, staffId);
@@ -264,6 +338,163 @@ function createApi(ctx: TenantContext): WorkspaceApi {
       await latency(80);
       authorizeAppointment(ctx, id);
       return patchAppointmentIn(B, id, (x) => ({ ...x, internalNote }));
+    },
+
+    async createSessions(input, repeat) {
+      await latency(250);
+      const t = authorize(ctx, 'appointments.manage');
+      const staffId = can(ctx.role, 'calendar.all') ? input.staffId : ctx.staffId;
+      if (!staffId) throw new ApiError('forbidden');
+      const service = t.services.find((s) => s.id === input.serviceId);
+      if (!service || !isClass(service) || !t.staff.some((s) => s.id === staffId) || !isTime(input.date, input.start)) throw new ApiError('invalid');
+      const capacity = cleanCapacity(input.capacity ?? service.capacity);
+      const { everyWeeks, count } = repeat ? checkRepeat(repeat) : { everyWeeks: 1, count: 1 };
+      const terms = termsFor(service, staffId);
+      const seriesId = count > 1 ? uid('ss') : undefined;
+      const out: SessionSeriesResult = { created: [], skipped: [] };
+      write((cur) => {
+        out.created = [];
+        out.skipped = [];
+        let next = cur;
+        for (let i = 0; i < count; i++) {
+          const date = addDays(input.date, i * everyWeeks * 7);
+          const conflict = checkSlot(next, { staffId, date, start: input.start, duration: terms.duration, serviceId: service.id });
+          if (conflict && !(input.force && conflict.kind === 'outside_shift')) {
+            if (i === 0) throw new ApiError('slot_taken', conflict);
+            out.skipped.push({ date, conflict });
+            continue;
+          }
+          const s: ClassSession = {
+            businessId: B,
+            id: uid('cs'),
+            serviceId: service.id,
+            staffId,
+            date,
+            start: input.start,
+            duration: terms.duration,
+            capacity,
+            price: terms.price,
+            seriesId,
+            status: 'scheduled',
+            waitlist: [],
+            note: cleanText(input.note),
+            createdAt: nowISO(),
+          };
+          next = { ...next, sessions: [...sessionsOf(next), s] };
+          out.created.push(s);
+        }
+        return next;
+      });
+      return out;
+    },
+
+    async updateSession(id, patch) {
+      await latency(150);
+      const t = authorize(ctx, 'appointments.manage');
+      const s = sessionsOf(t).find((x) => x.id === id);
+      if (!s) throw new ApiError('not_found');
+      const all = can(ctx.role, 'calendar.all');
+      if (!all && s.staffId !== ctx.staffId) throw new ApiError('forbidden');
+      if (s.status === 'cancelled') throw new ApiError('invalid');
+      const staffId = patch.staffId ?? s.staffId;
+      if (staffId !== s.staffId && (!all || !t.staff.some((x) => x.id === staffId))) throw new ApiError(all ? 'invalid' : 'forbidden');
+      const date = patch.date ?? s.date;
+      const start = patch.start ?? s.start;
+      if (!isTime(date, start)) throw new ApiError('invalid');
+      const moved = date !== s.date || start !== s.start || staffId !== s.staffId;
+      const service = t.services.find((x) => x.id === s.serviceId);
+      const duration = staffId !== s.staffId && service ? termsFor(service, staffId).duration : s.duration;
+      if (moved) {
+        const conflict = checkSlot(t, { staffId, date, start, duration, serviceId: s.serviceId, excludeSessionId: s.id });
+        if (conflict && !(patch.force && conflict.kind === 'outside_shift')) throw new ApiError('slot_taken', conflict);
+      }
+      const capacity = patch.capacity === undefined ? s.capacity : cleanCapacity(patch.capacity);
+      const detail = `${s.date} ${s.start} ${s.staffId} → ${date} ${start} ${staffId}`;
+      let out!: ClassSession;
+      write((cur) => {
+        const now = sessionsOf(cur).find((x) => x.id === id);
+        if (!now) throw new ApiError('not_found');
+        const seats = participantsOf(cur, id);
+        if (capacity < seats.length) throw new ApiError('invalid');
+        out = { ...now, date, start, staffId, duration, capacity, note: patch.note === undefined ? now.note : cleanText(patch.note) };
+        let next = replaceSession(cur, out);
+        if (moved)
+          for (const a of seats) {
+            const m = { ...a, date, start, staffId, duration, updatedAt: nowISO(), history: [...a.history, event('rescheduled', 'staff', detail)] };
+            next = { ...next, appointments: next.appointments.map((x) => (x.id === a.id ? m : x)) };
+            next = { ...next, outbox: withMessages(next, m, ['reschedule', 'reminder']) };
+          }
+        return withSeatOffers(next, id);
+      });
+      return out;
+    },
+
+    async cancelSessions(id, scope, reason) {
+      await latency(200);
+      const t = authorize(ctx, 'appointments.manage');
+      const first = sessionsOf(t).find((x) => x.id === id);
+      if (!first) throw new ApiError('not_found');
+      const all = can(ctx.role, 'calendar.all');
+      if (!all && first.staffId !== ctx.staffId) throw new ApiError('forbidden');
+      const why = cleanText(reason);
+      const later = (x: ClassSession) => x.date > first.date || (x.date === first.date && x.start >= first.start);
+      let count = 0;
+      write((cur) => {
+        count = 0;
+        const targets = sessionsOf(cur).filter(
+          (x) =>
+            x.status === 'scheduled' &&
+            (all || x.staffId === ctx.staffId) &&
+            (x.id === id || (scope === 'following' && !!first.seriesId && x.seriesId === first.seriesId && later(x))),
+        );
+        let next = cur;
+        for (const x of targets) {
+          const seats = participantsOf(next, x.id);
+          next = replaceSession(next, { ...x, status: 'cancelled', cancellation: cancelledBy('staff', why), waitlist: [] });
+          for (const a of seats) {
+            const c: Appointment = { ...a, status: 'cancelled', cancellation: cancelledBy('staff', why), updatedAt: nowISO(), history: [...a.history, event('cancelled', 'staff', why)] };
+            next = { ...next, appointments: next.appointments.map((y) => (y.id === a.id ? c : y)) };
+            next = { ...next, outbox: withMessages(next, c, ['cancellation']) };
+          }
+          count++;
+        }
+        return next;
+      });
+      return count;
+    },
+
+    async addParticipant(sessionId, customer, customerId) {
+      await latency(200);
+      const t = authorize(ctx, 'appointments.manage');
+      const s = sessionsOf(t).find((x) => x.id === sessionId);
+      if (!s) throw new ApiError('not_found');
+      if (!can(ctx.role, 'calendar.all') && s.staffId !== ctx.staffId) throw new ApiError('forbidden');
+      let created!: Appointment;
+      write((cur) => {
+        const now = sessionsOf(cur).find((x) => x.id === sessionId);
+        if (!now) throw new ApiError('not_found');
+        const block = joinBlock(cur, now, false);
+        if (block === 'full') throw new ApiError('slot_taken');
+        if (block) throw new ApiError('policy');
+        const [customers, c] = upsertCustomer(cur, customer, customerId);
+        const withCustomer = { ...cur, customers };
+        if (hasSeat(withCustomer, now.id, c.id)) throw new ApiError('exists');
+        created = newSeat(withCustomer, now, c.id, { status: 'confirmed', source: 'studio', note: customer.note || undefined }, 'staff');
+        return afterJoin(insertAppointment(withCustomer, created), now.id, c.id);
+      });
+      return created;
+    },
+
+    async removeFromWaitlist(sessionId, entryId) {
+      await latency(100);
+      const t = authorize(ctx, 'appointments.manage');
+      const s = sessionsOf(t).find((x) => x.id === sessionId);
+      if (!s) throw new ApiError('not_found');
+      if (!can(ctx.role, 'calendar.all') && s.staffId !== ctx.staffId) throw new ApiError('forbidden');
+      write((cur) => {
+        const now = sessionsOf(cur).find((x) => x.id === sessionId);
+        return now ? replaceSession(cur, { ...now, waitlist: now.waitlist.filter((w) => w.id !== entryId) }) : cur;
+      });
     },
 
     async createCustomer(input) {
@@ -328,7 +559,14 @@ function createApi(ctx: TenantContext): WorkspaceApi {
       await latency(120);
       authorize(ctx, 'services.manage');
       const days = Number(s.rebookAfterDays);
-      const scoped = { ...s, businessId: B, staffTerms: cleanTerms(s), rebookAfterDays: days >= 1 && days <= 365 ? Math.round(days) : undefined };
+      const capacity = Math.round(Number(s.capacity));
+      const scoped = {
+        ...s,
+        businessId: B,
+        staffTerms: cleanTerms(s),
+        rebookAfterDays: days >= 1 && days <= 365 ? Math.round(days) : undefined,
+        capacity: capacity >= 2 && capacity <= CAPACITY_LIMIT ? capacity : undefined,
+      };
       write((t) => ({ ...t, services: upsert(t.services, scoped) }));
       return scoped;
     },
@@ -525,11 +763,13 @@ function createApi(ctx: TenantContext): WorkspaceApi {
 export function scopeForRole(t: TenantData, ctx: TenantContext): TenantData {
   if (can(ctx.role, 'calendar.all')) return can(ctx.role, 'staff.manage') ? t : { ...t, business: { ...t.business, invites: undefined, usage: undefined } };
   const appointments = t.appointments.filter((a) => a.staffId === ctx.staffId);
-  const customerIds = new Set(appointments.map((a) => a.customerId));
+  const sessions = sessionsOf(t).filter((s) => s.staffId === ctx.staffId);
+  const customerIds = new Set([...appointments.map((a) => a.customerId), ...sessions.flatMap((s) => s.waitlist.map((w) => w.customerId))]);
   return {
     ...t,
     business: { ...t.business, invites: undefined, usage: undefined, calendarFeeds: t.business.calendarFeeds?.filter((f) => f.staffId !== null && f.staffId === ctx.staffId) },
     appointments,
+    sessions,
     customers: t.customers.filter((c) => customerIds.has(c.id)),
     timeOff: t.timeOff.filter((x) => x.staffId === ctx.staffId),
     blocks: t.blocks.filter((b) => b.staffId === null || b.staffId === ctx.staffId),

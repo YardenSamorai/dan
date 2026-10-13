@@ -1,12 +1,26 @@
 import { useMemo } from 'react';
 import { canCustomerCancel, canCustomerReschedule } from '../../domain/policy';
-import { availableSlots, businessNow, firstAvailableDate, pickStaff, termsIfMoved } from '../../domain/scheduling';
+import { availableSlots, businessNow, firstAvailableDate, isClass, pickStaff, sessionsOf, termsIfMoved } from '../../domain/scheduling';
+import { joinBlock } from '../../domain/classes';
 import { WEEKDAYS } from '../../domain/defaults';
 import { pageOf } from '../../domain/page';
-import type { Appointment, TenantData } from '../../domain/types';
-import { ApiError, type PublicBooking, type PublicBookingApi, type PublicBusiness } from '../contracts';
-import { getDb, getSession, latency, mutateTenant, useMockDb, useMockSession, type MockDatabase } from './db';
-import { appointmentEvent, cancelledBy, insertAppointment, newAppointment, normalizePhone, patchAppointmentIn, upsertCustomer, withOwnerAlert } from './workspace';
+import type { Appointment, ClassSession, TenantData } from '../../domain/types';
+import { ApiError, type PublicBooking, type PublicBookingApi, type PublicBookingInput, type PublicBusiness, type SessionJoinInput } from '../contracts';
+import { publicSessions } from '../sessions';
+import { getDb, getSession, latency, mutateTenant, uid, useMockDb, useMockSession, type MockDatabase } from './db';
+import {
+  afterJoin,
+  appointmentEvent,
+  cancelledBy,
+  hasSeat,
+  insertAppointment,
+  newAppointment,
+  newSeat,
+  normalizePhone,
+  patchAppointmentIn,
+  upsertCustomer,
+  withOwnerAlert,
+} from './workspace';
 
 /**
  * Mock of the public booking endpoints. Availability is computed here from the
@@ -28,6 +42,23 @@ function isBlocked(t: TenantData, who: { phone: string; email?: string }) {
   const email = who.email?.trim().toLowerCase();
   return t.customers.some((c) => c.blocked && (normalizePhone(c.phone) === phone || (!!email && c.email?.trim().toLowerCase() === email)));
 }
+
+function checkCustomer(t: TenantData, customer: PublicBookingInput['customer']) {
+  if (!customer?.name?.trim() || normalizePhone(customer.phone ?? '').length < 9) throw new ApiError('invalid');
+  if (t.business.policies.requireEmail && !customer.email) throw new ApiError('invalid');
+  if (isBlocked(t, customer)) throw new ApiError('blocked');
+}
+
+/** A session someone may sign up to online: its class and instructor are on the booking page. */
+function onlineSession(t: TenantData, sessionId: string): ClassSession {
+  const s = sessionsOf(t).find((x) => x.id === sessionId);
+  const listed = s && t.services.some((x) => x.id === s.serviceId && x.active && x.onlineBookable) && t.staff.some((x) => x.id === s.staffId && x.active && x.onlineBookable);
+  if (!s || !listed) throw new ApiError('not_found');
+  return s;
+}
+
+/** Most people a single session's waitlist holds. */
+const WAITLIST_LIMIT = 100;
 
 /** Case, spacing, niqqud and punctuation (geresh, hyphens, quotes) don't count when comparing names. */
 const nameKey = (s: string) =>
@@ -97,7 +128,7 @@ export function project(t: TenantData): PublicBusiness {
     categories: t.categories.map(({ id, name }) => ({ id, name })),
     services: t.services
       .filter((s) => s.active && s.onlineBookable && s.staffIds.some((id) => staffIds.has(id)))
-      .map(({ id, categoryId, name, description, duration, price, bufferBefore, bufferAfter, staffIds: ids, staffTerms, imageUrl }) => ({
+      .map(({ id, categoryId, name, description, duration, price, bufferBefore, bufferAfter, staffIds: ids, staffTerms, imageUrl, capacity }) => ({
         id,
         categoryId,
         name,
@@ -109,6 +140,7 @@ export function project(t: TenantData): PublicBusiness {
         staffIds: ids.filter((x) => staffIds.has(x)),
         staffTerms: staffTerms && Object.fromEntries(Object.entries(staffTerms).filter(([x]) => staffIds.has(x))),
         imageUrl,
+        capacity,
       })),
     addOns: t.addOns.filter((a) => a.active).map(({ id, name, duration, price }) => ({ id, name, duration, price })),
     staff: staff.map((s) => ({
@@ -142,6 +174,9 @@ export function availabilityView(t: TenantData): TenantData {
     appointments: t.appointments
       .filter((a) => a.date >= from && a.status !== 'cancelled')
       .map((a) => ({ ...a, code: '', customerId: '', note: undefined, internalNote: undefined, cancellation: undefined, history: [], price: 0 })),
+    sessions: sessionsOf(t)
+      .filter((s) => s.date >= from && s.status === 'scheduled')
+      .map((s) => ({ ...s, note: undefined, waitlist: s.waitlist.map(() => ({ id: '', customerId: '', at: '' })) })),
   };
 }
 
@@ -162,6 +197,7 @@ export function toPublic(t: TenantData, a: Appointment): PublicBooking {
     customerFirstName: c?.name.split(' ')[0] ?? '',
     contactPhone: c?.phone ?? '',
     cancellation: a.cancellation,
+    sessionId: a.sessionId,
   };
 }
 
@@ -197,11 +233,9 @@ export const mockPublicBooking: PublicBookingApi = {
     await latency(700);
     const t = requireTenant(slug);
     const service = t.services.find((s) => s.id === input.serviceId && s.active && s.onlineBookable);
-    if (!service) throw new ApiError('invalid');
+    if (!service || isClass(service)) throw new ApiError('invalid');
     if (input.staffId === 'any' && !t.business.policies.allowAnyStaff) throw new ApiError('invalid');
-    if (!input.customer.name.trim() || normalizePhone(input.customer.phone).length < 9) throw new ApiError('invalid');
-    if (t.business.policies.requireEmail && !input.customer.email) throw new ApiError('invalid');
-    if (isBlocked(t, input.customer)) throw new ApiError('blocked');
+    checkCustomer(t, input.customer);
     const slot = availableSlots(t, { ...input, online: true }).find((x) => x.start === input.start);
     if (!slot) throw new ApiError('slot_taken');
     const staffId = input.staffId === 'any' ? pickStaff(t, input.date, slot.staffIds) : input.staffId;
@@ -299,5 +333,60 @@ export const mockPublicBooking: PublicBookingApi = {
       'ownerRescheduled',
     );
     return toPublic(getDb().tenants[t.business.id], out);
+  },
+
+  sessions(slug, q) {
+    const t = bySlug(getDb(), slug);
+    return t ? publicSessions(t, q) : [];
+  },
+
+  async joinSession(slug, input: SessionJoinInput) {
+    await latency(600);
+    const t = requireTenant(slug);
+    checkCustomer(t, input.customer);
+    onlineSession(t, input.sessionId);
+    let created!: Appointment;
+    let after!: TenantData;
+    mutateTenant(t.business.id, (cur) => {
+      // Seats are counted again on the latest data, so two people can't take the last one.
+      const s = onlineSession(cur, input.sessionId);
+      const block = joinBlock(cur, s, true);
+      if (block === 'full') throw new ApiError('slot_taken');
+      if (block) throw new ApiError('policy');
+      const [customers, customer] = upsertCustomer(cur, input.customer);
+      const withCustomer = { ...cur, customers };
+      if (hasSeat(withCustomer, s.id, customer.id)) throw new ApiError('exists');
+      const status = cur.business.policies.confirmationMode === 'manual' ? 'pending' : 'confirmed';
+      created = newSeat(withCustomer, s, customer.id, { status, source: 'online', note: input.customer.note || undefined }, 'customer');
+      after = afterJoin(withOwnerAlert(insertAppointment(withCustomer, created), created, 'ownerBooked'), s.id, customer.id);
+      return after;
+    });
+    return toPublic(after, created);
+  },
+
+  async joinWaitlist(slug, input: SessionJoinInput) {
+    await latency(500);
+    const t = requireTenant(slug);
+    checkCustomer(t, input.customer);
+    onlineSession(t, input.sessionId);
+    let position = 0;
+    mutateTenant(t.business.id, (cur) => {
+      const s = onlineSession(cur, input.sessionId);
+      const block = joinBlock(cur, s, true);
+      if (block !== 'full') throw new ApiError(block ? 'policy' : 'invalid');
+      const [customers, customer] = upsertCustomer(cur, input.customer);
+      const withCustomer = { ...cur, customers };
+      if (hasSeat(withCustomer, s.id, customer.id)) throw new ApiError('exists');
+      const mine = s.waitlist.findIndex((w) => w.customerId === customer.id);
+      if (mine >= 0) {
+        position = mine + 1;
+        return cur;
+      }
+      if (s.waitlist.length >= WAITLIST_LIMIT) throw new ApiError('policy');
+      position = s.waitlist.length + 1;
+      const waitlist = [...s.waitlist, { id: uid('w'), customerId: customer.id, at: new Date().toISOString() }];
+      return { ...withCustomer, sessions: sessionsOf(cur).map((x) => (x.id === s.id ? { ...s, waitlist } : x)) };
+    });
+    return { sessionId: input.sessionId, position };
   },
 };

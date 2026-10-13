@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { publicBooking, type AvailabilityQuery, type PublicBusiness } from '../../data';
+import { publicBooking, type AvailabilityQuery, type PublicBusiness, type PublicSession } from '../../data';
 import type { Slot } from '../../domain/scheduling';
 import type { ISODate } from '../../domain/types';
 
@@ -17,6 +17,8 @@ export interface PublicTenant {
   addOn: (id: string) => PublicBusiness['addOns'][number] | undefined;
   slots: (q: AvailabilityQuery & { date: ISODate }) => Slot[];
   firstAvailable: (q: AvailabilityQuery, from?: ISODate) => ISODate | null;
+  /** Upcoming group sessions of a class service, from today. */
+  sessions: (serviceId: string, days?: number) => PublicSession[];
 }
 
 const Ctx = createContext<PublicTenant | null>(null);
@@ -37,6 +39,7 @@ export function PublicTenantProvider({ slug, value, children }: { slug: string; 
       addOn: (id) => business.addOns.find((a) => a.id === id),
       slots: (q) => publicBooking.slots(slug, q),
       firstAvailable: (q, from = today) => publicBooking.firstAvailable(slug, q, from),
+      sessions: (serviceId, days = 62) => publicBooking.sessions(slug, { serviceId, from: today, days }),
     };
   }, [slug, business, preview]);
   return <Ctx.Provider value={tenant}>{children}</Ctx.Provider>;

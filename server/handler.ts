@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { buildIcs } from '../src/domain/ics';
-import { ApiError, type NewBusinessInput, type PublicBookingInput, type TenantContext, type WorkspaceApi } from '../src/data/contracts';
+import { ApiError, type NewBusinessInput, type PublicBookingInput, type SessionJoinInput, type TenantContext, type WorkspaceApi } from '../src/data/contracts';
 import { mockAuth, mockDirectory, sessionInfo } from '../src/data/mock/auth';
 import { getDb, mutateDb, type MockDatabase } from '../src/data/mock/db';
 import { availabilityView, bySlug, mockPublicBooking, project, toPublic, visible } from '../src/data/mock/public';
@@ -58,6 +58,11 @@ const WORKSPACE_METHODS = new Set<keyof WorkspaceApi>([
   'cancelAppointment',
   'setAppointmentStatus',
   'updateAppointmentNotes',
+  'createSessions',
+  'updateSession',
+  'cancelSessions',
+  'addParticipant',
+  'removeFromWaitlist',
   'createCustomer',
   'saveCustomer',
   'importCustomers',
@@ -214,6 +219,14 @@ const FNS: Record<string, Fn> = {
   'public.rescheduleBooking': {
     hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
     run: ([slug, token, to]) => mockPublicBooking.rescheduleBooking(str(slug), str(token), to),
+  },
+  'public.joinSession': {
+    hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
+    run: ([slug, input]) => mockPublicBooking.joinSession(str(slug), input as SessionJoinInput),
+  },
+  'public.joinWaitlist': {
+    hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
+    run: ([slug, input]) => mockPublicBooking.joinWaitlist(str(slug), input as SessionJoinInput),
   },
 
   'invite.peek': {

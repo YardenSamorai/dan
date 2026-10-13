@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { availableSlots, businessNow, firstAvailableDate } from '../../domain/scheduling';
 import type { TenantData } from '../../domain/types';
-import type { PublicBooking, PublicBookingApi, PublicBusiness } from '../contracts';
+import type { PublicBooking, PublicBookingApi, PublicBusiness, WaitlistResult } from '../contracts';
+import { publicSessions } from '../sessions';
 import { Resource, rpc } from './client';
 
 interface PublicView {
@@ -90,5 +91,27 @@ export const remotePublicBooking: PublicBookingApi = {
 
   async rescheduleBooking(slug, token, to) {
     return afterChange(slug, await rpc<PublicBooking>('public.rescheduleBooking', slug, token, to));
+  },
+
+  sessions(slug, q) {
+    const t = views.peek(slug)?.availability;
+    return t ? publicSessions(t, q) : [];
+  },
+
+  async joinSession(slug, input) {
+    try {
+      return await afterChange(slug, await rpc<PublicBooking>('public.joinSession', slug, input));
+    } catch (e) {
+      void views.refresh(slug);
+      throw e;
+    }
+  },
+
+  async joinWaitlist(slug, input) {
+    try {
+      return await rpc<WaitlistResult>('public.joinWaitlist', slug, input);
+    } finally {
+      void views.refresh(slug);
+    }
   },
 };

@@ -1,6 +1,7 @@
 import type { Locale, LText } from '../i18n/config';
 import type { BusinessMember, Role, User } from '../domain/platform';
 import type { Conflict, Slot } from '../domain/scheduling';
+import type { JoinBlock } from '../domain/classes';
 import type {
   AccentKey,
   AddOn,
@@ -12,6 +13,7 @@ import type {
   Business,
   BusinessType,
   Channel,
+  ClassSession,
   Customer,
   Invite,
   ISODate,
@@ -140,8 +142,36 @@ export interface BusinessDirectory {
 
 export type PublicService = Pick<
   Service,
-  'id' | 'categoryId' | 'name' | 'description' | 'duration' | 'price' | 'bufferBefore' | 'bufferAfter' | 'staffIds' | 'staffTerms' | 'imageUrl'
+  'id' | 'categoryId' | 'name' | 'description' | 'duration' | 'price' | 'bufferBefore' | 'bufferAfter' | 'staffIds' | 'staffTerms' | 'imageUrl' | 'capacity'
 >;
+
+/** A class session as the booking page sees it: counts only, never who joined. */
+export interface PublicSession {
+  id: string;
+  serviceId: string;
+  staffId: string;
+  date: ISODate;
+  start: Minutes;
+  duration: Minutes;
+  price: number;
+  capacity: number;
+  seatsLeft: number;
+  /** People on the waitlist. */
+  waiting: number;
+  /** Why it can't be joined online right now, if it can't. */
+  block: JoinBlock | null;
+}
+
+export interface SessionJoinInput {
+  sessionId: string;
+  customer: PublicBookingInput['customer'];
+}
+
+export interface WaitlistResult {
+  sessionId: string;
+  /** 1 = first in line. */
+  position: number;
+}
 export type PublicStaff = Pick<Staff, 'id' | 'name' | 'role' | 'bio' | 'color' | 'avatarUrl'> & { workingDays: Weekday[] };
 export type PublicPolicies = Pick<
   BookingPolicies,
@@ -202,6 +232,8 @@ export interface PublicBooking {
   customerFirstName: string;
   contactPhone: string;
   cancellation?: Appointment['cancellation'];
+  /** A seat in a class session. */
+  sessionId?: string;
 }
 
 export interface AvailabilityQuery {
@@ -239,6 +271,12 @@ export interface PublicBookingApi {
   findBookings(slug: string, phone: string, proof: string): Promise<PublicBooking[]>;
   cancelBooking(slug: string, token: string): Promise<PublicBooking>;
   rescheduleBooking(slug: string, token: string, to: { date: ISODate; start: Minutes }): Promise<PublicBooking>;
+  /** Sessions of a class from `from` for `days` days, including full ones. */
+  sessions(slug: string, q: { serviceId: string; from: ISODate; days: number }): PublicSession[];
+  /** Takes a seat. Throws `slot_taken` when the session filled up, `policy` past the sign-up cutoff, `exists` when this phone already has a seat. */
+  joinSession(slug: string, input: SessionJoinInput): Promise<PublicBooking>;
+  /** Only for a full session that's otherwise open; joining twice keeps the first place. */
+  joinWaitlist(slug: string, input: SessionJoinInput): Promise<WaitlistResult>;
 }
 
 // ── Workspace (authenticated member of one business) ─────────────────
@@ -293,6 +331,34 @@ export interface SeriesResult {
   skipped: { date: ISODate; conflict: Conflict }[];
 }
 
+export interface SessionInput {
+  serviceId: string;
+  staffId: string;
+  date: ISODate;
+  start: Minutes;
+  /** Defaults to the service's capacity. */
+  capacity?: number;
+  note?: string;
+  /** Allow it outside the usual shift (never over another appointment). */
+  force?: boolean;
+}
+
+export interface SessionSeriesResult {
+  created: ClassSession[];
+  skipped: { date: ISODate; conflict: Conflict }[];
+}
+
+export interface SessionPatch {
+  date?: ISODate;
+  start?: Minutes;
+  staffId?: string;
+  capacity?: number;
+  note?: string;
+  force?: boolean;
+}
+
+export const CAPACITY_LIMIT = 200;
+
 export interface RescheduleInput {
   date: ISODate;
   start: Minutes;
@@ -321,6 +387,15 @@ export interface WorkspaceApi {
   cancelAppointment(id: string, reason?: string): Promise<Appointment>;
   setAppointmentStatus(id: string, status: AppointmentStatus): Promise<Appointment>;
   updateAppointmentNotes(id: string, internalNote: string): Promise<Appointment>;
+  /** Opens a class session, or a weekly series of them (`repeat`): the first date must be free, later busy dates are skipped. */
+  createSessions(input: SessionInput, repeat?: RepeatInput): Promise<SessionSeriesResult>;
+  /** Moving a session moves everyone in it and tells them. Capacity can't go below the seats taken. */
+  updateSession(id: string, patch: SessionPatch): Promise<ClassSession>;
+  /** Cancels this session, or it and the rest of its series (`following`), and everyone's seats in them. Returns how many sessions. */
+  cancelSessions(id: string, scope: 'one' | 'following', reason?: string): Promise<number>;
+  /** The team adds someone; works past the online cutoff, never over capacity. */
+  addParticipant(sessionId: string, customer: CustomerInput, customerId?: string): Promise<Appointment>;
+  removeFromWaitlist(sessionId: string, entryId: string): Promise<void>;
   createCustomer(input: CustomerInput): Promise<Customer>;
   saveCustomer(c: Customer): Promise<Customer>;
   /**

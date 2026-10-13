@@ -36,6 +36,11 @@ const EXAMPLES: Record<Locale, Partial<Record<TemplateVar, string>>> = {
   he: { name: 'דנה', business: 'סטודיו נועה', service: 'תספורת', date: 'יום שלישי, 14 באוקטובר', time: '10:30', link: 'https://tornu.co.il/book/demo-studio' },
   en: { name: 'Dana', business: 'Noa Studio', service: 'Haircut', date: 'Tuesday, October 14', time: '10:30', link: 'https://tornu.co.il/book/demo-studio' },
 };
+const CLASS_EXAMPLES: Record<Locale, Partial<Record<TemplateVar, string>>> = {
+  he: { business: 'סטודיו נועה', service: 'פילאטיס מכשירים', link: 'https://tornu.co.il/book/demo-studio/class/cs_example' },
+  en: { business: 'Noa Studio', service: 'Reformer Pilates', link: 'https://tornu.co.il/book/demo-studio/class/cs_example' },
+};
+const exampleFor = (kind: string, locale: Locale) => (kind === 'spotOpen' ? { ...EXAMPLES[locale], ...CLASS_EXAMPLES[locale] } : EXAMPLES[locale]);
 
 async function graph<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${GRAPH_API}/${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' } });
@@ -51,7 +56,7 @@ const existing = await list();
 const has = (name: string, lang: string) => existing.some((t) => t.name === name && t.language === lang);
 
 if (!process.argv.includes('--status')) {
-  for (const tpl of Object.values(WHATSAPP_TEMPLATES)) {
+  for (const [kind, tpl] of Object.entries(WHATSAPP_TEMPLATES)) {
     for (const locale of Object.keys(WHATSAPP_LANGUAGE) as Locale[]) {
       const language = WHATSAPP_LANGUAGE[locale];
       if (has(tpl.name, language)) continue;
@@ -67,7 +72,7 @@ if (!process.argv.includes('--status')) {
               {
                 type: 'BODY',
                 text: tpl.text[locale],
-                example: { body_text_named_params: tpl.vars.map((v) => ({ param_name: v, example: EXAMPLES[locale][v] ?? v })) },
+                example: { body_text_named_params: tpl.vars.map((v) => ({ param_name: v, example: exampleFor(kind, locale)[v] ?? v })) },
               },
             ],
           }),

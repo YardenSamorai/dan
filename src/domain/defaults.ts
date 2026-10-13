@@ -49,7 +49,12 @@ export function defaultNotifications(): NotificationSettings {
     reschedule: { enabled: true, channels: ['whatsapp'] },
     cancellation: { enabled: true, channels: ['whatsapp'] },
     rebook: { enabled: true, channels: ['whatsapp'] },
+    spotOpen: { enabled: true, channels: ['whatsapp'] },
     templates: {
+      spotOpen: {
+        en: 'Hi {name}, a spot opened in {service} on {date} at {time}. The first to book gets it: {link}\n{business}',
+        he: 'היי {name}, התפנה מקום ב{service} ב{date} בשעה {time}. מי שנרשם ראשון מקבל אותו: {link}\n{business}',
+      },
       rebook: {
         en: 'Hi {name}, it’s been a while since your last {service}. Want to book the next one? {link}\n{business}',
         he: 'היי {name}, עבר זמן מאז ה{service} האחרון. רוצה לקבוע את הבא? {link}\n{business}',

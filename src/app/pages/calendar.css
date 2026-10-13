@@ -562,6 +562,33 @@
   opacity: 0.6;
 }
 
+/* A class: one block for the whole group, with its seat count beside the time. */
+.cal-class {
+  --bg: repeating-linear-gradient(135deg, color-mix(in srgb, var(--tone) 16%, var(--white)) 0 8px, color-mix(in srgb, var(--tone) 11%, var(--white)) 8px 16px);
+}
+
+.cal-class__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.cal-class__seats {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--white);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: color-mix(in srgb, var(--tone) 62%, var(--ink));
+  direction: ltr;
+}
+
+.cal-class[data-full] .cal-class__seats {
+  background: color-mix(in srgb, var(--tone) 62%, var(--ink));
+  color: var(--white);
+}
 /* Buffers: the appointment's own colour, thinned out. */
 .cal-buffer {
   flex: none;

@@ -49,7 +49,7 @@ function Body({ a, L, onClose }: { a: Appointment; L: Lookup; onClose: () => voi
   const { t, tx, fmt } = useI18n();
   const toast = useToast();
   const conflictText = useConflictText();
-  const { openCustomer } = useAppUI();
+  const { openCustomer, openSession } = useAppUI();
   const { api, can, solo } = useWorkspace();
   const info = platform.useInfo();
   const customer = L.customers.get(a.customerId);
@@ -140,9 +140,11 @@ function Body({ a, L, onClose }: { a: Appointment; L: Lookup; onClose: () => voi
           ))}
           {active && (
             <>
-              <button type="button" className="btn btn--sm btn--ghost" aria-expanded={moving} onClick={() => setMoving((v) => !v)}>
-                {t('appt.actions.reschedule')}
-              </button>
+              {!a.sessionId && (
+                <button type="button" className="btn btn--sm btn--ghost" aria-expanded={moving} onClick={() => setMoving((v) => !v)}>
+                  {t('appt.actions.reschedule')}
+                </button>
+              )}
               <button type="button" className="btn btn--sm btn--quiet btn--danger" disabled={busy} onClick={() => setConfirmCancel(true)}>
                 {t('appt.actions.cancel')}
               </button>
@@ -152,6 +154,15 @@ function Body({ a, L, onClose }: { a: Appointment; L: Lookup; onClose: () => voi
       )}
 
       {moving && <Reschedule a={a} L={L} onDone={() => setMoving(false)} />}
+
+      {a.sessionId && (
+        <div className="inline-alert detail__class">
+          <span>{t('classes.partOf')}</span>
+          <button type="button" className="btn btn--ghost btn--xs" onClick={() => (onClose(), openSession(a.sessionId!))}>
+            {t('classes.openClass')}
+          </button>
+        </div>
+      )}
 
       <section className="detail__block" aria-label={t('appt.customer')}>
         <h3 className="section-title">{t('appt.customer')}</h3>

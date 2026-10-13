@@ -4,7 +4,8 @@ import { Drawer } from '../../components/ui/Drawer';
 import { CheckIcon, PlusIcon } from '../../components/ui/Icons';
 import { StaffAvatar, Switch } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
-import { termsFor, termsRange } from '../../domain/scheduling';
+import { CAPACITY_LIMIT } from '../../data';
+import { isClass, termsFor, termsRange } from '../../domain/scheduling';
 import type { AddOn, Service, StaffTerms } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useLookup } from '../lookup';
@@ -103,7 +104,8 @@ export default function ServicesAdmin() {
                     {tx(s.name)}{' '}
                     {!s.active && <span className="badge badge--plain">{t('servicesAdmin.inactive')}</span>}{' '}
                     {s.active && !s.onlineBookable && <span className="badge badge--plain">{t('servicesAdmin.hiddenOnline')}</span>}{' '}
-                    {s.blocksAll && <span className="badge badge--plain">{t('servicesAdmin.blocksAllBadge')}</span>}
+                    {s.blocksAll && <span className="badge badge--plain">{t('servicesAdmin.blocksAllBadge')}</span>}{' '}
+                    {isClass(s) && <span className="badge badge--plain">{t('servicesAdmin.classBadge', { count: s.capacity! })}</span>}
                   </span>
                   <span className="list__sub">
                     {fmt.durationRange(r.duration)}
@@ -257,6 +259,24 @@ function ServiceForm({ initial, onSaved }: { initial: Service; onSaved: () => vo
           <input className="field__input" type="number" min={0} step={1} value={s.price} onChange={(e) => set('price', num(e.target.value))} />
         </label>
       </div>
+      <div className="form-grid">
+        <Switch checked={isClass(s)} onChange={(v) => set('capacity', v ? initial.capacity ?? 8 : undefined)} label={t('servicesAdmin.fields.isClass')} />
+        <p className="field__hint">{t('servicesAdmin.fields.isClassHint')}</p>
+        {isClass(s) && (
+          <label className="field">
+            <span className="field__label">{t('servicesAdmin.fields.capacity')}</span>
+            <input
+              className="field__input"
+              type="number"
+              inputMode="numeric"
+              min={2}
+              max={CAPACITY_LIMIT}
+              value={s.capacity}
+              onChange={(e) => set('capacity', Math.min(CAPACITY_LIMIT, Math.max(2, Math.round(Number(e.target.value)) || 2)))}
+            />
+          </label>
+        )}
+      </div>
       <div className="field-row">
         <label className="field">
           <span className="field__label">{t('servicesAdmin.fields.bufferBefore')}</span>
@@ -288,7 +308,7 @@ function ServiceForm({ initial, onSaved }: { initial: Service; onSaved: () => vo
         <span className="field__label">
           {t('servicesAdmin.fields.image')} <span className="muted">({t('common.optional')})</span>
         </span>
-        <input className="field__input" type="url" dir="ltr" value={s.imageUrl ?? ''} onChange={(e) => set('imageUrl', e.target.value)} />
+        <input className="field__input" type="text" inputMode="url" dir="ltr" value={s.imageUrl ?? ''} onChange={(e) => set('imageUrl', e.target.value)} />
       </label>
       <Switch checked={s.active} onChange={(v) => set('active', v)} label={t('servicesAdmin.fields.active')} />
       <Switch checked={s.onlineBookable} onChange={(v) => set('onlineBookable', v)} label={t('servicesAdmin.fields.online')} />

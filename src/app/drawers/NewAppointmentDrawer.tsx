@@ -3,8 +3,9 @@ import { Drawer } from '../../components/ui/Drawer';
 import { SearchIcon } from '../../components/ui/Icons';
 import { Avatar } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
-import { ApiError, REPEAT_LIMITS } from '../../data';
-import { bookingDuration, bookingPrice, businessNow, checkSlot, eligibleStaff, termsFor, termsRange, type Conflict } from '../../domain/scheduling';
+import { ApiError, CAPACITY_LIMIT, REPEAT_LIMITS } from '../../data';
+import { Link } from 'react-router-dom';
+import { bookingDuration, bookingPrice, businessNow, checkSlot, eligibleStaff, isClass, termsFor, termsRange, type Conflict } from '../../domain/scheduling';
 import { addDays, snap } from '../../domain/time';
 import type { BlockKind, Customer, Minutes, TenantData } from '../../domain/types';
 import { localeMeta, locales, type Locale } from '../../i18n/config';
@@ -17,13 +18,17 @@ import { useWorkspace } from '../workspace';
 interface Props {
   prefill: NewAppointmentPrefill | null;
   onClose: () => void;
-  onCreated: (appointmentId?: string) => void;
+  onCreated: (id?: string, kind?: 'session') => void;
 }
+
+type Mode = NonNullable<NewAppointmentPrefill['mode']>;
+const TAB_LABEL = { appointment: 'appt.new.tabAppointment', class: 'classes.new.tab', block: 'appt.new.tabBlock' } as const;
+const TITLE = { appointment: 'appt.new.title', class: 'classes.new.title', block: 'appt.new.blockTitle' } as const;
 
 export function NewAppointmentDrawer({ prefill, onClose, onCreated }: Props) {
   const { t } = useI18n();
   const L = useLookup();
-  const [mode, setMode] = useState<'appointment' | 'block'>('appointment');
+  const [mode, setMode] = useState<Mode>('appointment');
   const [opened, setOpened] = useState<NewAppointmentPrefill | null>(null);
   const [seq, setSeq] = useState(0);
   if (prefill !== opened) {
@@ -31,20 +36,24 @@ export function NewAppointmentDrawer({ prefill, onClose, onCreated }: Props) {
     setSeq((n) => n + 1);
     if (prefill) setMode(prefill.mode ?? 'appointment');
   }
+  const hasClasses = L.state.services.some((s) => s.active && isClass(s));
+  const modes: Mode[] = hasClasses || mode === 'class' ? ['appointment', 'class', 'block'] : ['appointment', 'block'];
 
   return (
-    <Drawer open={!!prefill} onClose={onClose} title={mode === 'block' ? t('appt.new.blockTitle') : t('appt.new.title')}>
+    <Drawer open={!!prefill} onClose={onClose} title={t(TITLE[mode])}>
       {prefill && (
         <div className="detail">
           <div className="tabs" role="tablist">
-            {(['appointment', 'block'] as const).map((m) => (
+            {modes.map((m) => (
               <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)}>
-                {m === 'appointment' ? t('appt.new.tabAppointment') : t('appt.new.tabBlock')}
+                {t(TAB_LABEL[m])}
               </button>
             ))}
           </div>
           {mode === 'appointment' ? (
             <AppointmentForm key={seq} L={L} prefill={prefill} onCreated={onCreated} />
+          ) : mode === 'class' ? (
+            <ClassForm key={seq} L={L} prefill={prefill} onCreated={(id) => onCreated(id, 'session')} />
           ) : (
             <BlockForm key={seq} L={L} prefill={prefill} onCreated={onCreated} />
           )}
@@ -74,7 +83,7 @@ function AppointmentForm({ L, prefill, onCreated }: { L: Lookup; prefill: NewApp
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', locale: business.defaultLocale as Locale });
 
-  const bookable = services.filter((s) => s.active && (allCalendar || (me && s.staffIds.includes(me.id))));
+  const bookable = services.filter((s) => s.active && !isClass(s) && (allCalendar || (me && s.staffIds.includes(me.id))));
   const [serviceId, setServiceId] = useState(() => {
     const s = prefill.staffId ? bookable.find((x) => x.staffIds.includes(prefill.staffId!)) : bookable[0];
     return (s ?? bookable[0])?.id ?? '';
@@ -366,6 +375,186 @@ function AppointmentForm({ L, prefill, onCreated }: { L: Lookup; prefill: NewApp
         )}
         <button type="button" className="btn btn--primary" disabled={busy || !customerReady || !resolved.staffId || !isSoftConflict(resolved.conflict)} onClick={submit}>
           {busy ? t('common.saving') : resolved.conflict && isSoftConflict(resolved.conflict) ? t('appt.reschedule.force') : t('appt.new.create')}
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function ClassForm({ L, prefill, onCreated }: { L: Lookup; prefill: NewAppointmentPrefill; onCreated: (id?: string) => void }) {
+  const { t, tx, fmt } = useI18n();
+  const toast = useToast();
+  const conflictText = useConflictText();
+  const { api, can, me, solo } = useWorkspace();
+  const step = L.state.business.policies.slotInterval;
+  const allCalendar = can('calendar.all');
+  const classes = L.state.services.filter((s) => s.active && isClass(s) && (allCalendar || (me && s.staffIds.includes(me.id))));
+  const [serviceId, setServiceId] = useState(() => (prefill.staffId ? classes.find((s) => s.staffIds.includes(prefill.staffId!)) : classes[0])?.id ?? classes[0]?.id ?? '');
+  const service = L.services.get(serviceId);
+  const staffList = eligibleStaff(L.state, serviceId).filter((s) => allCalendar || s.id === me?.id);
+  const [staffChoice, setStaffChoice] = useState(prefill.staffId ?? me?.id ?? '');
+  const staffId = staffList.some((s) => s.id === staffChoice) ? staffChoice : staffList[0]?.id ?? '';
+  const [date, setDate] = useState(prefill.date ?? businessNow(L.state).date);
+  const [start, setStart] = useState(() => defaultStart(L.state, prefill, step));
+  const [capacity, setCapacity] = useState<number | null>(null);
+  const seats = capacity ?? service?.capacity ?? 8;
+  const [note, setNote] = useState('');
+  const [everyWeeks, setEveryWeeks] = useState(0);
+  const [count, setCount] = useState(12);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const terms = service ? termsFor(service, staffId) : { duration: 60, price: 0 };
+  const conflict = staffId ? checkSlot(L.state, { staffId, date, start, duration: terms.duration, serviceId }) : ({ kind: 'not_working' } as Conflict);
+  const later = useMemo(
+    () =>
+      everyWeeks && staffId
+        ? Array.from({ length: count - 1 }, (_, i) => {
+            const d = addDays(date, (i + 1) * everyWeeks * 7);
+            return { date: d, conflict: checkSlot(L.state, { staffId, date: d, start, duration: terms.duration, serviceId }) };
+          })
+        : [],
+    [L.state, everyWeeks, count, date, start, terms.duration, serviceId, staffId],
+  );
+  const soft = !!conflict && isSoftConflict(conflict);
+  const taken = later.filter((x) => x.conflict && !(soft && isSoftConflict(x.conflict)));
+
+  if (!classes.length)
+    return (
+      <div className="form-grid">
+        <p className="muted">{t('classes.new.none')}</p>
+        {can('services.manage') && (
+          <Link to="/app/services" className="btn btn--ghost btn--sm" style={{ justifySelf: 'start' }}>
+            {t('classes.new.toServices')}
+          </Link>
+        )}
+      </div>
+    );
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.createSessions({ serviceId, staffId, date, start, capacity: seats, note: note.trim() || undefined, force: soft }, everyWeeks ? { everyWeeks, count } : undefined);
+      toast(
+        !everyWeeks ? t('classes.new.created') : r.skipped.length ? t('classes.new.seriesPartly', { count: r.created.length }) : t('classes.new.seriesCreated', { count: r.created.length }),
+      );
+      onCreated(r.created[0]?.id);
+    } catch (e) {
+      setBusy(false);
+      setError(e instanceof ApiError && e.code === 'forbidden' ? t('common.forbidden') : e instanceof ApiError ? conflictText(e.conflict ?? { kind: 'slot_taken' }, L.staff.get(staffId)) : t('common.unknownError'));
+    }
+  };
+
+  return (
+    <div className="form-grid">
+      <section className="form-section form-grid">
+        <label className="field">
+          <span className="field__label">{t('classes.new.class')}</span>
+          <select className="field__input" value={serviceId} onChange={(e) => (setServiceId(e.target.value), setCapacity(null))}>
+            {classes.map((s) => (
+              <option key={s.id} value={s.id}>
+                {tx(s.name)} · {fmt.duration(s.duration)} · {t('servicesAdmin.classBadge', { count: s.capacity! })}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="field-row">
+          {!solo && staffList.length > 1 && (
+            <label className="field">
+              <span className="field__label">{t('classes.new.instructor')}</span>
+              <select className="field__input" value={staffId} onChange={(e) => setStaffChoice(e.target.value)}>
+                {staffList.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {tx(s.name)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="field">
+            <span className="field__label">{t('classes.new.capacity')}</span>
+            <input
+              className="field__input"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={CAPACITY_LIMIT}
+              value={seats}
+              onChange={(e) => setCapacity(Math.min(CAPACITY_LIMIT, Math.max(1, Math.round(Number(e.target.value)) || 1)))}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="form-section form-grid">
+        <div className="field-row">
+          <label className="field">
+            <span className="field__label">{t('appt.reschedule.date')}</span>
+            <input type="date" className="field__input" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="field__label">{t('appt.reschedule.time')}</span>
+            <TimeSelect value={start} onChange={setStart} step={step} />
+          </label>
+        </div>
+        <SlotStatus conflict={conflict} staff={L.staff.get(staffId)} okLabel={t('appt.reschedule.ok')} />
+        <p className="muted">
+          {fmt.timeRange(start, start + terms.duration)} · {fmt.duration(terms.duration)} · {fmt.money(terms.price)}
+        </p>
+        <div className="field-row">
+          <label className="field">
+            <span className="field__label">{t('appt.new.repeat')}</span>
+            <select className="field__input" value={everyWeeks} onChange={(e) => setEveryWeeks(Number(e.target.value))}>
+              {[0, 1, 2].map((n) => (
+                <option key={n} value={n}>
+                  {n ? t('appt.new.every', { count: n }) : t('appt.new.once')}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!!everyWeeks && (
+            <label className="field">
+              <span className="field__label">{t('classes.new.howMany')}</span>
+              <select className="field__input" value={count} onChange={(e) => setCount(Number(e.target.value))}>
+                {Array.from({ length: REPEAT_LIMITS.count - 1 }, (_, i) => i + 2).map((n) => (
+                  <option key={n} value={n}>
+                    {t('classes.new.count', { count: n })}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        {!!everyWeeks && later.length > 0 && (
+          <div className="series-preview">
+            <p className="muted">{t('classes.new.until', { date: fmt.date(later[later.length - 1].date, 'medium') })}</p>
+            {taken.length > 0 && (
+              <div className="series-preview__taken" role="status">
+                <p>{t('classes.new.takenDates', { count: taken.length })}</p>
+                <ul>
+                  {taken.map((x) => (
+                    <li key={x.date}>
+                      {fmt.date(x.date, 'medium')} · {conflictText(x.conflict!, L.staff.get(staffId))}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+        <label className="field">
+          <span className="field__label">
+            {t('classes.new.note')} <span className="muted">({t('common.optional')})</span>
+          </span>
+          <input className="field__input" placeholder={t('appt.internalNotePlaceholder')} value={note} onChange={(e) => setNote(e.target.value)} />
+        </label>
+        {error && (
+          <p className="field__error" role="alert">
+            {error}
+          </p>
+        )}
+        <button type="button" className="btn btn--primary" disabled={busy || !staffId || !isSoftConflict(conflict)} onClick={submit}>
+          {busy ? t('common.saving') : soft ? t('appt.reschedule.force') : t('classes.new.create')}
         </button>
       </section>
     </div>

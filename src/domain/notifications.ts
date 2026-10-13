@@ -1,7 +1,8 @@
 import { localeMeta, pickText, type Locale } from '../i18n/config';
 import { appointmentStart } from './scheduling';
+import { messageSubject, sessionPath } from './classes';
 import { defaultNotifications } from './defaults';
-import type { Appointment, Business, Channel, NotificationSettings, OutboxMessage, OwnerAlertKind, OwnerAlerts, TemplateKind, TenantData } from './types';
+import type { Appointment, Business, Channel, MessageKind, NotificationSettings, OutboxMessage, OwnerAlertKind, OwnerAlerts, TemplateKind, TenantData } from './types';
 
 export const TEMPLATE_VARS = ['name', 'service', 'date', 'time', 'staff', 'business', 'code', 'link'] as const;
 export type TemplateVar = (typeof TEMPLATE_VARS)[number];
@@ -22,8 +23,12 @@ export const LINK_PLACEHOLDER = '{link}';
 export const bookingLink = (origin: string, slug: string) => `${origin}/book/${slug}`;
 const siteOrigin = () => (typeof location !== 'undefined' && location.origin ? location.origin : null);
 
+/** A seat offer links straight to the session; everything else to the booking page. */
+export const messageLink = (origin: string, state: TenantData, a: Appointment, kind?: MessageKind) =>
+  kind === 'spotOpen' && a.sessionId ? origin + sessionPath(state.business.slug, a.sessionId) : bookingLink(origin, state.business.slug);
+
 /** Values are formatted in the *customer's* locale and the *business's* timezone. */
-export function messageVars(state: TenantData, a: Appointment, locale: Locale): Record<TemplateVar, string> {
+export function messageVars(state: TenantData, a: Appointment, locale: Locale, kind?: MessageKind): Record<TemplateVar, string> {
   const origin = siteOrigin();
   const intl = localeMeta[locale].intl;
   const timeZone = state.business.timezone;
@@ -39,13 +44,13 @@ export function messageVars(state: TenantData, a: Appointment, locale: Locale): 
     staff: pickText(staff?.name, locale).split(' ')[0],
     business: pickText(state.business.name, locale),
     code: a.code,
-    link: origin ? bookingLink(origin, state.business.slug) : LINK_PLACEHOLDER,
+    link: origin ? messageLink(origin, state, a, kind) : LINK_PLACEHOLDER,
   };
 }
 
 export function renderMessage(state: TenantData, a: Appointment, kind: TemplateKind, locale: Locale): string {
   const tpl = pickText(notificationsOf(state.business).templates[kind], locale);
-  return renderTemplate(tpl, messageVars(state, a, locale));
+  return renderTemplate(tpl, messageVars(state, a, locale, kind));
 }
 
 // ── Alerts to the business ──────────────────────────────────────────
@@ -86,7 +91,7 @@ export function renderOwnerAlert(state: TenantData, a: Appointment, kind: OwnerA
 /** Where a message goes: the customer's phone / email, or the business's for alerts. */
 export function recipientOf(state: TenantData, m: OutboxMessage): string | null {
   if (m.to === 'owner') return (m.channel === 'email' ? state.business.email : state.business.phone)?.trim() || null;
-  const a = state.appointments.find((x) => x.id === m.appointmentId);
+  const a = messageSubject(state, m);
   const c = a && state.customers.find((x) => x.id === a.customerId);
   if (!c) return null;
   return (m.channel === 'email' ? c.email : c.phone)?.trim() || null;

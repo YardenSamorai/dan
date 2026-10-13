@@ -50,7 +50,7 @@ export interface BookingPolicies {
   confirmationMode: 'auto' | 'manual';
 }
 
-export type TemplateKind = 'confirmation' | 'reminder' | 'reschedule' | 'cancellation' | 'rebook';
+export type TemplateKind = 'confirmation' | 'reminder' | 'reschedule' | 'cancellation' | 'rebook' | 'spotOpen';
 
 /** Stored settings may predate newer kinds; read them through `notificationsOf`. */
 export interface NotificationSettings {
@@ -60,6 +60,8 @@ export interface NotificationSettings {
   cancellation: { enabled: boolean; channels: Channel[] };
   /** "Time to book again", `Service.rebookAfterDays` after a visit. */
   rebook: { enabled: boolean; channels: Channel[] };
+  /** A seat opened in a full class: everyone on its waitlist hears, first to book gets it. */
+  spotOpen: { enabled: boolean; channels: Channel[] };
   templates: Record<TemplateKind, LText>;
 }
 
@@ -228,6 +230,8 @@ export interface Service extends Owned {
   imageUrl?: string;
   /** Invite the customer to book again this many days after the visit (unless they already have). */
   rebookAfterDays?: number;
+  /** 2 or more makes this a group class: people join sessions the business opens, up to this many each. */
+  capacity?: number;
 }
 
 export interface AddOn extends Owned {
@@ -336,6 +340,8 @@ export interface Appointment extends Owned {
   anyStaff: boolean;
   /** Shared by appointments booked together as a repeating series. */
   seriesId?: string;
+  /** A seat in this group session; date, time and person follow the session. */
+  sessionId?: string;
   note?: string;
   internalNote?: string;
   cancellation?: { at: string; by: Actor; reason?: string };
@@ -344,12 +350,47 @@ export interface Appointment extends Owned {
   history: AppointmentEvent[];
 }
 
+/** Someone waiting for a seat in a full session. */
+export interface WaitlistEntry {
+  /** Also stands in for an appointment id on the messages about it. */
+  id: string;
+  customerId: string;
+  at: string;
+  /** When they were told a seat opened. Cleared when the session fills again, so they hear about the next one. */
+  offeredAt?: string;
+}
+
+/**
+ * A group class at a set time (pilates at 18:00, 8 seats). It holds the
+ * instructor's time whether or not anyone joined; each participant is an
+ * appointment with `sessionId`.
+ */
+export interface ClassSession extends Owned {
+  id: string;
+  serviceId: string;
+  staffId: string;
+  date: ISODate;
+  start: Minutes;
+  duration: Minutes;
+  capacity: number;
+  /** What each participant pays. */
+  price: number;
+  /** Shared by sessions opened together as a weekly series. */
+  seriesId?: string;
+  status: 'scheduled' | 'cancelled';
+  cancellation?: { at: string; by: Actor; reason?: string };
+  waitlist: WaitlistEntry[];
+  note?: string;
+  createdAt: string;
+}
+
 /**
  * A message the system generated for a customer. Without a messaging provider
  * these are only queued — never delivered — and the UI says so.
  */
 export interface OutboxMessage extends Owned {
   id: string;
+  /** The appointment it's about; for a seat offer, the waitlist entry's id. */
   appointmentId: string;
   kind: MessageKind;
   /** Missing = the customer. `owner` = the business's own contact details (alerts). */
@@ -411,5 +452,7 @@ export interface TenantData {
   exceptions: ScheduleException[];
   customers: Customer[];
   appointments: Appointment[];
+  /** Group class sessions. Missing on businesses saved before classes existed; read through `sessionsOf`. */
+  sessions?: ClassSession[];
   outbox: OutboxMessage[];
 }
