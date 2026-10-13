@@ -119,6 +119,25 @@ export class SupabaseStore implements Store {
     };
     if (changes.businesses.some((b) => before.tenants[b.id] && b.version === null)) throw new Error('commit: business without a known version');
     await this.rest('rpc/commit_changes', { method: 'POST', body: JSON.stringify({ changes }) });
+    for (const id of changes.deletedBusinesses) {
+      // The business is already gone; leftover images must not fail the request.
+      await this.deleteImages(id).catch((e) => console.error('image cleanup', id, e));
+    }
+  }
+
+  /** Removes every image stored under a business (`media/{businessId}/…`). */
+  private async deleteImages(businessId: string) {
+    if (!ID.test(businessId)) return;
+    const headers = { apikey: this.cfg.secretKey, authorization: `Bearer ${this.cfg.secretKey}`, 'content-type': 'application/json' };
+    const storage = `${this.cfg.url}/storage/v1/object`;
+    for (;;) {
+      const res = await fetch(`${storage}/list/media`, { method: 'POST', headers, body: JSON.stringify({ prefix: businessId, limit: 1000 }) });
+      if (!res.ok) throw new Error(`image list ${res.status} ${await res.text()}`);
+      const files = ((await res.json()) as { name: string; id: string | null }[]).filter((f) => f.id);
+      if (!files.length) return;
+      const del = await fetch(`${storage}/media`, { method: 'DELETE', headers, body: JSON.stringify({ prefixes: files.map((f) => `${businessId}/${f.name}`) }) });
+      if (!del.ok) throw new Error(`image delete ${del.status} ${await del.text()}`);
+    }
   }
 
   async dueBusinesses(now: string, _channels: readonly Channel[], limit: number) {

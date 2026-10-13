@@ -134,6 +134,10 @@ try {
   const deleted = await call('workspace.call', [biz, 'deleteBusiness', [slug]], owner.token);
   check('owner deletes the business', deleted.status === 200, deleted);
   check('page is gone after delete', (await call('public.business', [slug])).result === null);
+  if (logo) {
+    const stored = await fetch(logo.replace('/object/public/media/', '/object/media/'), { headers: admin });
+    check('images are deleted with the business', !stored.ok, stored.status);
+  }
 } catch (e) {
   failed++;
   console.error('FAIL crashed', e);

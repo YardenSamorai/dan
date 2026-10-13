@@ -43,7 +43,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
             'פרטי לקוחות ותורים: שם, טלפון, אימייל אם נמסר, הערות, מועדי התורים והיסטוריית שינויים.',
             'הודעות ללקוחות: תוכן ההודעות שנשלחות בשם העסק (אישור, תזכורת, שינוי או ביטול של תור), מספר הטלפון או האימייל שאליו נשלחו, ומצב המסירה (נשלחה, נמסרה, נקראה או לא נמסרה).',
             'מידע טכני: כתובת IP, סוג דפדפן ומכשיר, ויומני שרת שנשמרים לצורכי אבטחה ותקלות.',
-            'תשלומים: פרטי כרטיס האשראי נמסרים ישירות לחברת הסליקה ואינם נשמרים אצלנו. אנחנו שומרים רק את סטטוס המנוי וחשבוניות.',
+            'תשלומים: כרגע השירות לא גובה תשלום. כשנתחיל, פרטי כרטיס האשראי יימסרו ישירות לחברת הסליקה ולא יישמרו אצלנו. אנחנו נשמור רק את סטטוס המנוי וחשבוניות.',
           ],
         },
         {
@@ -51,7 +51,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
           p: [
             'כדי להפעיל את השירות: עמוד קביעת התורים, היומן, ניהול הלקוחות, תזכורות וסנכרון ליומן.',
             'כדי לשלוח ללקוחות הודעות על התורים שלהם בשם העסק, בוואטסאפ, ב־SMS או באימייל, ולהציג לעסק כמה הודעות נשלחו החודש.',
-            'כדי לגבות תשלום על המנוי ולהפיק חשבוניות כנדרש בחוק.',
+            'כשנתחיל לגבות תשלום: כדי לגבות את המנוי ולהפיק חשבוניות כנדרש בחוק.',
             'כדי לשמור על אבטחת השירות, למנוע שימוש לרעה ולטפל בתקלות.',
             'כדי לשלוח לבעלי עסקים הודעות שירות (למשל שינוי בתנאים או תקלה). דיוור שיווקי יישלח רק בהסכמה, ואפשר להסיר את ההסכמה בכל עת.',
             'אנחנו לא מוכרים מידע, לא משתמשים במידע של לקוחות העסקים לפרסום, ולא משתפים אותו עם מפרסמים.',
@@ -79,8 +79,11 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
         {
           h: 'כמה זמן המידע נשמר',
           p: [
-            'כל עוד החשבון פעיל. אחרי מחיקת עסק או חשבון, המידע נמחק תוך 30 יום, וגיבויים נמחקים תוך 30 יום נוספים.',
-            'חשבוניות ורשומות תשלום נשמרות לתקופה שדיני המס מחייבים.',
+            'כל עוד העסק והחשבון פעילים.',
+            'כשבעל עסק מוחק את העסק (בהגדרות › חשבון ונתונים), כל המידע שלו נמחק מיד: לקוחות, תורים, הודעות ותמונות. עותקים בגיבויים נמחקים תוך 30 יום.',
+            'כדי למחוק חשבון אישי (שם, אימייל ופרטי כניסה), כותבים לנו ל־{email}. נמחק אותו תוך 30 יום.',
+            'ספקי ההודעות (WhatsApp, Global SMS ו־Resend) שומרים רישום של הודעות שעברו דרכם, לפי המדיניות שלהם.',
+            'כשנתחיל לגבות תשלום על השירות, חשבוניות ורשומות תשלום יישמרו לתקופה שדיני המס מחייבים.',
           ],
         },
         {
@@ -139,7 +142,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
             'Customer and appointment details: name, phone, email if given, notes, appointment times and change history.',
             'Messages to customers: the content of messages sent on the business’s behalf (booking confirmations, reminders, changes and cancellations), the phone number or email they went to, and their delivery status (sent, delivered, read or not delivered).',
             'Technical data: IP address, browser and device type, and server logs kept for security and troubleshooting.',
-            'Payments: card details go straight to the payment provider and are never stored by us. We keep only the subscription status and invoices.',
+            'Payments: the service doesn’t charge yet. Once it does, card details will go straight to the payment provider and won’t be stored by us. We’ll keep only the subscription status and invoices.',
           ],
         },
         {
@@ -147,7 +150,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
           p: [
             'To run the service: the booking page, calendar, customer list, reminders and calendar sync.',
             'To send customers messages about their appointments on the business’s behalf, by WhatsApp, SMS or email, and to show the business how many messages went out this month.',
-            'To charge for the subscription and issue invoices as the law requires.',
+            'Once we start charging: to bill the subscription and issue invoices as the law requires.',
             'To keep the service secure, prevent abuse and fix problems.',
             'To send business owners service messages (for example a change in terms or an outage). Marketing emails are sent only with consent, which you can withdraw at any time.',
             'We don’t sell data, don’t use businesses’ customer data for advertising, and don’t share it with advertisers.',
@@ -175,8 +178,11 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
         {
           h: 'How long we keep it',
           p: [
-            'For as long as the account is active. After a business or account is deleted, its data is erased within 30 days, and backups within a further 30 days.',
-            'Invoices and payment records are kept for as long as tax law requires.',
+            'For as long as the business and the account are active.',
+            'When an owner deletes their business (in Settings › Account & data), all of its data is erased right away: customers, appointments, messages and photos. Copies in backups are erased within 30 days.',
+            'To delete a personal account (name, email and sign-in details), email us at {email}. We’ll delete it within 30 days.',
+            'Message providers (WhatsApp, Global SMS and Resend) keep records of the messages that went through them, under their own policies.',
+            'Once we start charging for the service, invoices and payment records will be kept for as long as tax law requires.',
           ],
         },
         {
