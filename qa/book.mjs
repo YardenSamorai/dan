@@ -33,16 +33,17 @@ if (await page.locator('input[name="staff"]').count()) {
 }
 await page.waitForTimeout(500);
 await shot(1);
-await page.locator('.when__first').click();
-await page.locator('.slot').first().waitFor({ timeout: 4000 });
-await page.locator('.slot').first().click();
+const slot = page.locator('.pcal-entry--slot:visible:not([data-off])');
+await slot.first().waitFor({ timeout: 4000 });
+await slot.nth(2).click();
+await page.waitForTimeout(200);
 await shot(2);
 await cta().click();
+await page.waitForTimeout(300);
+await shot(3);
 await page.fill('#f-name', locale === 'he' ? 'דנה בדיקה' : 'Test Customer');
 await page.fill('#f-phone', '054-555-1234');
 if (await page.locator('#f-email[required]').count()) await page.fill('#f-email', 'test@example.com');
-await shot(3);
-await cta().click();
 await shot(4);
 await cta().click();
 await page.waitForURL(/\/confirmed\//, { timeout: 8000 });

@@ -127,6 +127,7 @@ export default function ManageBookingPage() {
             excludeBookingId={booking.id}
             date={pick.date ?? booking.date}
             start={pick.start}
+            duration={booking.duration}
             onChange={(v) => setPick(v)}
           />
           {error && (

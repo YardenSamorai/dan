@@ -84,13 +84,13 @@ const book = async (i) => {
   await cta().click();
   await page.waitForTimeout(400);
   if (i === 0) await shot('7-schedule');
-  await page.locator('label.choice:not([data-off])').filter({ has: page.locator('input[name="session"]') }).first().click();
+  await page.locator('.pcal-entry--session:visible:not([data-off]):not([data-other])').first().click();
+  await page.waitForTimeout(300);
+  await cta().click();
   await page.waitForTimeout(300);
   await page.fill('#f-name', he ? `לקוחה ${i + 1}` : `Customer ${i + 1}`);
   await page.fill('#f-phone', `054-555-10${i}${i}`);
   if (await page.locator('#f-email[required]').count()) await page.fill('#f-email', `c${i}@example.com`);
-  await cta().click();
-  await page.waitForTimeout(300);
   if (i === 0 || i === 3) await shot(`8-review-${i}`);
   await cta().click();
   await page.waitForTimeout(1200);

@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { addDays } from '../../domain/time';
 import type { ISODate, Minutes } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
 import { usePublicTenant } from '../../pages/booking/TenantContext';
-import { MonthCalendar } from './MonthCalendar';
+import { StaffAvatar } from '../ui/bits';
+import { openHours, ProviderCalendar, type CalDay } from './ProviderCalendar';
 
 interface Props {
   serviceId: string;
@@ -11,78 +12,87 @@ interface Props {
   staffId: string | 'any';
   date?: ISODate;
   start?: Minutes;
+  /** How long the booking takes, to draw it on the calendar once a time is picked. */
+  duration?: Minutes;
   excludeBookingId?: string;
   onChange: (v: { date: ISODate; start?: Minutes }) => void;
 }
 
-const PERIODS = [
-  { key: 'morning', from: 0, to: 12 * 60 },
-  { key: 'afternoon', from: 12 * 60, to: 17 * 60 },
-  { key: 'evening', from: 17 * 60, to: 24 * 60 },
-] as const;
-
-/** Date + time selection backed by the tenant's public availability. Shared by booking and customer rescheduling. */
-export function SlotPicker({ serviceId, addOnIds, staffId, date, start, excludeBookingId, onChange }: Props) {
-  const { t, fmt } = useI18n();
+/** Date + time selection on the provider's calendar. Shared by booking and customer rescheduling. */
+export function SlotPicker({ serviceId, addOnIds, staffId, date, start, duration, excludeBookingId, onChange }: Props) {
+  const { t, tx, fmt } = useI18n();
   const tenant = usePublicTenant();
   const { today, business } = tenant;
-  const max = addDays(today, business.policies.maxAdvanceDays);
+  const last = addDays(today, business.policies.maxAdvanceDays);
+  const interval = business.policies.slotInterval;
   const addOnKey = addOnIds.join();
   // Cached per selection; `business` changes identity whenever the tenant's data does.
   const q = useMemo(() => ({ serviceId, addOnIds, staffId, excludeBookingId }), [serviceId, addOnKey, staffId, excludeBookingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const dayCache = useMemo(() => new Map<ISODate, boolean>(), [tenant, q]);
-  const isAvailable = (iso: ISODate) => {
-    let v = dayCache.get(iso);
-    if (v === undefined) dayCache.set(iso, (v = tenant.slots({ ...q, date: iso }).length > 0));
-    return v;
-  };
+  const cache = useMemo(() => new Map<ISODate, ReturnType<typeof tenant.slots>>(), [tenant, q]);
+  const slotsOn = useCallback(
+    (iso: ISODate) => {
+      let v = cache.get(iso);
+      if (!v) cache.set(iso, (v = tenant.slots({ ...q, date: iso })));
+      return v;
+    },
+    [cache, tenant, q],
+  );
 
   const first = useMemo(() => tenant.firstAvailable(q), [tenant, q]);
-  const slots = useMemo(() => (date ? tenant.slots({ ...q, date }) : []), [tenant, q, date]);
 
+  const plan = useCallback(
+    (iso: ISODate): CalDay => {
+      const picked = iso === date && start !== undefined;
+      return {
+        hours: openHours(business, iso),
+        entries: slotsOn(iso).map((s) => ({
+          id: `${iso}-${s.start}`,
+          kind: 'slot' as const,
+          start: s.start,
+          end: s.start + interval,
+          title: fmt.time(s.start),
+          label: t('booking.time.slotLabel', { time: fmt.time(s.start), date: fmt.date(iso) }),
+          selected: picked && s.start === start,
+          onPick: () => onChange({ date: iso, start: s.start }),
+        })),
+        ghost: picked && duration ? { start: start!, end: start! + duration, label: fmt.timeRange(start!, start! + duration) } : undefined,
+      };
+    },
+    [business, slotsOn, interval, fmt, t, date, start, duration, onChange],
+  );
+
+  const next = useCallback(
+    (from: ISODate) => {
+      if (from > last) return null;
+      return tenant.firstAvailable(q, from);
+    },
+    [tenant, q, last],
+  );
+
+  const staff = staffId !== 'any' ? tenant.staff(staffId) : tenant.solo ? business.staff[0] : undefined;
+  const service = tenant.service(serviceId);
+  const owner = {
+    title: staff ? t('booking.calendar.of', { name: tx(staff.name).split(' ')[0] }) : t('booking.calendar.team'),
+    sub: [tx(service?.name), duration ? fmt.duration(duration) : ''].filter(Boolean).join(' · '),
+    avatar: staff ? <StaffAvatar staff={staff} /> : undefined,
+  };
+
+  if (!first) return <p className="muted">{t('booking.time.none')}</p>;
   return (
-    <div className="when">
-      <div className="when__cal">
-        <MonthCalendar value={date} min={today} max={max} isAvailable={isAvailable} onChange={(iso) => onChange({ date: iso })} />
-        {first && first !== date && (
-          <button type="button" className="when__first" onClick={() => onChange({ date: first })}>
-            {t('booking.time.firstAvailable', { date: fmt.relativeDay(first) ?? fmt.date(first, 'medium') })}
-          </button>
-        )}
-        <p className="when__tz muted">{t('booking.time.timezone', { zone: fmt.zoneName() })}</p>
-      </div>
-      <div className="when__slots" aria-live="polite">
-        {!first ? (
-          <p className="muted">{t('booking.time.none')}</p>
-        ) : !date ? (
-          <p className="muted">{t('booking.time.pickDay')}</p>
-        ) : (
-          <>
-            <h3 className="when__day">
-              {fmt.date(date)}
-              <span className="muted"> · {t('booking.time.count', { count: slots.length })}</span>
-            </h3>
-            {slots.length === 0 && <p className="muted">{t('booking.time.noSlots')}</p>}
-            {PERIODS.map((p) => {
-              const list = slots.filter((s) => s.start >= p.from && s.start < p.to);
-              if (!list.length) return null;
-              return (
-                <fieldset key={p.key} className="slots">
-                  <legend className="slots__legend">{t(`booking.time.${p.key}`)}</legend>
-                  <div className="slots__grid">
-                    {list.map((s) => (
-                      <button key={s.start} type="button" className="slot tabular" aria-pressed={s.start === start} onClick={() => onChange({ date, start: s.start })}>
-                        {fmt.time(s.start)}
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-              );
-            })}
-          </>
-        )}
-      </div>
-    </div>
+    <>
+      <ProviderCalendar
+        owner={owner}
+        initial={date ?? first}
+        today={today}
+        last={last}
+        interval={interval}
+        plan={plan}
+        count={(n) => t('booking.calendar.free', { count: n })}
+        empty={t('booking.calendar.emptyWeek')}
+        next={next}
+      />
+      <p className="pcal__tz muted">{t('booking.time.timezone', { zone: fmt.zoneName() })}</p>
+    </>
   );
 }
