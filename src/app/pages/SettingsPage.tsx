@@ -34,7 +34,7 @@ const SECTIONS: { id: Section; needs: Permission; previewOnly?: boolean }[] = [
   { id: 'data', needs: 'demo.reset', previewOnly: true },
 ];
 const KINDS: TemplateKind[] = ['confirmation', 'reminder', 'reschedule', 'cancellation', 'rebook'];
-const CHANNELS: Channel[] = ['sms', 'whatsapp', 'email'];
+const CHANNELS: Channel[] = ['whatsapp', 'sms', 'email'];
 const CURRENCIES = ['ILS', 'USD', 'EUR', 'GBP', 'AUD', 'CAD'];
 const ZONES = ['Asia/Jerusalem', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Australia/Sydney'];
 

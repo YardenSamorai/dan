@@ -44,11 +44,11 @@ export const DEFAULT_POLICIES: BookingPolicies = {
 
 export function defaultNotifications(): NotificationSettings {
   return {
-    confirmation: { enabled: true, channels: ['sms'] },
-    reminder: { enabled: true, hoursBefore: 24, channels: ['sms'] },
-    reschedule: { enabled: true, channels: ['sms'] },
-    cancellation: { enabled: true, channels: ['sms'] },
-    rebook: { enabled: true, channels: ['sms'] },
+    confirmation: { enabled: true, channels: ['whatsapp'] },
+    reminder: { enabled: true, hoursBefore: 24, channels: ['whatsapp'] },
+    reschedule: { enabled: true, channels: ['whatsapp'] },
+    cancellation: { enabled: true, channels: ['whatsapp'] },
+    rebook: { enabled: true, channels: ['whatsapp'] },
     templates: {
       rebook: {
         en: 'Hi {name}, it’s been a while since your last {service}. Want to book the next one? {link}\n{business}',

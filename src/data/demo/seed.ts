@@ -147,7 +147,7 @@ function tenStudio(today: string, createdAt: string): TenantData {
       5: dayHours([range('09:00', '14:00')]),
     }),
     policies: { ...DEFAULT_POLICIES },
-    notifications: { ...defaultNotifications(), confirmation: { enabled: true, channels: ['sms', 'email'] } },
+    notifications: { ...defaultNotifications(), confirmation: { enabled: true, channels: ['whatsapp', 'email'] } },
     subscription: { status: 'not_configured', planId: null },
   };
 

@@ -403,6 +403,8 @@ try {
     const junk = await call('workspace.call', [BIZ, 'saveService', [{ ...svc, rebookAfterDays: -5 }]], owner);
     check('nonsense intervals are dropped', junk.result?.result?.rebookAfterDays === undefined, junk);
     await call('workspace.call', [BIZ, 'saveService', [{ ...svc, rebookAfterDays: 28 }]], owner);
+    const notes = (await call('workspace.tenant', [BIZ], owner)).result.business.notifications;
+    await call('workspace.call', [BIZ, 'updateBusiness', [{ notifications: { ...notes, rebook: { ...notes.rebook, channels: ['sms'] } } }]], owner);
 
     const wideDays = Array.from({ length: 40 }, (_, i) => new Date(Date.now() + (i + 2) * 86_400_000).toISOString().slice(0, 10));
     const bookAt = async (name: string, phone: string, fromDay: number) => {
