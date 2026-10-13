@@ -4,7 +4,9 @@ import type { Locale } from '../../i18n/config';
  * Long-form content: the help centre and the legal pages. Kept out of the UI
  * message catalogues because it's prose, not interface copy.
  *
- * Placeholders: {product} {company} {companyId} {address} {email} {a11yContact} {updated}
+ * Placeholders: {product} {company} {companyRef} {address} {addressRef} {email} {a11yContact} {updated}
+ * {companyRef} and {addressRef} read " (id)" and ", address", or nothing when unset.
+ * A paragraph that uses an unset {address} is left out.
  *
  * The legal texts are a careful starting point written for an Israeli SaaS
  * (Privacy Protection Law incl. Amendment 13, IS 5568). Have a lawyer review
@@ -24,7 +26,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
     he: {
       title: 'מדיניות פרטיות',
       intro:
-        'המדיניות מסבירה איזה מידע {product} אוסף, למה, עם מי הוא משותף ומה הזכויות שלך. השירות מופעל על ידי {company} ({companyId}), {address}. עדכון אחרון: {updated}.',
+        'המדיניות מסבירה איזה מידע {product} אוסף, למה, עם מי הוא משותף ומה הזכויות שלך. השירות מופעל על ידי {company}{companyRef}{addressRef}. עדכון אחרון: {updated}.',
       sections: [
         {
           h: 'מי אחראי על המידע',
@@ -39,6 +41,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
             'פרטי חשבון: שם, כתובת אימייל, שפה מועדפת ופרטי הכניסה.',
             'פרטי העסק: שם, כתובת, טלפון, שירותים, מחירים, שעות פעילות, תמונות ותוכן שהעסק מעלה לעמוד שלו.',
             'פרטי לקוחות ותורים: שם, טלפון, אימייל אם נמסר, הערות, מועדי התורים והיסטוריית שינויים.',
+            'הודעות ללקוחות: תוכן ההודעות שנשלחות בשם העסק (אישור, תזכורת, שינוי או ביטול של תור), מספר הטלפון או האימייל שאליו נשלחו, ומצב המסירה (נשלחה, נמסרה, נקראה או לא נמסרה).',
             'מידע טכני: כתובת IP, סוג דפדפן ומכשיר, ויומני שרת שנשמרים לצורכי אבטחה ותקלות.',
             'תשלומים: פרטי כרטיס האשראי נמסרים ישירות לחברת הסליקה ואינם נשמרים אצלנו. אנחנו שומרים רק את סטטוס המנוי וחשבוניות.',
           ],
@@ -47,6 +50,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
           h: 'למה המידע משמש',
           p: [
             'כדי להפעיל את השירות: עמוד קביעת התורים, היומן, ניהול הלקוחות, תזכורות וסנכרון ליומן.',
+            'כדי לשלוח ללקוחות הודעות על התורים שלהם בשם העסק, בוואטסאפ, ב־SMS או באימייל, ולהציג לעסק כמה הודעות נשלחו החודש.',
             'כדי לגבות תשלום על המנוי ולהפיק חשבוניות כנדרש בחוק.',
             'כדי לשמור על אבטחת השירות, למנוע שימוש לרעה ולטפל בתקלות.',
             'כדי לשלוח לבעלי עסקים הודעות שירות (למשל שינוי בתנאים או תקלה). דיוור שיווקי יישלח רק בהסכמה, ואפשר להסיר את ההסכמה בכל עת.',
@@ -56,9 +60,20 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
         {
           h: 'עם מי המידע משותף',
           p: [
-            'עם ספקים שמפעילים עבורנו חלקים מהשירות, ורק במידה הנדרשת: אחסון ושרתים, מסד נתונים, שליחת אימיילים והודעות, סליקה והפקת חשבוניות. הספקים מחויבים בחוזה לשמור על המידע ולהשתמש בו רק לצורך השירות.',
-            'חלק מהספקים מאחסנים מידע מחוץ לישראל, בעיקר באיחוד האירופי. העברת המידע נעשית לפי תקנות הגנת הפרטיות (העברת מידע אל מאגרי מידע שמחוץ לגבולות המדינה).',
+            'עם ספקים שמפעילים עבורנו חלקים מהשירות, ורק במידה הנדרשת. הספקים מחויבים בחוזה לשמור על המידע ולהשתמש בו רק לצורך השירות:',
+            'Cloudflare: אחסון האתר והשרתים. Supabase: מסד הנתונים, התמונות והכניסה לחשבון. Meta Platforms (WhatsApp Business): שליחת הודעות וואטסאפ, והיא מקבלת את מספר הטלפון של הלקוח ואת תוכן ההודעה. Global SMS: שליחת הודעות SMS, והיא מקבלת את מספר הטלפון ואת תוכן ההודעה. Resend: שליחת אימיילים, והיא מקבלת את כתובת האימייל ואת תוכן ההודעה.',
+            'הודעות וואטסאפ עוברות דרך השירות של WhatsApp, וחלים עליהן גם תנאי השימוש ומדיניות הפרטיות של WhatsApp.',
+            'חלק מהספקים מאחסנים מידע מחוץ לישראל, למשל בארצות הברית ובאיחוד האירופי. העברת המידע נעשית לפי תקנות הגנת הפרטיות (העברת מידע אל מאגרי מידע שמחוץ לגבולות המדינה).',
             'עם רשויות, רק כשהחוק מחייב זאת או לפי צו שיפוטי.',
+          ],
+        },
+        {
+          h: 'הודעות וואטסאפ, SMS ואימייל',
+          p: [
+            'כשקובעים תור אצל עסק, העסק יכול לשלוח הודעות על התור: אישור, תזכורת, שינוי מועד או ביטול. אלה הודעות שירות שקשורות לתור שקבעת.',
+            'הודעה שמזמינה לקבוע תור חדש היא הודעה שיווקית, והעסק רשאי לשלוח אותה רק למי שהסכים לקבל ממנו הודעות כאלה.',
+            'אם הודעת וואטסאפ לא נמסרה, ייתכן שאותה הודעה תישלח ב־SMS.',
+            'כדי להפסיק לקבל הודעות, אפשר לבקש זאת מהעסק או לכתוב לנו ל־{email}, ונטפל בבקשה.',
           ],
         },
         {
@@ -100,14 +115,14 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
         },
         {
           h: 'יצירת קשר',
-          p: ['{company}, {address}. אימייל: {email}.'],
+          p: ['{company}{addressRef}. אימייל: {email}.'],
         },
       ],
     },
     en: {
       title: 'Privacy policy',
       intro:
-        'This policy explains what information {product} collects, why, who it’s shared with and what your rights are. The service is operated by {company} ({companyId}), {address}. Last updated: {updated}.',
+        'This policy explains what information {product} collects, why, who it’s shared with and what your rights are. The service is operated by {company}{companyRef}{addressRef}. Last updated: {updated}.',
       sections: [
         {
           h: 'Who is responsible for the data',
@@ -122,6 +137,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
             'Account details: name, email address, preferred language and sign-in details.',
             'Business details: name, address, phone, services, prices, opening hours, photos and other content the business puts on its page.',
             'Customer and appointment details: name, phone, email if given, notes, appointment times and change history.',
+            'Messages to customers: the content of messages sent on the business’s behalf (booking confirmations, reminders, changes and cancellations), the phone number or email they went to, and their delivery status (sent, delivered, read or not delivered).',
             'Technical data: IP address, browser and device type, and server logs kept for security and troubleshooting.',
             'Payments: card details go straight to the payment provider and are never stored by us. We keep only the subscription status and invoices.',
           ],
@@ -130,6 +146,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
           h: 'How we use it',
           p: [
             'To run the service: the booking page, calendar, customer list, reminders and calendar sync.',
+            'To send customers messages about their appointments on the business’s behalf, by WhatsApp, SMS or email, and to show the business how many messages went out this month.',
             'To charge for the subscription and issue invoices as the law requires.',
             'To keep the service secure, prevent abuse and fix problems.',
             'To send business owners service messages (for example a change in terms or an outage). Marketing emails are sent only with consent, which you can withdraw at any time.',
@@ -139,9 +156,20 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
         {
           h: 'Who we share it with',
           p: [
-            'Providers that run parts of the service for us, and only as much as they need: hosting, database, email and message delivery, payments and invoicing. They’re contractually bound to protect the data and use it only for the service.',
-            'Some providers store data outside Israel, mainly in the European Union. Transfers follow the Israeli Privacy Protection (Transfer of Data to Databases Abroad) Regulations.',
+            'Providers that run parts of the service for us, and only as much as they need. They’re contractually bound to protect the data and use it only for the service:',
+            'Cloudflare: website hosting and servers. Supabase: database, images and sign-in. Meta Platforms (WhatsApp Business): WhatsApp messages; it receives the customer’s phone number and the message. Global SMS: text messages; it receives the phone number and the message. Resend: email; it receives the email address and the message.',
+            'WhatsApp messages go through WhatsApp’s service, so WhatsApp’s own terms and privacy policy also apply to them.',
+            'Some providers store data outside Israel, for example in the United States and the European Union. Transfers follow the Israeli Privacy Protection (Transfer of Data to Databases Abroad) Regulations.',
             'Authorities, only when the law or a court order requires it.',
+          ],
+        },
+        {
+          h: 'WhatsApp, text and email messages',
+          p: [
+            'When you book with a business, it can send you messages about that booking: a confirmation, a reminder, a new time or a cancellation. These are service messages about your appointment.',
+            'A message inviting you to book again is a marketing message, and the business may send it only if you agreed to get such messages from it.',
+            'If a WhatsApp message isn’t delivered, the same message may be sent as a text message instead.',
+            'To stop getting messages, ask the business or email us at {email} and we’ll take care of it.',
           ],
         },
         {
@@ -183,7 +211,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
         },
         {
           h: 'Contact',
-          p: ['{company}, {address}. Email: {email}.'],
+          p: ['{company}{addressRef}. Email: {email}.'],
         },
       ],
     },
@@ -192,7 +220,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
   terms: {
     he: {
       title: 'תנאי שימוש',
-      intro: 'התנאים חלים על השימוש ב-{product}, שמופעל על ידי {company} ({companyId}). השימוש בשירות מהווה הסכמה לתנאים. עדכון אחרון: {updated}.',
+      intro: 'התנאים חלים על השימוש ב-{product}, שמופעל על ידי {company}{companyRef}. השימוש בשירות מהווה הסכמה לתנאים. עדכון אחרון: {updated}.',
       sections: [
         {
           h: 'השירות',
@@ -225,6 +253,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
             'העסק הוא שמספק את השירות ללקוחות שלו, וקובע את המחירים, מדיניות הביטול והתנאים. אנחנו לא צד להתקשרות בין העסק ללקוחותיו.',
             'העסק אחראי שהמידע בעמוד שלו נכון ושיש לו זכות להשתמש בתמונות ובתוכן שהוא מעלה.',
             'העסק אחראי לפעול לפי דיני הגנת הפרטיות כלפי הלקוחות שלו, ולשלוח הודעות שיווקיות רק למי שהסכים לקבל אותן (סעיף 30א לחוק התקשורת). הודעות אישור ותזכורת לתור הן הודעות שירות.',
+            'הודעות וואטסאפ נשלחות דרך WhatsApp Business, והעסק מתחייב לפעול גם לפי מדיניות ההודעות העסקיות של WhatsApp. החבילה יכולה לכלול מספר מוגבל של הודעות בחודש, ומספר ההודעות שנשלחו מופיע בהגדרות. אנחנו לא יכולים להבטיח שכל הודעה תימסר, למשל כשהמספר שגוי או שהלקוח חסם את העסק.',
             'העסק אחראי להנגשת השירות שהוא נותן ללקוחותיו. אנחנו מספקים עמוד קביעת תורים נגיש, אבל התוכן שהעסק מוסיף (כמו טקסטים ותמונות) באחריותו.',
           ],
         },
@@ -274,13 +303,13 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
         },
         {
           h: 'יצירת קשר',
-          p: ['{company}, {address}. אימייל: {email}.'],
+          p: ['{company}{addressRef}. אימייל: {email}.'],
         },
       ],
     },
     en: {
       title: 'Terms of service',
-      intro: 'These terms apply to your use of {product}, operated by {company} ({companyId}). By using the service you agree to them. Last updated: {updated}.',
+      intro: 'These terms apply to your use of {product}, operated by {company}{companyRef}. By using the service you agree to them. Last updated: {updated}.',
       sections: [
         {
           h: 'The service',
@@ -313,6 +342,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
             'The business provides its services to its customers and sets its own prices, cancellation policy and terms. We aren’t a party to the agreement between a business and its customers.',
             'The business is responsible for the accuracy of its page and for having the right to use the photos and content it uploads.',
             'The business is responsible for complying with privacy law towards its customers, and for sending marketing messages only to people who agreed to receive them (section 30A of the Israeli Communications Law). Booking confirmations and reminders are service messages.',
+            'WhatsApp messages are sent through WhatsApp Business, and the business agrees to follow WhatsApp’s Business Messaging Policy too. Your plan may include a limited number of messages a month, and the number sent is shown in Settings. We can’t guarantee every message is delivered, for example when a number is wrong or a customer has blocked the business.',
             'The business is responsible for the accessibility of the services it provides. We supply an accessible booking page, but content the business adds (such as text and photos) is its responsibility.',
           ],
         },
@@ -362,7 +392,7 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
         },
         {
           h: 'Contact',
-          p: ['{company}, {address}. Email: {email}.'],
+          p: ['{company}{addressRef}. Email: {email}.'],
         },
       ],
     },
@@ -410,7 +440,8 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
           h: 'נתקלת בבעיה?',
           p: [
             'נשמח לשמוע ולתקן. כדאי לכתוב באיזה עמוד מדובר, מה ניסית לעשות ובאיזה דפדפן או טכנולוגיה מסייעת השתמשת.',
-            'רכז/ת הנגישות: {a11yContact}. אימייל: {email}. כתובת: {address}.',
+            'רכז/ת הנגישות: {a11yContact}. אימייל: {email}.',
+            'כתובת: {address}.',
             'נחזור אליך תוך 5 ימי עסקים.',
           ],
         },
@@ -456,7 +487,8 @@ export const LEGAL: Record<DocKey, Record<Locale, Doc>> = {
           h: 'Found a problem?',
           p: [
             'We’d like to hear about it and fix it. Tell us which page, what you were trying to do and which browser or assistive technology you used.',
-            'Accessibility coordinator: {a11yContact}. Email: {email}. Address: {address}.',
+            'Accessibility coordinator: {a11yContact}. Email: {email}.',
+            'Address: {address}.',
             'We’ll get back to you within 5 business days.',
           ],
         },

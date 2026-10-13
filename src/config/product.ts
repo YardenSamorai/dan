@@ -16,17 +16,19 @@ export const storageKey = (key: string) => `${PRODUCT.storagePrefix}.${key}`;
 
 /**
  * Who runs the service, for the legal pages and the help page. Fill these in
- * (env vars) before launch; the pages show "[…]" placeholders until then.
+ * (env vars) before launch; the name shows a "[…]" placeholder until then.
+ * The registration number and address are optional: the pages leave them out.
  */
+const company = env.VITE_LEGAL_COMPANY?.trim() || '[שם העסק / החברה]';
 export const OPERATOR = {
-  company: env.VITE_LEGAL_COMPANY?.trim() || '[שם העסק / החברה]',
-  companyId: env.VITE_LEGAL_COMPANY_ID?.trim() || '[ח.פ. / ע.מ.]',
-  address: env.VITE_LEGAL_ADDRESS?.trim() || '[כתובת למשלוח דואר]',
+  company,
+  companyId: env.VITE_LEGAL_COMPANY_ID?.trim() || '',
+  address: env.VITE_LEGAL_ADDRESS?.trim() || '',
   email: env.VITE_SUPPORT_EMAIL?.trim() || 'support@example.com',
   /** Accessibility coordinator, required on the accessibility statement. */
-  a11yContact: env.VITE_A11Y_CONTACT?.trim() || '[שם רכז/ת הנגישות]',
+  a11yContact: env.VITE_A11Y_CONTACT?.trim() || company,
   /** "Last updated" on the legal pages; bump when their wording changes. */
-  legalUpdated: '2026-10-10',
+  legalUpdated: '2026-10-13',
 };
 
 /** Setup videos, by checklist step. A step without a link simply shows no video button. */

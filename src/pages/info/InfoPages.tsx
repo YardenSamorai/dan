@@ -12,8 +12,9 @@ function useFill() {
   const vars: Record<string, string> = {
     product: PRODUCT.name,
     company: OPERATOR.company,
-    companyId: OPERATOR.companyId,
+    companyRef: OPERATOR.companyId && ` (${OPERATOR.companyId})`,
     address: OPERATOR.address,
+    addressRef: OPERATOR.address && `, ${OPERATOR.address}`,
     email: OPERATOR.email,
     a11yContact: OPERATOR.a11yContact,
     updated: fmt.date(OPERATOR.legalUpdated, 'numeric'),
@@ -60,9 +61,11 @@ export function LegalPage({ doc }: { doc: DocKey }) {
       {d.sections.map((s, i) => (
         <section key={i} className="info__section">
           <h2>{s.h}</h2>
-          {s.p.map((p, j) => (
-            <Para key={j} text={fill(p)} />
-          ))}
+          {s.p
+            .filter((p) => OPERATOR.address || !p.includes('{address}'))
+            .map((p, j) => (
+              <Para key={j} text={fill(p)} />
+            ))}
         </section>
       ))}
       <nav className="info__related" aria-label={t('legal.related')}>
