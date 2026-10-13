@@ -17,7 +17,7 @@ export function supabaseConfig(env: Env): SupabaseConfig | null {
   if (!url) return null;
   const secretKey = env.SUPABASE_SECRET_KEY;
   const publishableKey = env.SUPABASE_PUBLISHABLE_KEY ?? env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  if (!secretKey || !publishableKey) throw new Error('Supabase is configured without SUPABASE_SECRET_KEY / the publishable key. See .env.example.');
+  if (!secretKey || !publishableKey) throw new Error('Supabase is configured without SUPABASE_SECRET_KEY / the publishable key. See .env.');
   return { url: url.replace(/\/$/, ''), secretKey, publishableKey };
 }
 

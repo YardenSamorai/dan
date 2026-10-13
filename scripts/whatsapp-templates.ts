@@ -4,7 +4,7 @@
  *   npm run whatsapp:templates              submit the missing ones, then list
  *   npm run whatsapp:templates -- --status  only list
  *
- * Needs WHATSAPP_TOKEN and WHATSAPP_BUSINESS_ACCOUNT_ID in .env.local; never prints them.
+ * Needs WHATSAPP_TOKEN and WHATSAPP_BUSINESS_ACCOUNT_ID in .env; never prints them.
  * Approval usually takes minutes, sometimes up to a day. A template that's
  * already there isn't touched: edit it in WhatsApp Manager, or delete it there
  * and run this again.
@@ -23,12 +23,11 @@ function loadEnv(file: string) {
   }
 }
 loadEnv('.env');
-loadEnv('.env.local');
 
 const token = process.env.WHATSAPP_TOKEN;
 const account = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
 if (!token || !account) {
-  console.error('Missing WHATSAPP_TOKEN or WHATSAPP_BUSINESS_ACCOUNT_ID in .env.local.');
+  console.error('Missing WHATSAPP_TOKEN or WHATSAPP_BUSINESS_ACCOUNT_ID in .env.');
   process.exit(1);
 }
 

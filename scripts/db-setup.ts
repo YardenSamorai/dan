@@ -6,7 +6,7 @@
  *
  * --import-local moves businesses made on the local dev server. Each owner
  * must have signed in once with the same email (so they have a profile).
- * Reads settings from .env.local; never prints keys.
+ * Reads settings from .env; never prints keys.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { freshDatabase, type MockDatabase } from '../src/data/mock/db';
@@ -21,11 +21,10 @@ function loadEnv(file: string) {
   }
 }
 loadEnv('.env');
-loadEnv('.env.local');
 
 const cfg = supabaseConfig(process.env);
 if (!cfg) {
-  console.error('No Supabase settings found (VITE_SUPABASE_URL in .env.local).');
+  console.error('No Supabase settings found (VITE_SUPABASE_URL in .env).');
   process.exit(1);
 }
 

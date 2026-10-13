@@ -3,7 +3,7 @@
  *   npm run messages:usage               this month
  *   npm run messages:usage -- 2026-09    another month
  *
- * Reads the businesses from Supabase (SUPABASE_SECRET_KEY in .env.local; never
+ * Reads the businesses from Supabase (SUPABASE_SECRET_KEY in .env; never
  * printed). WhatsApp is priced at Meta's Israel rates; SMS shows gateway
  * credits, priced only if SMS_CREDIT_ILS is set.
  */
@@ -20,7 +20,6 @@ function loadEnv(file: string) {
   }
 }
 loadEnv('.env');
-loadEnv('.env.local');
 
 /** Meta's rate card for recipients in Israel, USD per delivered message (October 2026). */
 const WHATSAPP_USD = { utility: 0.0053, marketing: 0.0353 };
@@ -28,7 +27,7 @@ const WHATSAPP_USD = { utility: 0.0053, marketing: 0.0353 };
 const url = (process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? '').replace(/\/$/, '');
 const key = process.env.SUPABASE_SECRET_KEY;
 if (!url || !key) {
-  console.error('Missing VITE_SUPABASE_URL or SUPABASE_SECRET_KEY in .env.local.');
+  console.error('Missing VITE_SUPABASE_URL or SUPABASE_SECRET_KEY in .env.');
   process.exit(1);
 }
 

@@ -9,9 +9,8 @@ import { supabaseConfig } from '../server/app';
 import { handleRpc, type ApiDeps } from '../server/handler';
 import { SupabaseStore, supabaseAuthenticator } from '../server/supabase';
 
-for (const file of ['.env', '.env.local']) {
-  if (!existsSync(file)) continue;
-  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
+if (existsSync('.env')) {
+  for (const line of readFileSync('.env', 'utf8').split(/\r?\n/)) {
     const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
     if (m && !(m[1] in process.env)) process.env[m[1]] = m[2];
   }
