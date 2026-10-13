@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type InputHTMLAttributes } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ProviderCalendar, openHours, type CalDay } from '../../components/booking/ProviderCalendar';
+import { DateStrip, type StripDay } from '../../components/booking/DateStrip';
 import { SlotPicker } from '../../components/booking/SlotPicker';
-import { ArrowBackIcon, CheckIcon, ClockIcon, CloseIcon } from '../../components/ui/Icons';
+import { CheckIcon, ClockIcon, CloseIcon, PlusIcon } from '../../components/ui/Icons';
 import { BusinessWordmark, StaffAvatar } from '../../components/ui/bits';
 import { storageKey } from '../../config/product';
 import { ApiError, publicBooking, type PublicSession } from '../../data';
@@ -29,7 +29,9 @@ interface Draft {
 }
 
 type Errors = Partial<Record<'name' | 'phone' | 'email', string>>;
-type StepKey = 'service' | 'staff' | 'time' | 'details';
+type StepKey = 'service' | 'time' | 'details' | 'review';
+const STEPS: StepKey[] = ['service', 'time', 'details', 'review'];
+const idx = (k: StepKey) => STEPS.indexOf(k);
 
 const draftKey = (slug: string) => storageKey(`draft.${slug}`);
 
@@ -58,8 +60,23 @@ function chosenSession(tenant: PublicTenant, d: Draft): PublicSession | undefine
   return tenant.sessions(s.id).find((x) => x.id === d.sessionId);
 }
 
+/**
+ * Who the booking is with. The saved choice only counts while it still fits
+ * the service; a service done by one person needs no choice at all.
+ */
+function staffFor(tenant: PublicTenant, d: Draft): { staffId: string; options: string[] } {
+  const { business } = tenant;
+  if (tenant.solo) return { staffId: business.staff[0]?.id ?? '', options: [] };
+  const s = d.serviceId ? tenant.service(d.serviceId) : undefined;
+  if (!s || isClass(s)) return { staffId: d.staffId, options: [] };
+  const people = s.staffIds.filter((id) => tenant.staff(id));
+  const options = [...(business.policies.allowAnyStaff && people.length > 1 ? ['any'] : []), ...people];
+  const staffId = options.includes(d.staffId) ? d.staffId : options.length === 1 ? options[0] : business.policies.allowAnyStaff ? 'any' : '';
+  return { staffId, options: options.length > 1 ? options : [] };
+}
+
 /** Until a specific person is chosen, duration and price span everyone who could take it. */
-function totals(tenant: PublicTenant, d: Draft) {
+function totals(tenant: PublicTenant, d: Draft, staffId: string) {
   const s = d.serviceId ? tenant.service(d.serviceId) : undefined;
   const session = chosenSession(tenant, d);
   if (s && isClass(s)) {
@@ -71,7 +88,7 @@ function totals(tenant: PublicTenant, d: Draft) {
   const extras = d.addOnIds.map((id) => tenant.addOn(id)).filter((a) => !!a);
   const xd = extras.reduce((m, a) => m + a!.duration, 0);
   const xp = extras.reduce((m, a) => m + a!.price, 0);
-  const who = d.staffId && d.staffId !== 'any' ? [d.staffId] : s?.staffIds ?? [];
+  const who = staffId && staffId !== 'any' ? [staffId] : s?.staffIds ?? [];
   const r = s ? termsRange(s, who) : { duration: [0, 0] as Span, price: [0, 0] as Span };
   return {
     service: s,
@@ -81,6 +98,13 @@ function totals(tenant: PublicTenant, d: Draft) {
   };
 }
 
+/** Date and start of the chosen time or class, once there is one. */
+function whenOf(tenant: PublicTenant, d: Draft): { date: ISODate; start: Minutes } | undefined {
+  const session = chosenSession(tenant, d);
+  if (session) return { date: session.date, start: session.start };
+  return d.date && d.start !== undefined ? { date: d.date, start: d.start } : undefined;
+}
+
 export default function BookFlowPage() {
   const i18n = useI18n();
   const { t, tx, fmt, locale } = i18n;
@@ -88,12 +112,10 @@ export default function BookFlowPage() {
   const { business, slug, base } = tenant;
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-
-  const soloId = tenant.solo ? business.staff[0]?.id ?? '' : null;
   const anyAllowed = business.policies.allowAnyStaff;
 
   const [draft, setDraft] = useState<Draft>(() => {
-    const d = loadDraft(slug, soloId ?? (anyAllowed ? 'any' : ''));
+    const d = loadDraft(slug, anyAllowed ? 'any' : '');
     const service = params.get('service');
     const staff = params.get('staff');
     const date = params.get('date');
@@ -108,9 +130,7 @@ export default function BookFlowPage() {
       d.serviceId = service;
     }
     if (session) d.sessionId = session;
-    if (soloId !== null) d.staffId = soloId;
-    else if (staff && ((staff === 'any' && anyAllowed) || tenant.staff(staff))) d.staffId = staff;
-    else if (d.staffId === 'any' && !anyAllowed) d.staffId = '';
+    if (staff && ((staff === 'any' && anyAllowed) || tenant.staff(staff))) d.staffId = staff;
     if (date) d.date = date;
     if (time && !Number.isNaN(Number(time))) d.start = Number(time);
     return d;
@@ -121,24 +141,22 @@ export default function BookFlowPage() {
   const [waited, setWaited] = useState<{ position: number; session: PublicSession } | null>(null);
 
   const cls = isClass(draft.serviceId ? tenant.service(draft.serviceId) : undefined);
-  const steps: StepKey[] = soloId !== null || cls ? ['service', 'time', 'details'] : ['service', 'staff', 'time', 'details'];
-  const idx = (k: StepKey) => steps.indexOf(k);
+  const { staffId } = staffFor(tenant, draft);
   const session = chosenSession(tenant, draft);
   const waiting = session?.block === 'full';
 
-  const staffChosen = cls || draft.staffId !== '';
   const timeOk = useMemo(() => {
     if (cls) return !!session && (!session.block || session.block === 'full');
-    if (!draft.serviceId || !staffChosen || !draft.date || draft.start === undefined) return false;
-    return tenant.slots({ serviceId: draft.serviceId, addOnIds: draft.addOnIds, staffId: draft.staffId, date: draft.date }).some((x) => x.start === draft.start);
-  }, [tenant, cls, session, draft.serviceId, draft.addOnIds, draft.staffId, draft.date, draft.start, staffChosen]);
+    if (!draft.serviceId || !staffId || !draft.date || draft.start === undefined) return false;
+    return tenant.slots({ serviceId: draft.serviceId, addOnIds: draft.addOnIds, staffId, date: draft.date }).some((x) => x.start === draft.start);
+  }, [tenant, cls, session, draft.serviceId, draft.addOnIds, staffId, draft.date, draft.start]);
 
-  const maxStep = !draft.serviceId ? 0 : !staffChosen ? idx('staff') : !timeOk ? idx('time') : idx('details');
+  const detailsOk = Object.keys(validate(draft, business.policies.requireEmail, t)).length === 0;
+  const maxStep = !draft.serviceId ? 0 : !timeOk ? idx('time') : !detailsOk ? idx('details') : idx('review');
 
   useEffect(() => {
     if (params.has('step')) return;
-    const start = !draft.serviceId ? 0 : timeOk ? idx('details') : params.get('staff') || soloId !== null ? idx('time') : 1;
-    setParams({ step: String(start) }, { replace: true });
+    setParams({ step: String(!draft.serviceId ? 0 : timeOk ? idx('details') : idx('time')) }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -148,7 +166,7 @@ export default function BookFlowPage() {
 
   const requested = Number(params.get('step') ?? 0);
   const step = Math.max(0, Math.min(Number.isFinite(requested) ? requested : 0, maxStep));
-  const key = steps[step];
+  const key = STEPS[step];
 
   const prevStep = useRef(step);
   const firstRender = useRef(true);
@@ -174,7 +192,6 @@ export default function BookFlowPage() {
   }, []);
 
   const goTo = useCallback((n: number) => setParams({ step: String(n) }), [setParams]);
-  const canContinue = key === 'service' ? !!draft.serviceId : key === 'staff' ? staffChosen : key === 'time' ? timeOk : true;
   const manual = business.policies.confirmationMode === 'manual';
 
   const customer = () => ({ name: draft.name.trim(), phone: draft.phone.trim(), email: draft.email.trim() || undefined, note: draft.note.trim(), locale });
@@ -219,7 +236,7 @@ export default function BookFlowPage() {
       const b = await publicBooking.createBooking(slug, {
         serviceId: draft.serviceId,
         addOnIds: draft.addOnIds,
-        staffId: draft.staffId,
+        staffId,
         date: draft.date,
         start: draft.start,
         customer: customer(),
@@ -239,7 +256,7 @@ export default function BookFlowPage() {
   };
 
   const next = () => {
-    if (!canContinue || submitting) return;
+    if (submitting) return;
     if (key === 'details') {
       const e = validate(draft, business.policies.requireEmail, t);
       setErrors(e);
@@ -248,38 +265,28 @@ export default function BookFlowPage() {
         document.getElementById(`f-${first}`)?.focus();
         return;
       }
-      return void submit();
     }
+    if (key === 'review') return void submit();
     setNotice(null);
     goTo(step + 1);
   };
 
-  const { service, duration, price } = totals(tenant, draft);
-  // A "change" link only for choices already behind the customer.
-  const edit: Edit = {
-    goTo,
-    service: step > 0 ? 0 : -1,
-    staff: soloId === null && !cls && step > idx('staff') ? idx('staff') : -1,
-    time: step > idx('time') ? idx('time') : -1,
-  };
-  const hint = key === 'service' ? t('booking.summary.empty') : key === 'time' ? t(cls ? 'booking.calendar.pickClass' : 'booking.calendar.pickTime') : '';
+  const { service, duration, price } = totals(tenant, draft, staffId);
+  const when = whenOf(tenant, draft);
+  const ready = key === 'service' ? !!draft.serviceId : key === 'time' ? timeOk : true;
   const ctaLabel =
-    key === 'details'
-      ? submitting
-        ? t('booking.review.confirming')
-        : t(waiting ? 'booking.classes.joinWaitlist' : manual ? 'booking.review.request' : cls ? 'booking.classes.join' : 'booking.review.confirm')
-      : t('common.continue');
-  const pickedTime = cls ? (session && timeOk ? session.start : undefined) : draft.date && draft.start !== undefined && timeOk ? draft.start : undefined;
-
-  const cta = (className = '') => (
-    <button type="button" className={`btn btn--primary btn--lg ${className}`} onClick={next} aria-disabled={!canContinue || submitting} aria-describedby={!canContinue ? 'cta-hint' : undefined}>
-      {submitting && <span className="spinner" aria-hidden="true" />}
-      {ctaLabel}
-    </button>
-  );
+    key === 'service'
+      ? t('booking.cta.toTime')
+      : key === 'time'
+        ? t('booking.cta.toDetails')
+        : key === 'details'
+          ? t('booking.cta.toReview')
+          : submitting
+            ? t('booking.review.confirming')
+            : t(waiting ? 'booking.classes.joinWaitlist' : manual ? 'booking.review.request' : cls ? 'booking.classes.join' : 'booking.review.confirm');
 
   const logo = (
-    <Link to={base} className="booking__logo">
+    <Link to={base} className="bk-top__id">
       <BusinessWordmark name={tx(business.name)} logoUrl={business.branding.logoUrl} hideMark={business.branding.hideLogo} />
     </Link>
   );
@@ -287,251 +294,133 @@ export default function BookFlowPage() {
   if (waited)
     return (
       <div className="booking">
-        <header className="booking__bar">
-          <div className="booking__bar-inner">{logo}</div>
+        <header className="bk-top">
+          <div className="bk-top__inner">{logo}</div>
         </header>
-        <div className="booking__body">
-          <main className="booking__main" id="main">
-            <WaitlistDone position={waited.position} session={waited.session} />
-          </main>
-        </div>
+        <main className="flow" id="main">
+          <WaitlistDone position={waited.position} session={waited.session} />
+        </main>
       </div>
     );
 
+  const termsLine = service ? [fmt.durationRange(duration), fmt.moneyRange(price)].join(' · ') : '';
+  const whenLine = when ? `${fmt.date(when.date, 'medium')} · ${fmt.time(when.start)}` : '';
+
   return (
     <div className="booking">
-      <header className="booking__bar">
-        <div className="booking__bar-inner">
+      <header className="bk-top">
+        <div className="bk-top__inner">
           {logo}
-          <nav className="progress" aria-label={t('booking.title')}>
-            <ol>
-              {steps.map((k, i) => (
-                <li key={k} data-state={i < step ? 'done' : i === step ? 'current' : 'todo'}>
-                  {i < step ? (
-                    <button type="button" onClick={() => goTo(i)}>
-                      <CheckIcon size={12} /> <span className="progress__label">{t(`booking.steps.${k}`)}</span>
-                    </button>
-                  ) : (
-                    <span aria-current={i === step ? 'step' : undefined}>
-                      <span className="progress__label">{t(`booking.steps.${k}`)}</span>
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
-            <p className="progress__mobile">
-              <span className="muted">{t('booking.stepOf', { current: step + 1, total: steps.length })}</span> · {t(`booking.steps.${key}`)}
-            </p>
-          </nav>
-          <Link to={base} className="booking__close" aria-label={t('booking.exit')}>
+          <Link to={base} className="bk-top__close" aria-label={t('booking.exit')}>
             <CloseIcon size={18} />
           </Link>
         </div>
-        <div className="progress__bar" aria-hidden="true">
-          <i style={{ transform: `scaleX(${(step + 1) / steps.length})` }} />
-        </div>
       </header>
 
-      <div className="booking__body">
-        <main className="booking__main" id="main">
-          {step > 0 && (
-            <button type="button" className="booking__back" onClick={() => goTo(step - 1)}>
-              <ArrowBackIcon size={14} /> {t(`booking.steps.${steps[step - 1]}`)}
-            </button>
-          )}
-          {notice && (
-            <p className="booking__notice" role="alert">
-              {notice}
-            </p>
-          )}
-          <div key={step} className="booking__step">
-            {key === 'service' && <StepService draft={draft} update={update} />}
-            {key === 'staff' && <StepStaff draft={draft} update={update} onPick={() => goTo(idx('time'))} />}
-            {key === 'time' && service && cls && <StepClass draft={draft} update={update} />}
-            {key === 'time' && service && !cls && (
-              <>
-                <StepTitle>{t('booking.time.title')}</StepTitle>
-                <SlotPicker
-                  serviceId={service.id}
-                  addOnIds={draft.addOnIds}
-                  staffId={draft.staffId}
-                  date={draft.date}
-                  start={draft.start}
-                  duration={duration[0]}
-                  onChange={(v) => update({ date: v.date, start: v.start })}
-                />
-              </>
-            )}
-            {key === 'details' && (
-              <>
-                <StepTitle lede={t(waiting ? 'booking.classes.fullLede' : 'booking.details.lede')}>{t(waiting ? 'booking.classes.waitTitle' : 'booking.details.title')}</StepTitle>
-                <div className="booking__ticket">
-                  <Summary draft={draft} edit={edit} />
-                </div>
-                <StepDetails draft={draft} update={update} errors={errors} requireEmail={business.policies.requireEmail} />
-                <Policies waiting={waiting} session={!!session} />
-              </>
-            )}
-          </div>
-        </main>
+      <main className="flow" id="main">
+        <nav className="steps" aria-label={t('booking.title')}>
+          <ol>
+            {STEPS.map((k, i) => (
+              <li key={k} data-state={i < step ? 'done' : i === step ? 'current' : 'todo'}>
+                {i < step ? (
+                  <button type="button" onClick={() => goTo(i)}>
+                    <span className="steps__n" aria-hidden="true">
+                      <CheckIcon size={11} />
+                    </span>
+                    {t(`booking.steps.${k}`)}
+                  </button>
+                ) : (
+                  <span aria-current={i === step ? 'step' : undefined}>
+                    <span className="steps__n" aria-hidden="true">
+                      {fmt.number(i + 1)}
+                    </span>
+                    {t(`booking.steps.${k}`)}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ol>
+        </nav>
 
-        <aside className="booking__aside" aria-label={t('booking.summary.title')}>
-          <div className="booking__card">
-            <Summary draft={draft} edit={edit} />
-            {cta('btn--block')}
-            {!canContinue && hint && (
-              <p id="cta-hint" className="booking__hint">
-                {hint}
-              </p>
-            )}
-          </div>
-        </aside>
-      </div>
+        {notice && (
+          <p className="flow__notice" role="alert">
+            {notice}
+          </p>
+        )}
 
-      <div className="dock">
-        <div className="dock__info" aria-live="polite">
-          {service ? (
+        <div key={step} className="flow__step">
+          {key === 'service' && <StepService draft={draft} update={update} />}
+          {key === 'time' && service && (
             <>
-              <strong className="tabular">{fmt.moneyRange(price)}</strong>
-              <span className="tabular">
-                {fmt.durationRange(duration)}
-                {pickedTime !== undefined ? ` · ${fmt.time(pickedTime)}` : ''}
-              </span>
+              <StepTitle>{t(cls ? 'booking.classes.title' : 'booking.time.title')}</StepTitle>
+              <Context onChange={() => goTo(0)} label={t('booking.steps.service')}>
+                <strong>{tx(service.name)}</strong>
+                {!cls && <span className="muted"> · {termsLine}</span>}
+              </Context>
+              {cls ? <StepClass draft={draft} update={update} /> : <StepTime draft={draft} update={update} staffId={staffId} />}
             </>
-          ) : (
-            <span className="muted">{hint}</span>
           )}
+          {key === 'details' && (
+            <>
+              <StepTitle lede={waiting ? t('booking.classes.fullLede') : undefined}>{t(waiting ? 'booking.classes.waitTitle' : 'booking.details.title')}</StepTitle>
+              <Context onChange={() => goTo(idx('time'))} label={t('booking.steps.time')}>
+                <strong>{tx(service?.name)}</strong>
+                <span className="muted"> · {whenLine}</span>
+              </Context>
+              <StepDetails draft={draft} update={update} errors={errors} requireEmail={business.policies.requireEmail} />
+            </>
+          )}
+          {key === 'review' && <StepReview draft={draft} staffId={staffId} goTo={goTo} waiting={waiting} />}
         </div>
-        {cta()}
-      </div>
+
+        {ready && (
+          <div className="bar" data-step={key}>
+            <div className="bar__info" aria-live="polite">
+              {key === 'service' && service && (
+                <>
+                  <strong>{tx(service.name)}</strong>
+                  <span>{cls ? t('booking.classes.groupLabel') : termsLine}</span>
+                </>
+              )}
+              {key !== 'service' && when && (
+                <>
+                  <strong className="tabular">{whenLine}</strong>
+                  <span className="tabular">{fmt.moneyRange(price)}</span>
+                </>
+              )}
+            </div>
+            <button type="button" className="btn btn--primary btn--lg bar__cta" onClick={next} aria-disabled={submitting}>
+              {submitting && <span className="spinner" aria-hidden="true" />}
+              {ctaLabel}
+            </button>
+          </div>
+        )}
+      </main>
     </div>
-  );
-}
-
-function WaitlistDone({ position, session }: { position: number; session: PublicSession }) {
-  const { t, tx, fmt } = useI18n();
-  const tenant = usePublicTenant();
-  const service = tenant.service(session.serviceId);
-  return (
-    <div className="waitlist-done">
-      <span className="waitlist-done__mark" aria-hidden="true">
-        <CheckIcon size={20} />
-      </span>
-      <StepTitle lede={t('booking.classes.done.body', { service: tx(service?.name), when: `${fmt.date(session.date, 'medium')} · ${fmt.time(session.start)}` })}>
-        {t('booking.classes.done.title')}
-      </StepTitle>
-      <p className="waitlist-done__pos">{t('booking.classes.done.position', { position: fmt.number(position) })}</p>
-      <p className="muted">{t('booking.classes.done.how')}</p>
-      <Link to={tenant.base} className="btn btn--ghost">
-        {t('confirmed.back', { business: tx(tenant.business.name) })}
-      </Link>
-    </div>
-  );
-}
-
-/**
- * Every class the business runs, on one schedule: the chosen class stands
- * out, the others stay visible so the customer sees the whole week and can
- * switch to another class from here.
- */
-function StepClass({ draft, update }: StepProps) {
-  const { t, tx, fmt } = useI18n();
-  const tenant = usePublicTenant();
-  const { business, today } = tenant;
-  const sessions = useMemo(
-    () =>
-      business.services
-        .filter(isClass)
-        .flatMap((c) => tenant.sessions(c.id))
-        .filter((s) => s.block !== 'cancelled' && s.block !== 'past')
-        .sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start),
-    [tenant, business.services],
-  );
-  const byDate = useMemo(() => {
-    const m = new Map<ISODate, PublicSession[]>();
-    for (const s of sessions) m.set(s.date, [...(m.get(s.date) ?? []), s]);
-    return m;
-  }, [sessions]);
-  const open = (s: PublicSession) => !s.block || s.block === 'full';
-  const chosen = sessions.find((s) => s.id === draft.sessionId);
-  const first = sessions.find((s) => s.serviceId === draft.serviceId && open(s)) ?? sessions.find(open) ?? sessions[0];
-  const last = sessions.at(-1)?.date ?? today;
-
-  const status = useCallback(
-    (s: PublicSession) =>
-      s.block === 'full'
-        ? t('booking.classes.fullWait')
-        : s.block === 'closed'
-          ? t('booking.classes.closed')
-          : s.block === 'too_far'
-            ? t('booking.classes.notYet')
-            : t('booking.classes.spotsLeft', { count: s.seatsLeft }),
-    [t],
-  );
-
-  const plan = useCallback(
-    (iso: ISODate): CalDay => ({
-      hours: openHours(business, iso),
-      entries: (byDate.get(iso) ?? []).map((s) => {
-        const name = tx(tenant.service(s.serviceId)?.name);
-        const staff = tenant.solo ? undefined : tenant.staff(s.staffId);
-        const when = fmt.timeRange(s.start, s.start + s.duration);
-        return {
-          id: s.id,
-          kind: 'session' as const,
-          start: s.start,
-          end: s.start + s.duration,
-          title: name,
-          sub: [when, staff ? tx(staff.name).split(' ')[0] : ''].filter(Boolean).join(' · '),
-          badge: status(s),
-          label: [name, fmt.date(iso), when, staff ? t('booking.classes.with', { name: tx(staff.name) }) : '', fmt.money(s.price), status(s)].filter(Boolean).join(', '),
-          selected: s.id === draft.sessionId,
-          off: !open(s),
-          full: s.block === 'full',
-          other: s.serviceId !== draft.serviceId,
-          onPick: () => update({ serviceId: s.serviceId, sessionId: s.id, addOnIds: [], start: undefined }),
-        };
-      }),
-    }),
-    [business, byDate, tenant, tx, fmt, t, status, draft.sessionId, draft.serviceId, update],
-  );
-  const next = useCallback((from: ISODate) => sessions.find((s) => s.date >= from && open(s))?.date ?? null, [sessions]);
-
-  const teachers = [...new Set(sessions.map((s) => s.staffId))];
-  const teacher = teachers.length === 1 ? tenant.staff(teachers[0]) : undefined;
-  const owner = teacher
-    ? { title: t('booking.calendar.of', { name: tx(teacher.name).split(' ')[0] }), sub: t('booking.calendar.schedule'), avatar: <StaffAvatar staff={teacher} /> }
-    : { title: t('booking.calendar.schedule'), sub: tx(business.name) };
-
-  return (
-    <>
-      <StepTitle lede={t('booking.time.timezone', { zone: fmt.zoneName() })}>{t('booking.classes.title')}</StepTitle>
-      {!sessions.length ? (
-        <p className="muted">{t('booking.classes.none')}</p>
-      ) : (
-        <ProviderCalendar
-          owner={owner}
-          initial={chosen?.date ?? first.date}
-          today={today}
-          last={last}
-          interval={20}
-          plan={plan}
-          count={(n) => t('booking.calendar.classes', { count: n })}
-          empty={t('booking.calendar.emptyClasses')}
-          next={next}
-        />
-      )}
-    </>
   );
 }
 
 function StepTitle({ children, lede }: { children: string; lede?: string }) {
   return (
     <div className="step-head">
-      <h1 id="step-title" className="display step-head__title" tabIndex={-1}>
+      <h1 id="step-title" className="step-head__title" tabIndex={-1}>
         {children}
       </h1>
-      {lede && <p className="muted">{lede}</p>}
+      {lede && <p className="step-head__lede">{lede}</p>}
+    </div>
+  );
+}
+
+/** What's been chosen so far, in one line, with a way back to change it. */
+function Context({ children, onChange, label }: { children: ReactNode; onChange: () => void; label: string }) {
+  const { t } = useI18n();
+  return (
+    <div className="context">
+      <p className="context__text">{children}</p>
+      <button type="button" className="context__change" onClick={onChange}>
+        {t('common.change')}
+        <span className="sr-only">, {label}</span>
+      </button>
     </div>
   );
 }
@@ -549,49 +438,59 @@ function StepService({ draft, update }: StepProps) {
     const rest = business.services.filter((s) => !s.categoryId || !business.categories.some((c) => c.id === s.categoryId));
     return [...cats, { id: '_', name: '', items: rest }].filter((g) => g.items.length);
   }, [business, tx]);
+  const chosen = business.services.find((s) => s.id === draft.serviceId);
 
   return (
     <>
       <StepTitle>{t('booking.service.title')}</StepTitle>
       {groups.map((g) => (
-        <fieldset key={g.id} className="choice-group">
-          {g.name && <legend className="choice-group__legend">{g.name}</legend>}
-          {g.items.map((s) => {
-            const selected = s.id === draft.serviceId;
-            const r = termsRange(s);
-            return (
-              <label key={s.id} className="choice" data-selected={selected}>
-                <input type="radio" name="service" className="sr-only" checked={selected} onChange={() => update({ serviceId: s.id, addOnIds: selected ? draft.addOnIds : [], start: undefined, sessionId: undefined })} />
-                <span className="choice__main">
-                  <span className="choice__title">{tx(s.name)}</span>
-                  {(tx(s.description) || isClass(s)) && <span className="choice__desc">{[isClass(s) ? t('booking.classes.groupLabel') : '', tx(s.description)].filter(Boolean).join(' · ')}</span>}
-                </span>
-                <span className="choice__side">
-                  <span className="choice__price tabular">{fmt.moneyRange(r.price)}</span>
-                  <span className="choice__meta">
-                    <ClockIcon size={12} /> {fmt.durationRange(r.duration)}
+        <fieldset key={g.id} className="svc-group">
+          {g.name && <legend className="svc-group__name">{g.name}</legend>}
+          <div className="svc-group__list">
+            {g.items.map((s) => {
+              const selected = s.id === draft.serviceId;
+              const r = termsRange(s);
+              const desc = [isClass(s) ? t('booking.classes.groupLabel') : '', tx(s.description)].filter(Boolean).join(' · ');
+              return (
+                <label key={s.id} className="svc" data-selected={selected}>
+                  <input
+                    type="radio"
+                    name="service"
+                    className="sr-only"
+                    checked={selected}
+                    onChange={() => update({ serviceId: s.id, addOnIds: selected ? draft.addOnIds : [], start: undefined, sessionId: undefined })}
+                  />
+                  <span className="svc__name">{tx(s.name)}</span>
+                  {desc && <span className="svc__desc">{desc}</span>}
+                  <span className="svc__meta">
+                    <span className="svc__duration">
+                      <ClockIcon size={13} /> {fmt.durationRange(r.duration)}
+                    </span>
+                    <span className="svc__price tabular">{fmt.moneyRange(r.price)}</span>
                   </span>
-                </span>
-                <span className="choice__tick" aria-hidden="true">
-                  <CheckIcon size={12} />
-                </span>
-              </label>
-            );
-          })}
+                  <span className="svc__tick" aria-hidden="true">
+                    <CheckIcon size={12} />
+                  </span>
+                </label>
+              );
+            })}
+          </div>
         </fieldset>
       ))}
-      {draft.serviceId && business.addOns.length > 0 && !isClass(business.services.find((s) => s.id === draft.serviceId)) && (
-        <fieldset className="choice-group">
-          <legend className="choice-group__legend">{t('booking.service.addOnsTitle')}</legend>
-          <p className="muted choice-group__hint">{t('booking.service.addOnsHint')}</p>
+      {chosen && business.addOns.length > 0 && !isClass(chosen) && (
+        <fieldset className="svc-group">
+          <legend className="svc-group__name">{t('booking.service.addOnsTitle')}</legend>
+          <p className="svc-group__hint">{t('booking.service.addOnsHint')}</p>
           <div className="addon-grid">
             {business.addOns.map((a) => {
               const on = draft.addOnIds.includes(a.id);
               return (
                 <label key={a.id} className="addon-choice" data-selected={on}>
                   <input type="checkbox" className="sr-only" checked={on} onChange={() => update({ addOnIds: on ? draft.addOnIds.filter((x) => x !== a.id) : [...draft.addOnIds, a.id], start: undefined })} />
-                  <span>{tx(a.name)}</span>
-                  <span className="muted tabular">
+                  <span className="addon-choice__name">
+                    {on ? <CheckIcon size={13} /> : <PlusIcon size={13} />} {tx(a.name)}
+                  </span>
+                  <span className="addon-choice__meta tabular">
                     +{fmt.money(a.price)} · {fmt.duration(a.duration)}
                   </span>
                 </label>
@@ -604,91 +503,112 @@ function StepService({ draft, update }: StepProps) {
   );
 }
 
-function StepStaff({ draft, update, onPick }: StepProps & { onPick: () => void }) {
-  const { t, tx, fmt } = useI18n();
+function StepTime({ draft, update, staffId }: StepProps & { staffId: string }) {
+  const { t, tx } = useI18n();
   const tenant = usePublicTenant();
-  const service = tenant.service(draft.serviceId!);
-  const staff = tenant.business.staff.filter((s) => service?.staffIds.includes(s.id));
-  const addOnKey = draft.addOnIds.join();
-
-  const nextFor = useMemo(() => {
-    const out: Record<string, string | null> = {};
-    const ids = [...(tenant.business.policies.allowAnyStaff ? ['any'] : []), ...staff.map((s) => s.id)];
-    for (const id of ids) {
-      const q = { serviceId: draft.serviceId!, addOnIds: draft.addOnIds, staffId: id };
-      const date = tenant.firstAvailable(q);
-      if (!date) {
-        out[id] = null;
-        continue;
-      }
-      const first = tenant.slots({ ...q, date })[0];
-      out[id] = `${fmt.relativeDay(date) ?? fmt.date(date, 'medium')} · ${fmt.time(first.start)}`;
-    }
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenant, draft.serviceId, addOnKey, fmt]);
-
-  const options = [
-    ...(tenant.business.policies.allowAnyStaff ? [{ id: 'any', title: t('booking.staff.anyTitle'), sub: t('booking.staff.anyBody'), staff: null }] : []),
-    ...staff.map((s) => ({ id: s.id, title: tx(s.name), sub: tx(s.role), staff: s })),
-  ];
-  // Only worth showing when the people differ; otherwise the price was already on the service.
-  const all = service ? termsRange(service) : null;
-  const varies = !!all && (all.price[0] !== all.price[1] || all.duration[0] !== all.duration[1]);
-  const termsOf = (id: string) => termsRange(service!, id === 'any' ? service!.staffIds : [id]);
-
+  const { options } = staffFor(tenant, draft);
   return (
     <>
-      <StepTitle>{t('booking.staff.title')}</StepTitle>
-      <div className="choice-group" role="radiogroup" aria-labelledby="step-title">
-        {options.map((o) => {
-          const selected = draft.staffId === o.id;
-          const next = nextFor[o.id];
-          return (
-            <label key={o.id} className="choice choice--staff" data-selected={selected}>
-              <input
-                type="radio"
-                name="staff"
-                className="sr-only"
-                checked={selected}
-                onChange={() => {
-                  update({ staffId: o.id, start: undefined });
-                  onPick();
-                }}
-                onClick={() => selected && onPick()}
-              />
-              {o.staff ? (
-                <StaffAvatar staff={o.staff} />
-              ) : (
-                <span className="avatar choice__any" aria-hidden>
-                  ∗
-                </span>
-              )}
-              <span className="choice__main">
-                <span className="choice__title">{o.title}</span>
-                {o.sub && <span className="choice__desc">{o.sub}</span>}
-              </span>
-              <span className="choice__side">
-                {varies && (
-                  <>
-                    <span className="choice__price tabular">{fmt.moneyRange(termsOf(o.id).price)}</span>
-                    <span className="choice__meta">
-                      <ClockIcon size={12} /> {fmt.durationRange(termsOf(o.id).duration)}
-                    </span>
-                  </>
-                )}
-                <span className="choice__meta">{next ? t('booking.staff.nextAvailable', { when: next }) : t('booking.staff.unavailable')}</span>
-              </span>
-            </label>
-          );
-        })}
-      </div>
+      {options.length > 0 && (
+        <div className="who">
+          <span className="who__label" id="who-label">
+            {t('booking.staff.title')}
+          </span>
+          <div className="who__list" role="radiogroup" aria-labelledby="who-label">
+            {options.map((id) => {
+              const person = id === 'any' ? undefined : tenant.staff(id);
+              const on = id === staffId;
+              return (
+                <button key={id} type="button" role="radio" aria-checked={on} className="who__opt" onClick={() => update({ staffId: id, start: undefined })}>
+                  {person && <StaffAvatar staff={person} size="sm" />}
+                  {person ? tx(person.name).split(' ')[0] : t('booking.staff.anyTitle')}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {staffId ? (
+        <SlotPicker serviceId={draft.serviceId!} addOnIds={draft.addOnIds} staffId={staffId} date={draft.date} start={draft.start} onChange={(v) => update({ date: v.date, start: v.start })} />
+      ) : (
+        <p className="times__none">{t('booking.staff.pickFirst')}</p>
+      )}
     </>
+  );
+}
+
+/** The sessions of the chosen class, one day at a time. */
+function StepClass({ draft, update }: StepProps) {
+  const { t, tx, fmt } = useI18n();
+  const tenant = usePublicTenant();
+  const sessions = useMemo(() => tenant.sessions(draft.serviceId!).filter((s) => s.block !== 'cancelled' && s.block !== 'past'), [tenant, draft.serviceId]);
+  const open = (s: PublicSession) => !s.block || s.block === 'full';
+
+  const days = useMemo<StripDay[]>(() => {
+    const m = new Map<ISODate, PublicSession[]>();
+    for (const s of sessions) m.set(s.date, [...(m.get(s.date) ?? []), s]);
+    return [...m].map(([date, list]) => {
+      const free = list.filter((s) => !s.block).length;
+      const status = free ? t('booking.classes.count', { count: free }) : list.some(open) ? t('booking.time.dayFull') : t('booking.classes.closed');
+      return { date, status, open: list.some(open) };
+    });
+  }, [sessions, t]);
+
+  const chosen = sessions.find((s) => s.id === draft.sessionId);
+  const [day, setDay] = useState<ISODate | undefined>(() => chosen?.date ?? days.find((d) => d.open)?.date ?? days[0]?.date);
+
+  if (!sessions.length) return <p className="times__none">{t('booking.classes.none')}</p>;
+
+  const status = (s: PublicSession) =>
+    s.block === 'full'
+      ? t('booking.classes.fullWait')
+      : s.block === 'closed'
+        ? t('booking.classes.closed')
+        : s.block === 'too_far'
+          ? t('booking.classes.notYet')
+          : t('booking.classes.spotsLeft', { count: s.seatsLeft });
+
+  return (
+    <div className="when">
+      <DateStrip days={days} value={day} onChange={setDay} today={tenant.today} />
+      <div className="sessions" role="radiogroup" aria-label={day ? fmt.date(day) : undefined}>
+        {sessions
+          .filter((s) => s.date === day)
+          .map((s) => {
+            const on = s.id === draft.sessionId;
+            const staff = tenant.solo ? undefined : tenant.staff(s.staffId);
+            return (
+              <button
+                key={s.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                className="session"
+                data-full={s.block === 'full' || undefined}
+                disabled={!open(s)}
+                onClick={() => update({ sessionId: s.id })}
+              >
+                <span className="session__time tabular">{fmt.timeRange(s.start, s.start + s.duration)}</span>
+                <span className="session__who">{staff ? t('booking.classes.with', { name: tx(staff.name) }) : fmt.duration(s.duration)}</span>
+                <span className="session__status">{status(s)}</span>
+                <span className="session__price tabular">{fmt.money(s.price)}</span>
+                {on && (
+                  <span className="session__tick" aria-hidden="true">
+                    <CheckIcon size={12} />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+      </div>
+      <p className="times__tz">{t('booking.time.timezone', { zone: fmt.zoneName() })}</p>
+    </div>
   );
 }
 
 function StepDetails({ draft, update, errors, requireEmail }: StepProps & { errors: Errors; requireEmail: boolean }) {
   const { t } = useI18n();
+  const [more, setMore] = useState(() => !!(draft.email || draft.note));
   const field = (key: 'name' | 'phone' | 'email', label: string, props: InputHTMLAttributes<HTMLInputElement>, hint?: string) => (
     <div className="field">
       <label className="field__label" htmlFor={`f-${key}`}>
@@ -716,127 +636,103 @@ function StepDetails({ draft, update, errors, requireEmail }: StepProps & { erro
       )}
     </div>
   );
+  const email = field('email', requireEmail ? t('booking.details.email') : `${t('booking.details.email')} (${t('common.optional')})`, { type: 'email', autoComplete: 'email', dir: 'ltr', required: requireEmail });
+  return (
+    <div className="details-form">
+      {field('name', t('booking.details.name'), { autoComplete: 'name', required: true })}
+      {field('phone', t('booking.details.phone'), { type: 'tel', autoComplete: 'tel', inputMode: 'tel', dir: 'ltr', required: true }, t('booking.details.phoneHint'))}
+      {requireEmail && email}
+      {more || errors.email ? (
+        <>
+          {!requireEmail && email}
+          <div className="field">
+            <label className="field__label" htmlFor="f-note">
+              {t('booking.details.note')} <span className="muted">({t('common.optional')})</span>
+            </label>
+            <textarea id="f-note" className="field__input" value={draft.note} placeholder={t('booking.details.notePlaceholder')} onChange={(e) => update({ note: e.target.value })} />
+          </div>
+        </>
+      ) : (
+        <button type="button" className="details-form__more" onClick={() => setMore(true)}>
+          <PlusIcon size={13} /> {t(requireEmail ? 'booking.details.addNote' : 'booking.details.addMore')}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function StepReview({ draft, staffId, goTo, waiting }: { draft: Draft; staffId: string; goTo: (n: number) => void; waiting: boolean }) {
+  const { t, tx, fmt } = useI18n();
+  const tenant = usePublicTenant();
+  const p = tenant.business.policies;
+  const { service, duration, price } = totals(tenant, draft, staffId);
+  const session = chosenSession(tenant, draft);
+  const when = whenOf(tenant, draft);
+  if (!service || !when) return null;
+  const staff = tenant.staff(session ? session.staffId : staffId);
+  const fixed = duration[0] === duration[1];
+  const rows: [string, ReactNode, number][] = [
+    [t('booking.review.rows.service'), [tx(service.name), ...draft.addOnIds.map((id) => tx(tenant.addOn(id)?.name))].join(' + '), idx('service')],
+    ...(!tenant.solo ? ([[t('booking.review.rows.with'), staff ? tx(staff.name) : t('booking.summary.staffAny'), idx('time')]] as [string, ReactNode, number][]) : []),
+    [t('booking.review.rows.date'), fmt.date(when.date), idx('time')],
+    [t('booking.review.rows.time'), <span className="tabular">{fixed ? fmt.timeRange(when.start, when.start + duration[0]) : fmt.time(when.start)}</span>, idx('time')],
+    [t('booking.review.rows.duration'), fmt.durationRange(duration), -1],
+    [t('booking.review.rows.details'), [draft.name, draft.phone, draft.email].filter(Boolean).join(' · '), idx('details')],
+  ];
   return (
     <>
-      <div className="details-form">
-        {field('name', t('booking.details.name'), { autoComplete: 'name', required: true })}
-        {field('phone', t('booking.details.phone'), { type: 'tel', autoComplete: 'tel', inputMode: 'tel', dir: 'ltr', required: true }, t('booking.details.phoneHint'))}
-        {field('email', requireEmail ? t('booking.details.email') : `${t('booking.details.email')} (${t('common.optional')})`, { type: 'email', autoComplete: 'email', dir: 'ltr', required: requireEmail })}
-        <div className="field">
-          <label className="field__label" htmlFor="f-note">
-            {t('booking.details.note')} <span className="muted">({t('common.optional')})</span>
-          </label>
-          <textarea id="f-note" className="field__input" value={draft.note} placeholder={t('booking.details.notePlaceholder')} onChange={(e) => update({ note: e.target.value })} />
+      <StepTitle lede={waiting ? t('booking.classes.fullLede') : undefined}>{t(waiting ? 'booking.classes.waitTitle' : 'booking.review.title')}</StepTitle>
+      <div className="review">
+        <dl className="review__rows">
+          {rows.map(([label, value, step]) => (
+            <div key={label} className="review__row">
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+              {step >= 0 && (
+                <button type="button" className="context__change" onClick={() => goTo(step)}>
+                  {t('common.change')}
+                  <span className="sr-only">, {label}</span>
+                </button>
+              )}
+            </div>
+          ))}
+        </dl>
+        <div className="review__total">
+          <span>{t('booking.summary.total')}</span>
+          <strong className="tabular">{fmt.moneyRange(price)}</strong>
         </div>
+        <p className="review__note">{price[0] !== price[1] ? t('booking.summary.dependsOnStaff') : t('booking.summary.payAtVisit')}</p>
+      </div>
+      <div className="review__policies">
+        {waiting && <p className="review__policy">{t('booking.classes.done.how')}</p>}
+        {!waiting && p.customerCanCancel && (
+          <p className="review__policy">
+            <ClockIcon /> {t(session ? 'booking.classes.policy' : 'booking.review.policy', { hours: t('units.hoursLong', { count: p.cancelWindowHours }) })}
+          </p>
+        )}
+        {!waiting && p.confirmationMode === 'manual' && <p className="review__policy">{t('booking.review.manual')}</p>}
       </div>
     </>
   );
 }
 
-function Policies({ waiting, session }: { waiting: boolean; session: boolean }) {
-  const { t } = useI18n();
-  const p = usePublicTenant().business.policies;
-  if (!waiting && !p.customerCanCancel && p.confirmationMode !== 'manual') return null;
-  return (
-    <div className="review__policies">
-      {waiting && <p className="review__policy">{t('booking.classes.done.how')}</p>}
-      {!waiting && p.customerCanCancel && (
-        <p className="review__policy">
-          <ClockIcon /> {t(session ? 'booking.classes.policy' : 'booking.review.policy', { hours: t('units.hoursLong', { count: p.cancelWindowHours }) })}
-        </p>
-      )}
-      {!waiting && p.confirmationMode === 'manual' && <p className="review__policy">{t('booking.review.manual')}</p>}
-    </div>
-  );
-}
-
-/** Step indexes the summary can jump back to; -1 hides that link. */
-interface Edit {
-  goTo: (n: number) => void;
-  service: number;
-  staff: number;
-  time: number;
-}
-
-function Change({ edit, step, label }: { edit?: Edit; step: number | undefined; label: string }) {
-  const { t } = useI18n();
-  if (!edit || step === undefined || step < 0) return null;
-  return (
-    <button type="button" className="summary__change" onClick={() => edit.goTo(step)}>
-      {t('common.change')}
-      <span className="sr-only">, {label}</span>
-    </button>
-  );
-}
-
-function Summary({ draft, edit }: { draft: Draft; edit?: Edit }) {
+function WaitlistDone({ position, session }: { position: number; session: PublicSession }) {
   const { t, tx, fmt } = useI18n();
   const tenant = usePublicTenant();
-  const { service, base, duration, price } = totals(tenant, draft);
-  if (!service) return <p className="summary__empty muted">{t('booking.summary.empty')}</p>;
-  const cls = isClass(service);
-  const session = chosenSession(tenant, draft);
-  const staff = tenant.staff(session ? session.staffId : draft.staffId);
-  const start = cls ? session?.start : draft.date ? draft.start : undefined;
-  const date = cls ? session?.date : draft.date;
-  const addOns = cls ? [] : draft.addOnIds.map((id) => tenant.addOn(id)).filter((a) => !!a);
+  const service = tenant.service(session.serviceId);
   return (
-    <div className="summary">
-      <p className="summary__eyebrow">
-        {t('booking.summary.title')}
-        <Change edit={edit} step={edit?.service} label={t('booking.steps.service')} />
-      </p>
-      <ul className="summary__lines">
-        <li>
-          <span>{tx(service.name)}</span>
-          <span className="tabular">{fmt.moneyRange(base)}</span>
-        </li>
-        {addOns.map((a) => (
-          <li key={a!.id} className="summary__addon">
-            <span>{tx(a!.name)}</span>
-            <span className="tabular">+{fmt.money(a!.price)}</span>
-          </li>
-        ))}
-      </ul>
-      <dl className="summary__meta">
-        {!tenant.solo && (cls ? !!session : !!draft.staffId) && (
-          <div>
-            <dt>
-              {t('booking.steps.staff')}
-              <Change edit={edit} step={edit?.staff} label={t('booking.steps.staff')} />
-            </dt>
-            <dd>{staff ? tx(staff.name) : t('booking.summary.staffAny')}</dd>
-          </div>
-        )}
-        {date && start !== undefined && (
-          <div>
-            <dt>
-              {t('booking.steps.time')}
-              <Change edit={edit} step={edit?.time} label={t('booking.steps.time')} />
-            </dt>
-            <dd>
-              {fmt.date(date, 'medium')} ·{' '}
-              <span className="tabular">{duration[0] === duration[1] ? fmt.timeRange(start, start + duration[0]) : fmt.time(start)}</span>
-            </dd>
-          </div>
-        )}
-        {session?.block === 'full' && (
-          <div>
-            <dt>{t('booking.classes.seats')}</dt>
-            <dd>{t('booking.classes.fullWait')}</dd>
-          </div>
-        )}
-        <div>
-          <dt>{t('appt.duration')}</dt>
-          <dd>{fmt.durationRange(duration)}</dd>
-        </div>
-      </dl>
-      <div className="summary__total">
-        <span>{t('booking.summary.total')}</span>
-        <span className="tabular">{fmt.moneyRange(price)}</span>
-      </div>
-      {price[0] !== price[1] && <p className="summary__note muted">{t('booking.summary.dependsOnStaff')}</p>}
-      <p className="summary__note muted">{t('booking.summary.payAtVisit')}</p>
+    <div className="waitlist-done">
+      <span className="waitlist-done__mark" aria-hidden="true">
+        <CheckIcon size={20} />
+      </span>
+      <StepTitle lede={t('booking.classes.done.body', { service: tx(service?.name), when: `${fmt.date(session.date, 'medium')} · ${fmt.time(session.start)}` })}>
+        {t('booking.classes.done.title')}
+      </StepTitle>
+      <p className="waitlist-done__pos">{t('booking.classes.done.position', { position: fmt.number(position) })}</p>
+      <p className="muted">{t('booking.classes.done.how')}</p>
+      <Link to={tenant.base} className="btn btn--ghost">
+        {t('confirmed.back', { business: tx(tenant.business.name) })}
+      </Link>
     </div>
   );
 }

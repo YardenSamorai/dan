@@ -19,6 +19,7 @@ page.on('console', (m) => (m.type() === 'error' || m.text().includes('[i18n]')) 
 await page.addInitScript((l) => localStorage.setItem('saas.locale', l), locale);
 const shot = (n) => page.screenshot({ path: `qa/shots/classes-${mode}-${locale}-${n}.png` });
 const cta = () => page.locator('.btn--primary.btn--lg:visible').first();
+const bar = () => page.locator('.bar__cta');
 
 await page.goto(`${BASE}/sign-in`, { waitUntil: 'networkidle' });
 await page.fill('#si-email', 'noa@demo-studio.example');
@@ -80,27 +81,29 @@ await shot('6-calendar');
 // 4. Book it online until it's full, then join the waitlist.
 const book = async (i) => {
   await page.goto(`${BASE}/book/${slug}/new`, { waitUntil: 'networkidle' });
-  await page.locator('label.choice', { hasText: he ? 'שיעור קבוצתי' : 'Group class' }).first().click();
-  await cta().click();
+  await page.locator('label.svc', { hasText: he ? 'שיעור קבוצתי' : 'Group class' }).first().click();
+  await bar().click();
   await page.waitForTimeout(400);
   if (i === 0) await shot('7-schedule');
-  await page.locator('.pcal-entry--session:visible:not([data-off]):not([data-other])').first().click();
+  await page.locator('button.session:not(:disabled)').first().click();
   await page.waitForTimeout(300);
-  await cta().click();
+  await bar().click();
   await page.waitForTimeout(300);
   await page.fill('#f-name', he ? `לקוחה ${i + 1}` : `Customer ${i + 1}`);
   await page.fill('#f-phone', `054-555-10${i}${i}`);
   if (await page.locator('#f-email[required]').count()) await page.fill('#f-email', `c${i}@example.com`);
+  await bar().click();
+  await page.waitForTimeout(300);
   if (i === 0 || i === 3) await shot(`8-review-${i}`);
-  await cta().click();
+  await bar().click();
   await page.waitForTimeout(1200);
   await shot(`9-done-${i}`);
 };
 for (let i = 0; i < 4; i++) await book(i);
 
 await page.goto(`${BASE}/book/${slug}/new`, { waitUntil: 'networkidle' });
-await page.locator('label.choice', { hasText: he ? 'שיעור קבוצתי' : 'Group class' }).first().click();
-await cta().click();
+await page.locator('label.svc', { hasText: he ? 'שיעור קבוצתי' : 'Group class' }).first().click();
+await bar().click();
 await page.waitForTimeout(400);
 await shot('10-schedule-full');
 
