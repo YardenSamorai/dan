@@ -30,9 +30,12 @@ export function apnsKeysFromEnv(env: Env): ApnsKeys | null {
     teamId,
     privateKey,
     topic: env.APNS_TOPIC?.trim() || 'il.co.tornu.app',
-    host: env.APNS_SANDBOX === 'true' ? 'api.sandbox.push.apple.com' : 'api.push.apple.com',
+    host: env.APNS_SANDBOX === 'true' ? SANDBOX : PRODUCTION,
   };
 }
+
+const PRODUCTION = 'api.push.apple.com';
+const SANDBOX = 'api.sandbox.push.apple.com';
 
 const encoder = new TextEncoder();
 
@@ -57,8 +60,8 @@ async function providerToken(keys: ApnsKeys): Promise<string> {
 
 /** `gone`: the app was removed or turned notifications off for good; forget the device. */
 export async function sendApns(token: string, message: PushMessage, keys: ApnsKeys, fetchImpl: typeof fetch = fetch): Promise<'sent' | 'gone' | 'failed'> {
-  try {
-    const res = await fetchImpl(`https://${keys.host}/3/device/${token}`, {
+  const post = async (host: string) => {
+    const res = await fetchImpl(`https://${host}/3/device/${token}`, {
       method: 'POST',
       headers: {
         authorization: `bearer ${await providerToken(keys)}`,
@@ -71,10 +74,19 @@ export async function sendApns(token: string, message: PushMessage, keys: ApnsKe
       },
       body: JSON.stringify({ aps: { alert: { title: message.title, body: message.body }, sound: 'default', 'thread-id': 'activity' }, url: message.url }),
     });
-    if (res.ok) return 'sent';
-    const reason = ((await res.json().catch(() => ({}))) as { reason?: string }).reason ?? '';
-    if (res.status === 410 || reason === 'BadDeviceToken' || reason === 'Unregistered' || reason === 'DeviceTokenNotForTopic') return 'gone';
-    console.error('[apns]', res.status, reason);
+    const reason = res.ok ? '' : (((await res.json().catch(() => ({}))) as { reason?: string }).reason ?? '');
+    return { ok: res.ok, status: res.status, reason };
+  };
+  try {
+    let r = await post(keys.host);
+    // A token from the other environment (a development build vs TestFlight) reads as a bad token: try there before forgetting the device.
+    if (r.reason === 'BadDeviceToken') {
+      const other = await post(keys.host === SANDBOX ? PRODUCTION : SANDBOX);
+      if (other.ok || other.reason !== 'BadDeviceToken') r = other;
+    }
+    if (r.ok) return 'sent';
+    console.error('[apns]', r.status, r.reason);
+    if (r.status === 410 || r.reason === 'BadDeviceToken' || r.reason === 'Unregistered' || r.reason === 'DeviceTokenNotForTopic') return 'gone';
     return 'failed';
   } catch (e) {
     console.error('[apns]', e instanceof Error ? e.message : e);

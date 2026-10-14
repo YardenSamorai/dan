@@ -15,6 +15,7 @@ import { usageMonth } from '../src/domain/usage';
 import { WHATSAPP_TEMPLATES, whatsAppParams } from '../src/domain/whatsapp';
 import { internationalPhone } from '../src/lib/phone';
 import { b64url, generatePushKeys, notifyDevices } from '../server/push';
+import { sendApns } from '../server/apns';
 import { FileStore } from '../server/store';
 import { availableSlots, isClass } from '../src/domain/scheduling';
 
@@ -912,6 +913,18 @@ try {
     if (forApp) await call('public.cancelBooking', [SLUG, forApp.id]);
     await notifyDevices(store, null, [{ before: before2, after: (await store.snapshot({})).tenants[BIZ] }], fakeFetch, apns);
     check('a device Apple says is gone is forgotten', (await store.snapshot({})).tenants[BIZ].pushDevices?.length === 0);
+
+    const hosts: string[] = [];
+    const appleSays = (sandboxOk: boolean) =>
+      (async (url: string) => {
+        const host = new URL(url).host;
+        hosts.push(host);
+        return sandboxOk && host.includes('sandbox') ? new Response(null, { status: 200 }) : new Response(JSON.stringify({ reason: 'BadDeviceToken' }), { status: 400 });
+      }) as unknown as typeof fetch;
+    const note = { title: 't', body: 'b', url: '/app', tag: 'x' };
+    const crossed = await sendApns(token, note, apns, appleSays(true));
+    check('a token from Apple’s other environment still gets through', crossed === 'sent' && hosts.join() === 'api.push.apple.com,api.sandbox.push.apple.com', hosts);
+    check('a token neither environment knows is forgotten', (await sendApns(token, note, apns, appleSays(false))) === 'gone');
   }
 
   const persisted = new FileStore(join(dir, 'db.json'));

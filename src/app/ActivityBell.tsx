@@ -159,12 +159,13 @@ export function PushControl() {
 export function PushRow() {
   const { t } = useI18n();
   const { state, busy, turnOn, turnOff, openSettings } = usePush();
-  if (state === 'on' || state === 'off') {
+  // In the app the row is always there; while the phone is asked, the switch waits.
+  if (state === 'on' || state === 'off' || (state === null && isNativeApp)) {
     return (
       <label className="sheet-row sheet-row--static">
         <span className="sheet-row__text">{t('activity.push.offTitle')}</span>
         <span className="switch">
-          <input type="checkbox" role="switch" checked={state === 'on'} disabled={busy} onChange={(e) => void (e.target.checked ? turnOn() : turnOff())} />
+          <input type="checkbox" role="switch" checked={state === 'on'} disabled={busy || state === null} onChange={(e) => void (e.target.checked ? turnOn() : turnOff())} />
         </span>
       </label>
     );

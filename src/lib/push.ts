@@ -21,11 +21,15 @@ const supported = () => typeof window !== 'undefined' && 'serviceWorker' in navi
 // ── The iPhone app: Apple's notifications, through Capacitor ──────────
 
 const APP_TOKEN_KEY = storageKey('apns-token');
-const plugin = () => import('@capacitor/push-notifications').then((m) => m.PushNotifications);
+/**
+ * The module, never the plugin itself: a Capacitor plugin answers any property,
+ * `then` included, so a promise resolved with it waits forever.
+ */
+const pluginModule = () => import('@capacitor/push-notifications');
 
 /** Registers with Apple and waits for this device's token; rejects with Apple's reason. */
 async function appToken(): Promise<string> {
-  const push = await plugin();
+  const { PushNotifications: push } = await pluginModule();
   return new Promise((resolve, reject) => {
     const handles: { remove: () => Promise<void> }[] = [];
     const done = (token: string | null, why = '') => {
@@ -36,7 +40,7 @@ async function appToken(): Promise<string> {
     };
     const timer = window.setTimeout(() => done(null, 'no answer from Apple'), 15_000);
     void (async () => {
-      handles.push(await push.addListener('registration', (t) => done(t.value)));
+      handles.push(await push.addListener('registration', (t) => done(t.value.toLowerCase())));
       handles.push(await push.addListener('registrationError', (e) => done(null, e.error)));
       await push.register();
     })().catch((e: unknown) => done(null, e instanceof Error ? e.message : String(e)));
@@ -46,13 +50,13 @@ async function appToken(): Promise<string> {
 const appDevice = (token: string): PushDeviceInput => ({ endpoint: APNS_PREFIX + token, p256dh: '', auth: '' });
 
 async function appState(): Promise<PushState> {
-  const { receive } = await (await plugin()).checkPermissions();
+  const { receive } = await (await pluginModule()).PushNotifications.checkPermissions();
   if (receive === 'denied') return 'denied';
   return receive === 'granted' && localStorage.getItem(APP_TOKEN_KEY) ? 'on' : 'off';
 }
 
 async function enableAppPush(): Promise<PushDeviceInput | null> {
-  const { receive } = await (await plugin()).requestPermissions();
+  const { receive } = await (await pluginModule()).PushNotifications.requestPermissions();
   if (receive !== 'granted') return null;
   const token = await appToken();
   localStorage.setItem(APP_TOKEN_KEY, token);
@@ -154,8 +158,8 @@ export function onNotificationOpen(go: (url: string) => void): () => void {
   if (isNativeApp) {
     let handle: { remove: () => Promise<void> } | null = null;
     let live = true;
-    void plugin()
-      .then((push) =>
+    void pluginModule()
+      .then(({ PushNotifications: push }) =>
         push.addListener('pushNotificationActionPerformed', (a) => {
           const url = (a.notification.data as { url?: unknown } | undefined)?.url;
           if (typeof url === 'string' && url.startsWith('/')) go(new URL(url, location.origin).href);
