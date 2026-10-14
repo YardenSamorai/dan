@@ -171,6 +171,7 @@ export function availabilityView(t: TenantData): TenantData {
     blocks: t.blocks.map((b) => ({ ...b, label: '' })),
     customers: [],
     outbox: [],
+    pushDevices: undefined,
     appointments: t.appointments
       .filter((a) => a.date >= from && a.status !== 'cancelled')
       .map((a) => ({ ...a, code: '', customerId: '', note: undefined, internalNote: undefined, cancellation: undefined, history: [], price: 0 })),

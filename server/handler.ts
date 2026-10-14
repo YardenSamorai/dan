@@ -23,6 +23,7 @@ interface Call {
   auth: Authenticator;
   store: Store;
   channels: readonly Channel[];
+  pushKey?: string;
 }
 
 /** Replaces every inline image (data URL) in `v` with the URL `put` stored it under. */
@@ -84,6 +85,8 @@ const WORKSPACE_METHODS = new Set<keyof WorkspaceApi>([
   'revokeInvite',
   'removeMember',
   'deleteBusiness',
+  'savePushDevice',
+  'removePushDevice',
   'resetDemo',
 ]);
 
@@ -159,7 +162,7 @@ const FNS: Record<string, Fn> = {
 
   /** Which message channels actually deliver here, so the UI never claims more. */
   'platform.info': {
-    run: (_, c) => ({ channels: c.channels }),
+    run: (_, c) => ({ channels: c.channels, ...(c.pushKey && { pushKey: c.pushKey }) }),
   },
 
   'auth.demoAccounts': {
@@ -284,6 +287,8 @@ export interface ApiDeps {
   auth: Authenticator;
   /** Channels with a connected provider. */
   channels?: readonly Channel[];
+  /** VAPID public key, when push notifications are set up. */
+  pushKey?: string;
 }
 
 /** GET /api/ics/{slug}/{key}.ics: the link itself is the credential, like Google's "secret address". */
@@ -308,8 +313,8 @@ export async function handleIcs(req: Request, deps: ApiDeps): Promise<Response> 
 const safeEqual = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 export interface RpcHooks {
-  /** After a successful save, with the businesses it changed. */
-  onSaved?: (tenants: TenantData[]) => void;
+  /** After a successful save, with the businesses it changed (`before` missing for a new one). */
+  onSaved?: (changes: { before?: TenantData; after: TenantData }[]) => void;
 }
 
 export async function handleRpc(req: Request, deps: ApiDeps, hooks: RpcHooks = {}): Promise<Response> {
@@ -324,7 +329,7 @@ export async function handleRpc(req: Request, deps: ApiDeps, hooks: RpcHooks = {
   if (!fn) return json({ error: 'invalid' }, 404);
   const args = Array.isArray(body.args) ? body.args : [];
   const token = bearer(req);
-  const call: Call = { userId: await deps.auth.userId(token), auth: deps.auth, store: deps.store, channels: deps.channels ?? [] };
+  const call: Call = { userId: await deps.auth.userId(token), auth: deps.auth, store: deps.store, channels: deps.channels ?? [], pushKey: deps.pushKey };
   if (call.userId && deps.auth.profile && deps.store.ensureUser) {
     try {
       const p = await deps.auth.profile(token);
@@ -341,7 +346,7 @@ export async function handleRpc(req: Request, deps: ApiDeps, hooks: RpcHooks = {
       const out = await inScope(before, call.userId, () => fn.run(args, call, getDb));
       if (out.db !== before) {
         await deps.store.commit(before, out.db);
-        hooks.onSaved?.(Object.values(changedTenants(before, out.db)));
+        hooks.onSaved?.(Object.entries(changedTenants(before, out.db)).map(([id, after]) => ({ before: before.tenants[id], after })));
       }
       return json({ result: out.result ?? null });
     } catch (e) {

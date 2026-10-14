@@ -440,6 +440,16 @@ export interface OwnerAlerts {
   changed: boolean;
 }
 
+/** A browser that asked for push notifications about this business. Server-side only: never sent to browsers. */
+export interface PushDevice {
+  userId: string;
+  endpoint: string;
+  /** The browser's public key and auth secret (base64url), for encrypting what's sent. */
+  p256dh: string;
+  auth: string;
+  at: string;
+}
+
 /** Everything one tenant owns. The scheduling engine operates on a single tenant at a time. */
 export interface TenantData {
   business: Business;
@@ -455,4 +465,5 @@ export interface TenantData {
   /** Group class sessions. Missing on businesses saved before classes existed; read through `sessionsOf`. */
   sessions?: ClassSession[];
   outbox: OutboxMessage[];
+  pushDevices?: PushDevice[];
 }

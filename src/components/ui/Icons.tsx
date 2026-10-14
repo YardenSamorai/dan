@@ -59,6 +59,12 @@ export const ClockIcon = icon(
     <path d="M8 5v3.2l2 1.3" />
   </>,
 );
+export const BellIcon = icon(
+  <>
+    <path d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1 1H3z" />
+    <path d="M6.6 14a1.5 1.5 0 0 0 2.8 0" />
+  </>,
+);
 export const PinIcon = icon(
   <>
     <path d="M8 14s4.5-4 4.5-7.5a4.5 4.5 0 1 0-9 0C3.5 10 8 14 8 14z" />

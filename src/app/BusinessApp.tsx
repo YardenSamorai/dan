@@ -31,7 +31,9 @@ import type { Permission } from '../domain/permissions';
 import { useI18n } from '../i18n/I18nProvider';
 import type { MessageKey } from '../i18n/messages';
 import { useMedia } from '../lib/useMedia';
+import { ActivityBell } from './ActivityBell';
 import { AppUIProvider, useAppUI } from './AppUI';
+import { usePopover } from './usePopover';
 import { useWorkspace, WorkspaceProvider } from './workspace';
 import './app.css';
 
@@ -81,29 +83,6 @@ function useNav() {
   const items = NAV.filter((n) => !n.needs || can(n.needs));
   const current = [...items].sort((a, b) => b.to.length - a.to.length).find((n) => pathname === n.to || pathname.startsWith(n.to + '/')) ?? items[0];
   return { items, current };
-}
-
-/** Outside-press and Esc close a popover; the trigger keeps focus semantics. */
-function usePopover() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const { pathname } = useLocation();
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('pointerdown', close);
-    document.addEventListener('keydown', close);
-    return () => {
-      document.removeEventListener('pointerdown', close);
-      document.removeEventListener('keydown', close);
-    };
-  }, [open]);
-  return { open, setOpen, ref };
 }
 
 /** The businesses this person belongs to, plus "create". Used in the switcher and the phone More sheet. */
@@ -385,6 +364,7 @@ function Shell() {
               <PlusIcon /> <span className="topbar__new-label">{t('app.newAppointment')}</span>
             </button>
           )}
+          <ActivityBell />
           <AccountMenu />
         </header>
         <DraftBanner />

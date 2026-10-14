@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { cleanPushDevice, PUSH_DEVICE_LIMIT } from '../../domain/activity';
 import { IMPORT_LIMIT, LIMITS, mergeNotes } from '../../domain/customerImport';
 import { alertsOf, notificationsOf, renderMessage, renderOwnerAlert } from '../../domain/notifications';
 import { locales } from '../../i18n/config';
@@ -734,7 +735,27 @@ function createApi(ctx: TenantContext): WorkspaceApi {
       if (!m) throw new ApiError('not_found');
       if (m.role === 'owner' || m.userId === ctx.userId || (m.role === 'manager' && ctx.role !== 'owner')) throw new ApiError('forbidden');
       mutateDb((db) => ({ ...db, members: db.members.filter((x) => x.id !== m.id) }));
-      write((cur) => ({ ...cur, staff: cur.staff.map((s) => (s.userId === m.userId ? { ...s, userId: undefined } : s)) }));
+      write((cur) => ({
+        ...cur,
+        staff: cur.staff.map((s) => (s.userId === m.userId ? { ...s, userId: undefined } : s)),
+        pushDevices: cur.pushDevices?.filter((d) => d.userId !== m.userId),
+      }));
+    },
+
+    async savePushDevice(device) {
+      await latency(60);
+      tenantOf(ctx);
+      const d = cleanPushDevice(device);
+      if (!d) throw new ApiError('invalid');
+      // One browser, one entry: whoever signed in on it last gets its notifications.
+      write((cur) => ({ ...cur, pushDevices: [...(cur.pushDevices ?? []).filter((x) => x.endpoint !== d.endpoint), { ...d, userId: ctx.userId, at: nowISO() }].slice(-PUSH_DEVICE_LIMIT) }));
+    },
+
+    async removePushDevice(endpoint) {
+      await latency(60);
+      tenantOf(ctx);
+      if (!getDb().tenants[B]?.pushDevices?.some((x) => x.endpoint === endpoint && x.userId === ctx.userId)) return;
+      write((cur) => ({ ...cur, pushDevices: cur.pushDevices?.filter((x) => !(x.endpoint === endpoint && x.userId === ctx.userId)) }));
     },
 
     async deleteBusiness(confirmSlug) {
@@ -760,7 +781,8 @@ function createApi(ctx: TenantContext): WorkspaceApi {
  * Role-scoped read model. A staff-role member gets their own appointments and
  * the customers attached to them — the same filtering a server would apply.
  */
-export function scopeForRole(t: TenantData, ctx: TenantContext): TenantData {
+export function scopeForRole(full: TenantData, ctx: TenantContext): TenantData {
+  const t = full.pushDevices ? { ...full, pushDevices: undefined } : full;
   if (can(ctx.role, 'calendar.all')) return can(ctx.role, 'staff.manage') ? t : { ...t, business: { ...t.business, invites: undefined, usage: undefined } };
   const appointments = t.appointments.filter((a) => a.staffId === ctx.staffId);
   const sessions = sessionsOf(t).filter((s) => s.staffId === ctx.staffId);

@@ -1,0 +1,15 @@
+{
+  "name": "תורנו",
+  "short_name": "תורנו",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "he",
+  "background_color": "#F6F6F4",
+  "theme_color": "#F6F6F4",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

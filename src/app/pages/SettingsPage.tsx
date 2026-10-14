@@ -18,6 +18,7 @@ import type { BookingPolicies, Business, Channel, Invite, NotificationSettings, 
 import { localeMeta, locales, type Locale } from '../../i18n/config';
 import { useI18n } from '../../i18n/I18nProvider';
 import type { MessageKey } from '../../i18n/messages';
+import { PushControl } from '../ActivityBell';
 import { PageHeader } from '../shared';
 import { useWorkspace } from '../workspace';
 
@@ -405,6 +406,7 @@ function OwnerAlertsPanel() {
           {t('settings.alerts.where', { email: b.email || '—', phone: b.phone || '—' })} <Link to="/app/settings/business">{t('settings.alerts.edit')}</Link>
         </p>
         {missing.length > 0 && <p className="inline-alert inline-alert--warn">{t(`settings.alerts.missing.${missing[0]}`)}</p>}
+        <PushControl />
       </div>
       <SaveBar dirty={d.dirty} onReset={d.reset} onSave={() => api.updateBusiness({ alerts: v })} />
     </section>

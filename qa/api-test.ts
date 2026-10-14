@@ -14,8 +14,9 @@ import { handleWhatsAppWebhook } from '../server/whatsappWebhook';
 import { usageMonth } from '../src/domain/usage';
 import { WHATSAPP_TEMPLATES, whatsAppParams } from '../src/domain/whatsapp';
 import { internationalPhone } from '../src/lib/phone';
+import { b64url, generatePushKeys, notifyDevices } from '../server/push';
 import { FileStore } from '../server/store';
-import { availableSlots } from '../src/domain/scheduling';
+import { availableSlots, isClass } from '../src/domain/scheduling';
 
 const dir = mkdtempSync(join(tmpdir(), 'api-test-'));
 const auth = devAuthenticator('test-secret');
@@ -31,6 +32,38 @@ async function call(fn: string, args: unknown[] = [], token?: string) {
     deps,
   );
   return { status: res.status, ...((await res.json()) as { result?: any; error?: string }) };
+}
+
+/** What a browser does with a push (RFC 8291), to prove the server's encryption is right. */
+async function decryptPush(body: Uint8Array, uaPrivate: CryptoKey, uaPublic: Uint8Array, auth: Uint8Array): Promise<string> {
+  const enc = new TextEncoder();
+  const join = (...xs: Uint8Array[]) => {
+    const out = new Uint8Array(xs.reduce((n, x) => n + x.length, 0));
+    let at = 0;
+    for (const x of xs) (out.set(x, at), (at += x.length));
+    return out;
+  };
+  const hkdf = async (salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, n: number) =>
+    new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']), n * 8));
+  const salt = body.slice(0, 16);
+  const asPublic = body.slice(21, 21 + body[20]);
+  const asKey = await crypto.subtle.importKey('raw', asPublic, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: asKey }, uaPrivate, 256));
+  const ikm = await hkdf(auth, shared, join(enc.encode('WebPush: info\0'), uaPublic, asPublic), 32);
+  const cek = await hkdf(salt, ikm, enc.encode('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await hkdf(salt, ikm, enc.encode('Content-Encoding: nonce\0'), 12);
+  const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['decrypt']);
+  const plain = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, key, body.slice(21 + body[20])));
+  return new TextDecoder().decode(plain.slice(0, plain.lastIndexOf(2)));
+}
+
+async function verifyVapid(header: string, publicKey: string, audience: string): Promise<boolean> {
+  const m = /^vapid t=([^.]+)\.([^.]+)\.([^,]+), k=(.+)$/.exec(header);
+  if (!m || m[4] !== publicKey) return false;
+  const claims = JSON.parse(new TextDecoder().decode(b64url.decode(m[2])));
+  if (claims.aud !== audience || claims.exp * 1000 < Date.now() || !/^mailto:|^https:/.test(claims.sub)) return false;
+  const key = await crypto.subtle.importKey('raw', b64url.decode(publicKey), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+  return crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, b64url.decode(m[3]), new TextEncoder().encode(`${m[1]}.${m[2]}`));
 }
 
 let failed = 0;
@@ -727,6 +760,83 @@ try {
       check('a cancelled session cannot be joined', late.status === 400 && late.error === 'policy', late);
     }
     await call('workspace.call', [BIZ, 'updateBusiness', [{ notifications: notes }]], owner);
+  }
+
+  // Push notifications to the team.
+  {
+    const store = deps.store;
+    const keys = { ...(await generatePushKeys()), subject: 'mailto:test@example.com' };
+    const ua = (await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits'])) as CryptoKeyPair;
+    const uaPublic = new Uint8Array(await crypto.subtle.exportKey('raw', ua.publicKey));
+    const authSecret = crypto.getRandomValues(new Uint8Array(16));
+    const device = (host: string) => ({ endpoint: `https://${host}/send/${Math.random().toString(36).slice(2)}`, p256dh: b64url.encode(uaPublic), auth: b64url.encode(authSecret) });
+    const ownerDevice = device('fcm.googleapis.com');
+    const staffDevice = device('web.push.apple.com');
+
+    const bad = await call('workspace.call', [BIZ, 'savePushDevice', [{ ...ownerDevice, endpoint: 'http://169.254.169.254/latest/meta-data' }]], owner);
+    check('a push address that isn’t a push service is refused', bad.status === 400, bad);
+    await call('workspace.call', [BIZ, 'savePushDevice', [ownerDevice]], owner);
+    await call('workspace.call', [BIZ, 'savePushDevice', [staffDevice]], staff);
+    check('each browser is stored once, for whoever turned it on', (await store.snapshot({})).tenants[BIZ].pushDevices?.length === 2);
+    const ownerSees = (await call('workspace.tenant', [BIZ], owner)).result;
+    const publicSees = (await call('public.business', [SLUG])).result;
+    check('push subscriptions never reach a browser', ownerSees.pushDevices === undefined && publicSees.availability.pushDevices === undefined);
+
+    const sent: { url: string; init: RequestInit }[] = [];
+    let reply = 201;
+    const fakeFetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      sent.push({ url: String(url), init: init! });
+      return new Response(null, { status: reply });
+    }) as typeof fetch;
+    const tracked = async <T>(fn: () => Promise<T>): Promise<T> => {
+      const before = (await store.snapshot({})).tenants[BIZ];
+      const out = await fn();
+      await notifyDevices(store, keys, [{ before, after: (await store.snapshot({})).tenants[BIZ] }], fakeFetch);
+      return out;
+    };
+    const live = (await call('workspace.tenant', [BIZ], owner)).result;
+    const bookFor = async (staffId: string, phone: string) => {
+      const svc = bookable.find((s: any) => s.staffIds.includes(staffId) && !isClass(s));
+      for (const date of days) {
+        const slot = svc && availableSlots(live, { serviceId: svc.id, staffId, date, online: true })[0];
+        if (!slot) continue;
+        const r = await call('public.createBooking', [SLUG, { serviceId: svc.id, addOnIds: [], staffId, date, start: slot.start, customer: { name: 'Push Test', phone, locale: 'he' } }]);
+        if (r.status === 200) return r.result;
+      }
+      return null;
+    };
+    const otherStaff = live.staff.find((s: any) => s.active && s.id !== mayaStaffId && bookable.some((b: any) => b.staffIds.includes(s.id) && !isClass(b)))?.id;
+
+    const theirs = otherStaff && (await tracked(() => bookFor(otherStaff, '0506660001')));
+    check('a booking with someone else reaches the owner only', !!theirs && sent.length === 1 && sent[0].url === ownerDevice.endpoint, sent.map((s) => s.url));
+    if (sent[0]) {
+      const body = new Uint8Array(sent[0].init.body as Uint8Array);
+      const msg = JSON.parse(await decryptPush(body, ua.privateKey, uaPublic, authSecret));
+      check('the notification decrypts and names the customer', msg.body.includes('Push Test') && msg.url.includes(theirs.id) && !!msg.title, msg);
+      const headers = sent[0].init.headers as Record<string, string>;
+      check('push is sent encrypted (aes128gcm)', headers['content-encoding'] === 'aes128gcm' && body[20] === 65);
+      check('the VAPID signature checks out', await verifyVapid(headers.authorization, keys.publicKey, 'https://fcm.googleapis.com'), headers.authorization);
+    }
+
+    sent.length = 0;
+    const mine = await tracked(() => bookFor(mayaStaffId, '0506660002'));
+    check('a booking with a staff member reaches them and the owner', !!mine && sent.length === 2, sent.map((s) => s.url));
+
+    sent.length = 0;
+    if (mine) await tracked(() => call('workspace.call', [BIZ, 'setAppointmentStatus', [mine.id, 'confirmed']], owner));
+    check('what the team does itself sends no push', sent.length === 0, sent.length);
+
+    const alerts = live.business.alerts;
+    await call('workspace.call', [BIZ, 'updateBusiness', [{ alerts: { channels: [], booked: true, changed: false } }]], owner);
+    if (theirs) await tracked(() => call('public.cancelBooking', [SLUG, theirs.id]));
+    check('no push for changes when that alert is off', sent.length === 0, sent.length);
+    await call('workspace.call', [BIZ, 'updateBusiness', [{ alerts: { channels: [], booked: true, changed: true } }]], owner);
+
+    reply = 410;
+    if (mine) await tracked(() => call('public.cancelBooking', [SLUG, mine.id]));
+    check('a cancellation is pushed', sent.length === 2, sent.length);
+    check('subscriptions the push service dropped are forgotten', (await store.snapshot({})).tenants[BIZ].pushDevices?.length === 0);
+    await call('workspace.call', [BIZ, 'updateBusiness', [{ alerts }]], owner);
   }
 
   const persisted = new FileStore(join(dir, 'db.json'));

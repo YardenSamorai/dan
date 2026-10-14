@@ -432,7 +432,17 @@ export interface WorkspaceApi {
   removeMember(memberId: string): Promise<void>;
   /** Owner only. Permanently removes the business, its data and everyone's access. `confirmSlug` must match. */
   deleteBusiness(confirmSlug: string): Promise<void>;
+  /** This browser gets push notifications about what customers do online (staff: about their own appointments). */
+  savePushDevice(device: PushDeviceInput): Promise<void>;
+  removePushDevice(endpoint: string): Promise<void>;
   resetDemo(): Promise<void>;
+}
+
+/** A browser's push subscription: its address and keys, base64url. */
+export interface PushDeviceInput {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
 }
 
 /** A person with sign-in access to the workspace. */
@@ -454,6 +464,8 @@ export interface WorkspaceData {
 export interface PlatformInfo {
   /** Message channels that really deliver. Messages on other channels are kept, not sent. */
   channels: Channel[];
+  /** The server's public key for push notifications; missing when push isn't set up. */
+  pushKey?: string;
 }
 
 export interface PlatformService {
