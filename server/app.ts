@@ -34,7 +34,8 @@ function build(env: Env): Deps {
   const cfg = supabaseConfig(env);
   const channels = channelsOf(senders);
   const push = pushKeysFromEnv(env);
-  const sendCode: ApiDeps['sendCode'] = canSendCodes(senders) ? (t, to, code, locale) => sendPhoneCode(senders, t, to, code, locale) : undefined;
+  // PHONE_CODES=off holds the booking lookup back, e.g. while WhatsApp's code template awaits approval.
+  const sendCode: ApiDeps['sendCode'] = canSendCodes(senders) && env.PHONE_CODES?.trim() !== 'off' ? (t, to, code, locale) => sendPhoneCode(senders, t, to, code, locale) : undefined;
   const shared = { senders, channels, push, pushKey: push?.publicKey, sendCode };
   if (cfg) return { store: new SupabaseStore({ ...cfg, channels }), auth: supabaseAuthenticator(cfg), ...shared };
   if (env.NODE_ENV === 'production' && !env.ALLOW_DEV_BACKEND) {
