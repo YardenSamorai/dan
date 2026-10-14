@@ -3,7 +3,7 @@ import { bookingLink, isWaiting, KEEP_DONE_MS, LINK_PLACEHOLDER, MAX_ATTEMPTS, m
 import { joinBlock, messageSubject, participantsOf } from '../src/domain/classes';
 import { appointmentStart, sessionsOf } from '../src/domain/scheduling';
 import { addUsage, usageKey, usageMonth } from '../src/domain/usage';
-import { renderWhatsApp, WHATSAPP_LANGUAGE, WHATSAPP_TEMPLATES, whatsAppParams } from '../src/domain/whatsapp';
+import { renderWhatsApp, SMS_CODE_TEXT, WHATSAPP_CODE_TEMPLATE, WHATSAPP_LANGUAGE, WHATSAPP_TEMPLATES, whatsAppParams } from '../src/domain/whatsapp';
 import type { Channel, MessageKind, OutboxMessage, TemplateKind, TenantData, UsageCounts } from '../src/domain/types';
 import { uid } from '../src/data/mock/db';
 import { internationalPhone } from '../src/lib/phone';
@@ -30,6 +30,8 @@ export interface OutgoingMessage {
   origin?: string;
   /** For WhatsApp, which only sends Meta-approved wording: the template and its values. Missing for owner alerts. */
   template?: { kind: TemplateKind; locale: Locale; params: { name: string; text: string }[] };
+  /** A one-time code: WhatsApp sends it with the authentication template instead. */
+  code?: string;
   /** Comes back with the provider's delivery reports (WhatsApp), so a report can find its business and message. */
   ref?: string;
 }
@@ -133,8 +135,23 @@ const WHATSAPP_THROTTLED = new Set([130429, 131056]);
 export function whatsappCloud(token: string, phoneNumberId: string, fetchImpl: typeof fetch = fetch): Sender {
   return {
     async send(m) {
-      if (!m.template) throw new SendError('whatsapp: only appointment messages to customers have a template', false);
-      const tpl = WHATSAPP_TEMPLATES[m.template.kind];
+      let template: unknown;
+      if (m.code) {
+        template = {
+          name: WHATSAPP_CODE_TEMPLATE.name,
+          language: { policy: 'deterministic', code: WHATSAPP_LANGUAGE[m.locale ?? 'he'] },
+          components: [
+            { type: 'body', parameters: [{ type: 'text', text: m.code }] },
+            { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: m.code }] },
+          ],
+        };
+      } else if (m.template) {
+        template = {
+          name: WHATSAPP_TEMPLATES[m.template.kind].name,
+          language: { policy: 'deterministic', code: WHATSAPP_LANGUAGE[m.template.locale] },
+          components: [{ type: 'body', parameters: m.template.params.map((p) => ({ type: 'text', parameter_name: p.name, text: p.text })) }],
+        };
+      } else throw new SendError('whatsapp: only appointment messages to customers have a template', false);
       const res = await fetchImpl(`${GRAPH_API}/${phoneNumberId}/messages`, {
         method: 'POST',
         headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
@@ -143,11 +160,7 @@ export function whatsappCloud(token: string, phoneNumberId: string, fetchImpl: t
           recipient_type: 'individual',
           to: m.to,
           type: 'template',
-          template: {
-            name: tpl.name,
-            language: { policy: 'deterministic', code: WHATSAPP_LANGUAGE[m.template.locale] },
-            components: [{ type: 'body', parameters: m.template.params.map((p) => ({ type: 'text', parameter_name: p.name, text: p.text })) }],
-          },
+          template,
           ...(m.ref && { biz_opaque_callback_data: m.ref }),
         }),
       });
@@ -192,6 +205,28 @@ export function sendersFromEnv(env: Env): Senders {
 }
 
 export const channelsOf = (senders: Senders) => Object.keys(senders) as Channel[];
+
+export const canSendCodes = (senders: Senders) => !!(senders.whatsapp || senders.sms);
+
+/** A customer's one-time code: by WhatsApp, or by SMS when WhatsApp isn't connected or fails. */
+export async function sendPhoneCode(senders: Senders, t: TenantData, to: string, code: string, locale: Locale): Promise<Channel> {
+  const business = pickText(t.business.name, locale);
+  const body = SMS_CODE_TEXT[locale].replace('{code}', code).replace('{business}', business);
+  const base = { body, subject: business, fromName: business, locale, code };
+  const wa = internationalPhone(to, t.business.timezone);
+  if (senders.whatsapp && wa) {
+    try {
+      await senders.whatsapp.send({ ...base, to: wa });
+      return 'whatsapp';
+    } catch (e) {
+      if (!senders.sms) throw e;
+      console.error('[codes] whatsapp', t.business.id, e instanceof Error ? e.message : e);
+    }
+  }
+  if (!senders.sms) throw new SendError('codes: no channel for this number', false);
+  await senders.sms.send({ ...base, to });
+  return 'sms';
+}
 
 type Outcome = Pick<OutboxMessage, 'state' | 'attempts' | 'doneAt' | 'error' | 'providerId'> & { units?: number };
 

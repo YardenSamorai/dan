@@ -44,7 +44,7 @@ const rows = (await res.json()) as { id: string; slug: string; name: LText | nul
 const usd = (n: number) => `$${n.toFixed(2)}`;
 const lines = rows
   .map((r) => ({ name: r.name?.he || r.name?.en || r.slug, c: r.usage?.[month] ?? {} }))
-  .filter((r) => allowanceUsed(r.c) || r.c.email)
+  .filter((r) => allowanceUsed(r.c) || r.c.email || r.c.phoneCodes)
   .sort((a, b) => allowanceUsed(b.c) - allowanceUsed(a.c));
 
 console.log(`Messages in ${month}\n`);
@@ -53,7 +53,7 @@ for (const { name, c } of lines) {
   const wa = (c.whatsapp ?? 0) * WHATSAPP_USD.utility + (c.whatsappMarketing ?? 0) * WHATSAPP_USD.marketing;
   total += wa;
   const sms = `SMS ${c.sms ?? 0} (${c.smsCredits ?? 0} credits${smsCredit ? `, ₪${((c.smsCredits ?? 0) * smsCredit).toFixed(2)}` : ''})`;
-  console.log(`${name}\n  WhatsApp ${c.whatsapp ?? 0} + marketing ${c.whatsappMarketing ?? 0} = ${usd(wa)} · ${sms} · email ${c.email ?? 0}`);
+  console.log(`${name}\n  WhatsApp ${c.whatsapp ?? 0} + marketing ${c.whatsappMarketing ?? 0} = ${usd(wa)} · ${sms} · email ${c.email ?? 0} · lookup codes ${c.phoneCodes ?? 0} (Meta's authentication rate)`);
 }
 if (!lines.length) console.log('No messages yet.');
 else console.log(`\nWhatsApp total: ${usd(total)}`);

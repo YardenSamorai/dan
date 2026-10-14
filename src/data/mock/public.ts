@@ -4,8 +4,10 @@ import { availableSlots, businessNow, firstAvailableDate, isClass, pickStaff, se
 import { joinBlock } from '../../domain/classes';
 import { WEEKDAYS } from '../../domain/defaults';
 import { pageOf } from '../../domain/page';
-import type { Appointment, ClassSession, TenantData } from '../../domain/types';
-import { ApiError, type PublicBooking, type PublicBookingApi, type PublicBookingInput, type PublicBusiness, type SessionJoinInput } from '../contracts';
+import { addUsage, usageMonth } from '../../domain/usage';
+import type { Appointment, ClassSession, PhoneCode, PhonePass, TenantData } from '../../domain/types';
+import { callingCode, phoneKey } from '../../lib/phone';
+import { ApiError, type PhoneVerified, type PublicBooking, type PublicBookingApi, type PublicBookingInput, type PublicBusiness, type SessionJoinInput } from '../contracts';
 import { publicSessions } from '../sessions';
 import { getDb, getSession, latency, mutateTenant, uid, useMockDb, useMockSession, type MockDatabase } from './db';
 import {
@@ -60,21 +62,116 @@ function onlineSession(t: TenantData, sessionId: string): ClassSession {
 /** Most people a single session's waitlist holds. */
 const WAITLIST_LIMIT = 100;
 
-/** Case, spacing, niqqud and punctuation (geresh, hyphens, quotes) don't count when comparing names. */
-const nameKey = (s: string) =>
-  s
-    .normalize('NFKD')
-    .replace(/[\u0591-\u05c7\u0300-\u036f]/g, '')
-    .replace(/[^\p{L}\p{N}\s]/gu, '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-
-/** The name the customer types matches their whole saved name or any single word of it. */
-const nameMatches = (saved: string, given: string) => {
-  const full = nameKey(saved);
-  return full === given || full.split(' ').includes(given);
+/**
+ * Looking up bookings by mobile number: a 6-digit code, then a pass the
+ * browser keeps. Every limit is stored with the business, so it holds across
+ * server instances. A number that isn't a customer gets the same answer and
+ * the same limits, and nothing is sent to it.
+ */
+const CODE = {
+  digits: 6,
+  validMs: 10 * 60_000,
+  tries: 5,
+  /** Codes per number: a few in a short while, more over a day. */
+  perWindow: 3,
+  windowMs: 15 * 60_000,
+  perDay: 8,
+  /** Codes per business per hour, so nobody can run up the bill. */
+  perHour: 60,
+  keepMs: 86_400_000,
 };
+const PASS = { validMs: 60 * 86_400_000, perPhone: 5, perBusiness: 2000 };
+
+const sha256 = async (s: string) => {
+  const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
+  return Array.from(d, (b) => b.toString(16).padStart(2, '0')).join('');
+};
+const randomCode = () => String(crypto.getRandomValues(new Uint32Array(1))[0] % 10 ** CODE.digits).padStart(CODE.digits, '0');
+const randomPass = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('');
+
+const lookupKey = (t: TenantData, phone: string) => phoneKey(phone, callingCode(t.business.timezone));
+const codeHash = (t: TenantData, phone: string, code: string) => sha256(`${t.business.id}|${phone}|${code}`);
+const liveCodes = (t: TenantData, now: number) => (t.phoneCodes ?? []).filter((c) => now - Date.parse(c.at) < CODE.keepMs);
+const livePasses = (t: TenantData, now: number) => (t.phonePasses ?? []).filter((p) => now - Date.parse(p.at) < PASS.validMs);
+
+/** Upcoming bookings of every customer with this number, then the last few past ones. */
+function bookingsOfPhone(t: TenantData, phone: string): PublicBooking[] {
+  const mine = new Set(t.customers.filter((c) => lookupKey(t, c.phone) === phone).map((c) => c.id));
+  const today = businessNow(t).date;
+  const own = t.appointments.filter((a) => mine.has(a.customerId) && a.status !== 'cancelled');
+  const order = (a: Appointment, b: Appointment) => a.date.localeCompare(b.date) || a.start - b.start;
+  const upcoming = own.filter((a) => a.date >= today).sort(order);
+  const past = own
+    .filter((a) => a.date < today)
+    .sort(order)
+    .slice(-10)
+    .reverse();
+  return [...upcoming, ...past].map((a) => toPublic(t, a));
+}
+
+/**
+ * Records a code request and returns the code and where to send it, or null
+ * when the number isn't a customer's. The caller sends it; nothing here does.
+ */
+export async function issuePhoneCode(slug: string, phone: string): Promise<{ code: string; to: string; tenant: TenantData } | null> {
+  const t = requireTenant(slug);
+  const key = lookupKey(t, phone);
+  if (key.length < 9 || key.length > 15) throw new ApiError('invalid');
+  const now = Date.now();
+  const codes = liveCodes(t, now);
+  const ofPhone = codes.filter((c) => c.phone === key);
+  if (ofPhone.length >= CODE.perDay || ofPhone.filter((c) => now - Date.parse(c.at) < CODE.windowMs).length >= CODE.perWindow) throw new ApiError('rate_limited');
+  if (codes.filter((c) => c.hash && now - Date.parse(c.at) < 3_600_000).length >= CODE.perHour) throw new ApiError('rate_limited');
+  const customer = t.customers.find((c) => lookupKey(t, c.phone) === key);
+  const code = randomCode();
+  const hash = customer ? await codeHash(t, key, code) : '';
+  const at = new Date(now).toISOString();
+  let tenant = t;
+  mutateTenant(t.business.id, (cur) => {
+    const business = customer ? { ...cur.business, usage: addUsage(cur.business.usage, usageMonth(new Date(now), cur.business.timezone), { phoneCodes: 1 }) } : cur.business;
+    tenant = { ...cur, business, phoneCodes: [...liveCodes(cur, now), { phone: key, hash, at, tries: 0 }].slice(-1000) };
+    return tenant;
+  });
+  return customer ? { code, to: customer.phone, tenant } : null;
+}
+
+export async function checkPhoneCode(slug: string, phone: string, code: string): Promise<PhoneVerified> {
+  const t = requireTenant(slug);
+  const key = lookupKey(t, phone);
+  const now = Date.now();
+  const valid = (c: PhoneCode) => c.phone === key && !!c.hash && now - Date.parse(c.at) < CODE.validMs && c.tries < CODE.tries;
+  if (!(t.phoneCodes ?? []).some(valid)) return { error: 'expired' };
+  const hash = await codeHash(t, key, code.replace(/\D/g, ''));
+  const pass = randomPass();
+  const passHash = await sha256(pass);
+  let result: PhoneVerified = { error: 'wrong' };
+  mutateTenant(t.business.id, (cur) => {
+    const codes = liveCodes(cur, now);
+    if (codes.some((c) => valid(c) && c.hash === hash)) {
+      const passes = livePasses(cur, now);
+      const others = passes.filter((p) => p.phone === key).slice(-(PASS.perPhone - 1));
+      const next = { ...cur, phoneCodes: codes.filter((c) => c.phone !== key || !c.hash), phonePasses: [...passes.filter((p) => p.phone !== key), ...others, { phone: key, hash: passHash, at: new Date(now).toISOString() }].slice(-PASS.perBusiness) };
+      result = { pass, bookings: bookingsOfPhone(next, key) };
+      return next;
+    }
+    const phoneCodes = codes.map((c) => (valid(c) ? { ...c, tries: c.tries + 1 } : c));
+    if (!phoneCodes.some(valid)) result = { error: 'expired' };
+    return { ...cur, phoneCodes };
+  });
+  return result;
+}
+
+async function passOf(t: TenantData, pass: string): Promise<PhonePass | undefined> {
+  if (!/^[a-f0-9]{64}$/.test(pass)) return undefined;
+  const hash = await sha256(pass);
+  return livePasses(t, Date.now()).find((p) => p.hash === hash);
+}
+
+async function forgetPhonePass(slug: string, pass: string) {
+  const t = requireTenant(slug);
+  const p = await passOf(t, pass);
+  if (p) mutateTenant(t.business.id, (cur) => ({ ...cur, phonePasses: cur.phonePasses?.filter((x) => x.hash !== p.hash) }));
+}
 
 export const visible = (db: MockDatabase, t: TenantData, userId?: string) =>
   t.business.status === 'published' || (!!userId && db.members.some((m) => m.businessId === t.business.id && m.userId === userId));
@@ -172,6 +269,8 @@ export function availabilityView(t: TenantData): TenantData {
     customers: [],
     outbox: [],
     pushDevices: undefined,
+    phoneCodes: undefined,
+    phonePasses: undefined,
     appointments: t.appointments
       .filter((a) => a.date >= from && a.status !== 'cancelled')
       .map((a) => ({ ...a, code: '', customerId: '', note: undefined, internalNote: undefined, cancellation: undefined, history: [], price: 0 })),
@@ -274,21 +373,25 @@ export const mockPublicBooking: PublicBookingApi = {
     return useMemo(() => (t && a ? toPublic(t, a) : undefined), [t, a]);
   },
 
-  async findBookings(slug, phone, proof) {
+  async requestPhoneCode(slug, phone) {
+    await latency(500);
+    const sent = await issuePhoneCode(slug, phone);
+    return sent ? { demoCode: sent.code } : {};
+  },
+
+  async verifyPhoneCode(slug, phone, code) {
     await latency(400);
+    return checkPhoneCode(slug, phone, code);
+  },
+
+  async phoneBookings(slug, pass) {
     const t = requireTenant(slug);
-    const digits = normalizePhone(phone);
-    const given = nameKey(proof);
-    if (digits.length < 9 || !given) return [];
-    const mine = new Set(t.customers.filter((c) => normalizePhone(c.phone) === digits).map((c) => c.id));
-    const byCode = t.appointments.find((a) => mine.has(a.customerId) && a.code.toUpperCase() === proof.trim().toUpperCase());
-    if (byCode) return [toPublic(t, byCode)];
-    const named = new Set(t.customers.filter((c) => mine.has(c.id) && nameMatches(c.name, given)).map((c) => c.id));
-    const today = businessNow(t).date;
-    return t.appointments
-      .filter((a) => named.has(a.customerId) && a.status !== 'cancelled' && a.date >= today)
-      .sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start)
-      .map((a) => toPublic(t, a));
+    const p = await passOf(t, pass);
+    return p ? bookingsOfPhone(t, p.phone) : null;
+  },
+
+  async forgetPhone(slug, pass) {
+    await forgetPhonePass(slug, pass);
   },
 
   async cancelBooking(slug, token) {

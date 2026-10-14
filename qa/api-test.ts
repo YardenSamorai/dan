@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { devAuthenticator } from '../server/auth';
 import { handleIcs, handleRpc, type ApiDeps } from '../server/handler';
-import { dispatchMessages, globalSms, parseMessageRef, SendError, smsNumber, whatsappCloud, type Sender, type Senders } from '../server/messaging';
+import { dispatchMessages, globalSms, parseMessageRef, SendError, sendPhoneCode, smsNumber, whatsappCloud, type Sender, type Senders } from '../server/messaging';
 import { handleWhatsAppWebhook } from '../server/whatsappWebhook';
 import { usageMonth } from '../src/domain/usage';
 import { WHATSAPP_TEMPLATES, whatsAppParams } from '../src/domain/whatsapp';
@@ -147,20 +147,52 @@ try {
     const fetched = await call('public.booking', [SLUG, booked.id]);
     check('booking readable by its token', fetched.result?.code === booked.code);
 
-    const byName = await call('public.findBookings', [SLUG, '050-111-1111', ' test ']);
-    check('phone + first name finds the booking', byName.status === 200 && byName.result.some((b: any) => b.id === booked.id), byName);
-    const byCode = await call('public.findBookings', [SLUG, '0501111111', booked.code.toLowerCase()]);
-    check('phone + booking ref finds exactly that booking', byCode.result?.length === 1 && byCode.result[0].id === booked.id, byCode);
-    const wrongName = await call('public.findBookings', [SLUG, '0501111111', 'Someone']);
-    check('phone + wrong name finds nothing', wrongName.status === 200 && wrongName.result.length === 0, wrongName);
-    const wrongPhone = await call('public.findBookings', [SLUG, '0509999999', 'Test']);
-    check('right name + wrong phone finds nothing', wrongPhone.result?.length === 0, wrongPhone);
-    const phoneOnly = await call('public.findBookings', [SLUG, '0501111111', '']);
-    check('phone alone finds nothing', phoneOnly.result?.length === 0, phoneOnly);
-    const guessed = `05${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`;
-    const guesses = [];
-    for (let i = 0; i < 6; i++) guesses.push((await call('public.findBookings', [SLUG, guessed, `guess${i}`])).status);
-    check('repeated wrong guesses for one number → 429', guesses.slice(0, 5).every((s) => s === 200) && guesses[5] === 429, guesses);
+    // Looking bookings up by mobile number: a one-time code, then a pass.
+    const codes: { to: string; code: string; locale: string }[] = [];
+    const settle = () => new Promise((r) => setTimeout(r, 10));
+    const noSender = await call('public.requestPhoneCode', [SLUG, '0501111111', 'he']);
+    check('no message channel → codes are refused', noSender.status === 403, noSender);
+    deps.sendCode = async (_t, to, code, locale) => void codes.push({ to, code, locale });
+    check('platform says codes are available', (await call('platform.info')).result?.phoneCodes === true);
+    const asked = await call('public.requestPhoneCode', [SLUG, '+972 50-111-1111', 'he']);
+    await settle();
+    check('a customer number gets a 6-digit code, and the answer holds no code', asked.status === 200 && JSON.stringify(asked.result) === '{}' && codes.length === 1 && /^\d{6}$/.test(codes[0].code) && codes[0].to === '0501111111', { asked, codes });
+    const stranger = await call('public.requestPhoneCode', [SLUG, '0507654321', 'he']);
+    await settle();
+    check('a stranger’s number gets the same answer and nothing is sent', stranger.status === 200 && JSON.stringify(stranger.result) === '{}' && codes.length === 1, { stranger, codes });
+    check('a number too short to be a mobile → invalid', (await call('public.requestPhoneCode', [SLUG, '05012', 'he'])).status === 400);
+    const right = codes[0].code;
+    const wrong = right === '000000' ? '111111' : '000000';
+    const missed = await call('public.verifyPhoneCode', [SLUG, '0501111111', wrong]);
+    check('wrong code → wrong', missed.result?.error === 'wrong', missed);
+    const proved = await call('public.verifyPhoneCode', [SLUG, '050-111-1111', right]);
+    check('right code → a pass and the number’s bookings', /^[a-f0-9]{64}$/.test(proved.result?.pass ?? '') && proved.result.bookings.some((b: any) => b.id === booked.id), proved);
+    check('a code works once', (await call('public.verifyPhoneCode', [SLUG, '0501111111', right])).result?.error === 'expired');
+    const pass = proved.result?.pass as string;
+    const byPass = await call('public.phoneBookings', [SLUG, pass]);
+    check('the pass lists the bookings later', byPass.result?.some((b: any) => b.id === booked.id), byPass);
+    check('a made-up pass lists nothing', (await call('public.phoneBookings', [SLUG, 'f'.repeat(64)])).result === null);
+    const stored = (await call('workspace.tenant', [BIZ], owner)).result;
+    check('codes and passes never reach the workspace', stored && !('phoneCodes' in stored) && !('phonePasses' in stored));
+    const view = (await call('public.business', [SLUG])).result?.availability;
+    check('…nor the public page', view && !view.phoneCodes && !view.phonePasses);
+    const raw = JSON.stringify((await deps.store.snapshot({ businessId: BIZ })).tenants[BIZ]);
+    check('the pass is stored only as a hash', !raw.includes(pass));
+
+    await call('public.requestPhoneCode', [SLUG, '0501111111', 'en']);
+    await settle();
+    const second = codes[1]?.code;
+    check('the code goes out in the page’s language', codes[1]?.locale === 'en', codes);
+    const tries = [];
+    for (let i = 0; i < 5; i++) tries.push((await call('public.verifyPhoneCode', [SLUG, '0501111111', second === '000000' ? '111111' : '000000'])).result?.error);
+    check('5 wrong codes use the code up', tries.slice(0, 4).every((x) => x === 'wrong') && tries[4] === 'expired', tries);
+    check('…even the right one stops working', (await call('public.verifyPhoneCode', [SLUG, '0501111111', second])).result?.error === 'expired');
+    const burst = [];
+    for (let i = 0; i < 4; i++) burst.push((await call('public.requestPhoneCode', [SLUG, '0507654321', 'he'])).status);
+    check('a 4th code for one number within 15 minutes → 429, customer or not', burst.slice(0, 2).every((s) => s === 200) && burst[2] === 429 && burst[3] === 429, burst);
+
+    await call('public.forgetPhone', [SLUG, pass]);
+    check('a forgotten pass stops working', (await call('public.phoneBookings', [SLUG, pass])).result === null);
 
     const cancelled = await call('public.cancelBooking', [SLUG, booked.id]);
     check('customer can cancel within policy', cancelled.status === 200 && cancelled.result.status === 'cancelled', cancelled);
@@ -539,6 +571,21 @@ try {
       return reply();
     }) as unknown as typeof fetch;
     const wa: Senders = { whatsapp: whatsappCloud('test-token', '1234567890', fakeFetch) };
+
+    const codeTenant = (await deps.store.snapshot({ businessId: BIZ })).tenants[BIZ];
+    check('a code goes by WhatsApp when it can', (await sendPhoneCode(wa, codeTenant, '050-111-1111', '123456', 'he')) === 'whatsapp');
+    const sentCode = calls.pop()?.body;
+    check(
+      'the code uses the authentication template, with the code in the body and the copy button',
+      sentCode?.to === '972501111111' && sentCode.template.name === 'phone_code' && sentCode.template.language.code === 'he' && sentCode.template.components[0].parameters[0].text === '123456' && sentCode.template.components[1].sub_type === 'url' && sentCode.template.components[1].parameters[0].text === '123456',
+      sentCode,
+    );
+    const smsCodes: string[] = [];
+    reply = () => new Response(JSON.stringify({ error: { code: 132001 } }), { status: 404 });
+    const viaSms = await sendPhoneCode({ ...wa, sms: { send: async (m) => void smsCodes.push(m.body) } }, codeTenant, '050-111-1111', '654321', 'he');
+    check('a code WhatsApp refuses goes by SMS', viaSms === 'sms' && smsCodes[0]?.includes('654321'), smsCodes);
+    calls.length = 0;
+    reply = () => new Response(JSON.stringify({ messages: [{ id: 'wamid.1' }] }), { status: 200 });
 
     const t0 = (await call('workspace.tenant', [BIZ], owner)).result;
     const n = t0.business.notifications;

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { availableSlots, businessNow, firstAvailableDate } from '../../domain/scheduling';
 import type { TenantData } from '../../domain/types';
-import type { PublicBooking, PublicBookingApi, PublicBusiness, WaitlistResult } from '../contracts';
+import type { PhoneCodeSent, PhoneVerified, PublicBooking, PublicBookingApi, PublicBusiness, WaitlistResult } from '../contracts';
 import { publicSessions } from '../sessions';
 import { Resource, rpc } from './client';
 
@@ -79,10 +79,24 @@ export const remotePublicBooking: PublicBookingApi = {
     return b ?? undefined;
   },
 
-  async findBookings(slug, phone, proof) {
-    const found = await rpc<PublicBooking[]>('public.findBookings', slug, phone, proof);
-    for (const b of found) bookings.set(bookingKey(slug, b.id), b);
+  requestPhoneCode(slug, phone, locale) {
+    return rpc<PhoneCodeSent>('public.requestPhoneCode', slug, phone, locale);
+  },
+
+  async verifyPhoneCode(slug, phone, code) {
+    const r = await rpc<PhoneVerified>('public.verifyPhoneCode', slug, phone, code);
+    if ('bookings' in r) for (const b of r.bookings) bookings.set(bookingKey(slug, b.id), b);
+    return r;
+  },
+
+  async phoneBookings(slug, pass) {
+    const found = await rpc<PublicBooking[] | null>('public.phoneBookings', slug, pass);
+    for (const b of found ?? []) bookings.set(bookingKey(slug, b.id), b);
     return found;
+  },
+
+  async forgetPhone(slug, pass) {
+    await rpc('public.forgetPhone', slug, pass);
   },
 
   async cancelBooking(slug, token) {

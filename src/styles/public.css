@@ -903,6 +903,7 @@ html[lang='he'] .svc-cat__title {
   display: grid;
   gap: var(--s-4);
   align-content: start;
+  align-self: start;
   padding: var(--s-6);
   border-radius: var(--r-lg);
   background: var(--paper);
@@ -912,6 +913,26 @@ html[lang='he'] .svc-cat__title {
 .mine__find-title {
   font-size: var(--text-lg);
   font-weight: 500;
+}
+
+.mine__code {
+  font-size: var(--text-lg);
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
+.mine__demo {
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--surface-sunken);
+  font-size: var(--text-sm);
+}
+
+.mine__again {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--s-2);
 }
 
 @media (max-width: 860px) {

@@ -2,7 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { nextMessageAt } from '../src/domain/notifications';
 import { devAuthenticator } from './auth';
 import { handleIcs, handleRpc, type ApiDeps } from './handler';
-import { channelsOf, dispatchMessages, sendersFromEnv, type Senders } from './messaging';
+import { canSendCodes, channelsOf, dispatchMessages, sendersFromEnv, sendPhoneCode, type Senders } from './messaging';
 import { FileStore } from './store';
 import { SupabaseStore, supabaseAuthenticator, type SupabaseConfig } from './supabase';
 import { notifyDevices, pushKeysFromEnv, type PushKeys } from './push';
@@ -34,7 +34,8 @@ function build(env: Env): Deps {
   const cfg = supabaseConfig(env);
   const channels = channelsOf(senders);
   const push = pushKeysFromEnv(env);
-  const shared = { senders, channels, push, pushKey: push?.publicKey };
+  const sendCode: ApiDeps['sendCode'] = canSendCodes(senders) ? (t, to, code, locale) => sendPhoneCode(senders, t, to, code, locale) : undefined;
+  const shared = { senders, channels, push, pushKey: push?.publicKey, sendCode };
   if (cfg) return { store: new SupabaseStore({ ...cfg, channels }), auth: supabaseAuthenticator(cfg), ...shared };
   if (env.NODE_ENV === 'production' && !env.ALLOW_DEV_BACKEND) {
     throw new Error('No production backend configured: set the Supabase environment variables.');
@@ -66,6 +67,7 @@ export function handle(req: Request, env: Env = process.env, waitUntil?: (p: Pro
   if (path.startsWith('/api/ics/')) return handleIcs(req, d);
   const channels = channelsOf(d.senders);
   return handleRpc(req, d, {
+    background: waitUntil,
     // A booking's confirmation, the owner's alert and push notifications go out right away, not at the next scheduled pass.
     onSaved(changes) {
       if (d.push && changes.some((c) => c.after.pushDevices?.length)) {

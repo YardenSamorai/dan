@@ -253,6 +253,13 @@ export interface PublicBookingInput {
   customer: { name: string; phone: string; email?: string; note?: string; locale: Locale };
 }
 
+export interface PhoneCodeSent {
+  /** In-browser demo only, which can't send messages: the code, shown on screen. */
+  demoCode?: string;
+}
+
+export type PhoneVerified = { pass: string; bookings: PublicBooking[] } | { error: 'wrong' | 'expired' };
+
 export interface PublicBookingApi {
   /** null = still loading; undefined = not found or not visible. `preview` = unpublished, shown only to its members. */
   useBusiness(slug: string): { business: PublicBusiness; preview: boolean } | null | undefined;
@@ -264,11 +271,16 @@ export interface PublicBookingApi {
   /** null = still loading; undefined = no such booking. */
   useBooking(slug: string, token: string): PublicBooking | null | undefined;
   /**
-   * Bookings for a mobile number, proven by the customer's first name (every
-   * upcoming booking) or a booking ref (that booking). Empty when nothing
-   * matches; throws `rate_limited` after repeated misses for the same number.
+   * Sends a one-time code to the number if it's one of the business's
+   * customers; the answer is the same either way. Throws `invalid` for a number
+   * that can't be a mobile, `rate_limited` after too many codes.
    */
-  findBookings(slug: string, phone: string, proof: string): Promise<PublicBooking[]>;
+  requestPhoneCode(slug: string, phone: string, locale: Locale): Promise<PhoneCodeSent>;
+  /** A right code gives a pass the browser keeps, and the number's bookings. */
+  verifyPhoneCode(slug: string, phone: string, code: string): Promise<PhoneVerified>;
+  /** The bookings of the number a pass proved; null once the pass has expired or was dropped. */
+  phoneBookings(slug: string, pass: string): Promise<PublicBooking[] | null>;
+  forgetPhone(slug: string, pass: string): Promise<void>;
   cancelBooking(slug: string, token: string): Promise<PublicBooking>;
   rescheduleBooking(slug: string, token: string, to: { date: ISODate; start: Minutes }): Promise<PublicBooking>;
   /** Sessions of a class from `from` for `days` days, including full ones. */
@@ -466,6 +478,8 @@ export interface PlatformInfo {
   channels: Channel[];
   /** The server's public key for push notifications; missing when push isn't set up. */
   pushKey?: string;
+  /** Customers can get a one-time code to look up their bookings (WhatsApp or SMS is connected). */
+  phoneCodes?: boolean;
 }
 
 export interface PlatformService {

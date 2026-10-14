@@ -426,6 +426,8 @@ export interface UsageCounts {
   /** Gateway credits: a long SMS takes more than one. */
   smsCredits?: number;
   email?: number;
+  /** One-time codes for customers looking up their bookings (WhatsApp authentication, or SMS). Not part of the allowance. */
+  phoneCodes?: number;
 }
 
 /** Messages to the customer use the owner's templates; alerts to the business use fixed wording. */
@@ -466,4 +468,29 @@ export interface TenantData {
   sessions?: ClassSession[];
   outbox: OutboxMessage[];
   pushDevices?: PushDevice[];
+  /** One-time codes sent to customers looking up their bookings. Server-side only. */
+  phoneCodes?: PhoneCode[];
+  /** Devices that proved a mobile number with a code. Server-side only. */
+  phonePasses?: PhonePass[];
+}
+
+/**
+ * A code requested on the booking page. Kept (without a hash) even for numbers
+ * that aren't customers, so the limits and the answer look the same either way.
+ */
+export interface PhoneCode {
+  /** `phoneKey` of the number. */
+  phone: string;
+  /** SHA-256 of the code; empty when nothing was sent. */
+  hash: string;
+  at: string;
+  /** Wrong codes entered while this one was valid. */
+  tries: number;
+}
+
+export interface PhonePass {
+  phone: string;
+  /** SHA-256 of the token the browser keeps. */
+  hash: string;
+  at: string;
 }

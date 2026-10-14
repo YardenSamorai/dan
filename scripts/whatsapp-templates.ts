@@ -11,7 +11,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { GRAPH_API } from '../server/messaging';
-import { WHATSAPP_LANGUAGE, WHATSAPP_TEMPLATES } from '../src/domain/whatsapp';
+import { WHATSAPP_CODE_TEMPLATE, WHATSAPP_LANGUAGE, WHATSAPP_TEMPLATES } from '../src/domain/whatsapp';
 import type { TemplateVar } from '../src/domain/notifications';
 import type { Locale } from '../src/i18n/config';
 
@@ -83,11 +83,35 @@ if (!process.argv.includes('--status')) {
       }
     }
   }
+  // Authentication: Meta supplies the wording; we only choose the extras.
+  for (const language of Object.values(WHATSAPP_LANGUAGE)) {
+    const { name, expiresMinutes } = WHATSAPP_CODE_TEMPLATE;
+    if (has(name, language)) continue;
+    try {
+      await graph(`${account}/message_templates`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          language,
+          category: 'AUTHENTICATION',
+          message_send_ttl_seconds: expiresMinutes * 60,
+          components: [
+            { type: 'BODY', add_security_recommendation: true },
+            { type: 'FOOTER', code_expiration_minutes: expiresMinutes },
+            { type: 'BUTTONS', buttons: [{ type: 'OTP', otp_type: 'COPY_CODE' }] },
+          ],
+        }),
+      });
+      console.log(`submitted  ${name} (${language})`);
+    } catch (e) {
+      console.error(`failed     ${name} (${language}): ${(e as Error).message}`);
+    }
+  }
 }
 
-const ours = new Set(Object.values(WHATSAPP_TEMPLATES).map((t) => t.name));
+const ours = new Set([...Object.values(WHATSAPP_TEMPLATES).map((t) => t.name), WHATSAPP_CODE_TEMPLATE.name]);
 const rows = (await list()).filter((t) => ours.has(t.name)).sort((a, b) => a.name.localeCompare(b.name) || a.language.localeCompare(b.language));
 console.log('');
 for (const t of rows) console.log(`${t.status.padEnd(10)} ${t.name} (${t.language}) ${t.category}`);
-const missing = Object.values(WHATSAPP_TEMPLATES).flatMap((t) => Object.values(WHATSAPP_LANGUAGE).filter((l) => !rows.some((r) => r.name === t.name && r.language === l)).map((l) => `${t.name} (${l})`));
+const missing = [...Object.values(WHATSAPP_TEMPLATES), WHATSAPP_CODE_TEMPLATE].flatMap((t) => Object.values(WHATSAPP_LANGUAGE).filter((l) => !rows.some((r) => r.name === t.name && r.language === l)).map((l) => `${t.name} (${l})`));
 if (missing.length) console.log(`\nnot submitted: ${missing.join(', ')}`);

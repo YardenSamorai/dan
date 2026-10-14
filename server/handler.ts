@@ -3,9 +3,9 @@ import { buildIcs } from '../src/domain/ics';
 import { ApiError, type NewBusinessInput, type PublicBookingInput, type SessionJoinInput, type TenantContext, type WorkspaceApi } from '../src/data/contracts';
 import { mockAuth, mockDirectory, sessionInfo } from '../src/data/mock/auth';
 import { getDb, mutateDb, type MockDatabase } from '../src/data/mock/db';
-import { availabilityView, bySlug, mockPublicBooking, project, toPublic, visible } from '../src/data/mock/public';
+import { availabilityView, bySlug, issuePhoneCode, mockPublicBooking, project, toPublic, visible } from '../src/data/mock/public';
 import { mockInvites } from '../src/data/mock/invites';
-import { membersOf, mockWorkspace, normalizePhone, scopeForRole } from '../src/data/mock/workspace';
+import { membersOf, mockWorkspace, scopeForRole } from '../src/data/mock/workspace';
 import type { Locale } from '../src/i18n/config';
 import { bearer, type Authenticator } from './auth';
 import { inScope } from './context';
@@ -24,6 +24,9 @@ interface Call {
   store: Store;
   channels: readonly Channel[];
   pushKey?: string;
+  sendCode?: ApiDeps['sendCode'];
+  /** Work that runs only once this call's changes are saved (dropped if the save is retried). */
+  afterSave: (task: () => Promise<unknown>) => void;
 }
 
 /** Replaces every inline image (data URL) in `v` with the URL `put` stored it under. */
@@ -38,14 +41,6 @@ async function uploadInline(v: unknown, put: (dataUrl: string) => Promise<string
 }
 
 const WITH_IMAGES = new Set<string>(['savePage', 'updateBusiness', 'saveService', 'saveStaff']);
-
-/**
- * Wrong guesses allowed per business and mobile number before booking lookups
- * pause. Counted per server instance, so it slows guessing rather than
- * stopping a determined attacker outright.
- */
-const LOOKUP_LIMIT = { misses: 5, windowMs: 15 * 60_000 };
-const lookupMisses = new Map<string, { count: number; until: number }>();
 
 interface Fn {
   hint?: (args: any[], c: Call) => Hint;
@@ -162,7 +157,7 @@ const FNS: Record<string, Fn> = {
 
   /** Which message channels actually deliver here, so the UI never claims more. */
   'platform.info': {
-    run: (_, c) => ({ channels: c.channels, ...(c.pushKey && { pushKey: c.pushKey }) }),
+    run: (_, c) => ({ channels: c.channels, ...(c.pushKey && { pushKey: c.pushKey }), ...(c.sendCode && { phoneCodes: true }) }),
   },
 
   'auth.demoAccounts': {
@@ -201,19 +196,28 @@ const FNS: Record<string, Fn> = {
     hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
     run: ([slug, input]) => mockPublicBooking.createBooking(str(slug), input as PublicBookingInput),
   },
-  'public.findBookings': {
+  /** Sent after the save and never awaited, so a customer's number answers exactly like a stranger's. */
+  'public.requestPhoneCode': {
     hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
-    run: async ([slug, phone, proof]) => {
-      const key = `${str(slug)}|${normalizePhone(str(phone))}`;
-      const now = Date.now();
-      if (lookupMisses.size > 10_000) for (const [k, m] of lookupMisses) if (m.until <= now) lookupMisses.delete(k);
-      const miss = lookupMisses.get(key);
-      if (miss && miss.until > now && miss.count >= LOOKUP_LIMIT.misses) throw new ApiError('rate_limited');
-      const found = await mockPublicBooking.findBookings(str(slug), str(phone), str(proof));
-      if (found.length) lookupMisses.delete(key);
-      else lookupMisses.set(key, { count: miss && miss.until > now ? miss.count + 1 : 1, until: now + LOOKUP_LIMIT.windowMs });
-      return found;
+    run: async ([slug, phone, locale], c) => {
+      const send = c.sendCode;
+      if (!send) throw new ApiError('forbidden');
+      const out = await issuePhoneCode(str(slug), str(phone));
+      if (out) c.afterSave(() => send(out.tenant, out.to, out.code, locale === 'en' ? 'en' : 'he'));
+      return {};
     },
+  },
+  'public.verifyPhoneCode': {
+    hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
+    run: ([slug, phone, code]) => mockPublicBooking.verifyPhoneCode(str(slug), str(phone), str(code)),
+  },
+  'public.phoneBookings': {
+    hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
+    run: ([slug, pass]) => mockPublicBooking.phoneBookings(str(slug), str(pass)),
+  },
+  'public.forgetPhone': {
+    hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
+    run: ([slug, pass]) => mockPublicBooking.forgetPhone(str(slug), str(pass)),
   },
   'public.cancelBooking': {
     hint: ([slug], c) => ({ userId: c.userId, slugs: [str(slug)] }),
@@ -289,6 +293,8 @@ export interface ApiDeps {
   channels?: readonly Channel[];
   /** VAPID public key, when push notifications are set up. */
   pushKey?: string;
+  /** Delivers a customer's one-time code; missing when no channel can. */
+  sendCode?: (t: TenantData, to: string, code: string, locale: Locale) => Promise<unknown>;
 }
 
 /** GET /api/ics/{slug}/{key}.ics: the link itself is the credential, like Google's "secret address". */
@@ -315,6 +321,8 @@ const safeEqual = (a: string, b: string) => a.length === b.length && timingSafeE
 export interface RpcHooks {
   /** After a successful save, with the businesses it changed (`before` missing for a new one). */
   onSaved?: (changes: { before?: TenantData; after: TenantData }[]) => void;
+  /** Keeps the instance alive for work that finishes after the response (Cloudflare's `waitUntil`). */
+  background?: (work: Promise<unknown>) => void;
 }
 
 export async function handleRpc(req: Request, deps: ApiDeps, hooks: RpcHooks = {}): Promise<Response> {
@@ -329,7 +337,16 @@ export async function handleRpc(req: Request, deps: ApiDeps, hooks: RpcHooks = {
   if (!fn) return json({ error: 'invalid' }, 404);
   const args = Array.isArray(body.args) ? body.args : [];
   const token = bearer(req);
-  const call: Call = { userId: await deps.auth.userId(token), auth: deps.auth, store: deps.store, channels: deps.channels ?? [], pushKey: deps.pushKey };
+  let tasks: (() => Promise<unknown>)[] = [];
+  const call: Call = {
+    userId: await deps.auth.userId(token),
+    auth: deps.auth,
+    store: deps.store,
+    channels: deps.channels ?? [],
+    pushKey: deps.pushKey,
+    sendCode: deps.sendCode,
+    afterSave: (task) => tasks.push(task),
+  };
   if (call.userId && deps.auth.profile && deps.store.ensureUser) {
     try {
       const p = await deps.auth.profile(token);
@@ -342,11 +359,16 @@ export async function handleRpc(req: Request, deps: ApiDeps, hooks: RpcHooks = {
 
   for (let attempt = 0; ; attempt++) {
     try {
+      tasks = [];
       const before = await deps.store.snapshot(fn.hint?.(args, call) ?? {});
       const out = await inScope(before, call.userId, () => fn.run(args, call, getDb));
       if (out.db !== before) {
         await deps.store.commit(before, out.db);
         hooks.onSaved?.(Object.entries(changedTenants(before, out.db)).map(([id, after]) => ({ before: before.tenants[id], after })));
+      }
+      for (const task of tasks) {
+        const work = task().catch((e) => console.error('[api] after', str(body.fn), e instanceof Error ? e.message : e));
+        hooks.background?.(work);
       }
       return json({ result: out.result ?? null });
     } catch (e) {

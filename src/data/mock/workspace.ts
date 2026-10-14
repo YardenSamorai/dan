@@ -782,7 +782,7 @@ function createApi(ctx: TenantContext): WorkspaceApi {
  * the customers attached to them — the same filtering a server would apply.
  */
 export function scopeForRole(full: TenantData, ctx: TenantContext): TenantData {
-  const t = full.pushDevices ? { ...full, pushDevices: undefined } : full;
+  const t = full.pushDevices || full.phoneCodes || full.phonePasses ? { ...full, pushDevices: undefined, phoneCodes: undefined, phonePasses: undefined } : full;
   if (can(ctx.role, 'calendar.all')) return can(ctx.role, 'staff.manage') ? t : { ...t, business: { ...t.business, invites: undefined, usage: undefined } };
   const appointments = t.appointments.filter((a) => a.staffId === ctx.staffId);
   const sessions = sessionsOf(t).filter((s) => s.staffId === ctx.staffId);

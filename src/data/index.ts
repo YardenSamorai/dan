@@ -21,8 +21,8 @@ export const directory: BusinessDirectory = remote ? remoteDirectory : mockDirec
 export const publicBooking: PublicBookingApi = remote ? remotePublicBooking : mockPublicBooking;
 export const workspace: WorkspaceData = remote ? remoteWorkspace : mockWorkspace;
 export const invites: InviteService = remote ? remoteInvites : mockInvites;
-/** The in-browser demo never delivers anything. */
-const NOTHING_CONNECTED: PlatformInfo = { channels: [] };
+/** The in-browser demo never delivers anything; its booking lookup shows the code on screen instead. */
+const NOTHING_CONNECTED: PlatformInfo = { channels: [], phoneCodes: true };
 export const platform: PlatformService = remote ? remotePlatform : { useInfo: () => NOTHING_CONNECTED };
 
 export * from './contracts';

@@ -84,6 +84,19 @@ export const WHATSAPP_TEMPLATES: Record<TemplateKind, WhatsAppTemplate> = {
   },
 };
 
+/**
+ * The one-time code customers get to look up their bookings. Meta writes the
+ * wording of authentication templates itself ("123456 is your verification
+ * code…") in each language, with a copy-code button.
+ */
+export const WHATSAPP_CODE_TEMPLATE = { name: 'phone_code', expiresMinutes: 10 };
+
+/** The same code by SMS. */
+export const SMS_CODE_TEXT: Record<Locale, string> = {
+  he: '{code} הוא קוד האימות שלך לצפייה בתורים ב{business}. הקוד בתוקף ל־10 דקות. אל תעבירו אותו לאף אחד.',
+  en: '{code} is your code to see your bookings at {business}. It expires in 10 minutes. Don’t share it with anyone.',
+};
+
 /** WhatsApp rejects empty values, and every customer is greeted by name; this stands in when there's none. */
 const NO_NAME: Record<Locale, string> = { he: 'לך', en: 'there' };
 
