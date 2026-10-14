@@ -25,7 +25,8 @@
   grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   gap: var(--s-4);
-  height: 64px;
+  height: calc(64px + env(safe-area-inset-top, 0px));
+  padding-block-start: env(safe-area-inset-top, 0px);
   padding-inline: var(--gutter);
   background: var(--glass);
   -webkit-backdrop-filter: var(--glass-blur);

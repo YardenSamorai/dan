@@ -41,11 +41,8 @@ function useAgo() {
   };
 }
 
-/**
- * Turning push notifications on and off for this browser. Shows nothing when
- * the server has no push keys, so the app never offers what can't be sent.
- */
-export function PushControl() {
+/** This device's notification state and the actions on it; null state while unknown or when the server can't send. */
+function usePush() {
   const { t } = useI18n();
   const { api } = useWorkspace();
   const toast = useToast();
@@ -62,8 +59,6 @@ export function PushControl() {
     };
   }, [key]);
 
-  if (!key || !state) return null;
-
   // Re-checked when the person comes back from the iPhone's Settings.
   const recheck = () => {
     const again = () => {
@@ -73,8 +68,10 @@ export function PushControl() {
     };
     document.addEventListener('visibilitychange', again);
   };
+  const openSettings = () => (recheck(), void openAppSettings());
 
   const turnOn = async () => {
+    if (!key) return;
     setBusy(true);
     try {
       const device = await enablePush(key);
@@ -104,6 +101,18 @@ export function PushControl() {
     }
   };
 
+  return { state: key ? state : null, busy, turnOn, turnOff, openSettings };
+}
+
+/**
+ * Turning push notifications on and off for this browser. Shows nothing when
+ * the server has no push keys, so the app never offers what can't be sent.
+ */
+export function PushControl() {
+  const { t } = useI18n();
+  const { state, busy, turnOn, turnOff, openSettings } = usePush();
+  if (!state) return null;
+
   if (state === 'on') {
     return (
       <div className="push-control">
@@ -131,13 +140,40 @@ export function PushControl() {
     return (
       <div className="push-control push-control--off">
         <p className="push-control__body">{t('activity.push.deniedApp')}</p>
-        <button type="button" className="btn btn--tinted btn--xs" onClick={() => (recheck(), void openAppSettings())}>
+        <button type="button" className="btn btn--tinted btn--xs" onClick={openSettings}>
           {t('activity.push.openSettings')}
         </button>
       </div>
     );
   }
   return <p className="push-control push-control__body">{t(`activity.push.${state}`)}</p>;
+}
+
+/** The same switch as a row of the phone's "More" sheet. */
+export function PushRow() {
+  const { t } = useI18n();
+  const { state, busy, turnOn, turnOff, openSettings } = usePush();
+  if (state === 'on' || state === 'off') {
+    return (
+      <label className="sheet-row sheet-row--static">
+        <span className="sheet-row__text">{t('activity.push.offTitle')}</span>
+        <span className="switch">
+          <input type="checkbox" role="switch" checked={state === 'on'} disabled={busy} onChange={(e) => void (e.target.checked ? turnOn() : turnOff())} />
+        </span>
+      </label>
+    );
+  }
+  if (state === 'denied' && isNativeApp) {
+    return (
+      <div className="sheet-row sheet-row--static">
+        <span className="sheet-row__text">{t('activity.push.offTitle')}</span>
+        <button type="button" className="btn btn--tinted btn--xs" onClick={openSettings}>
+          {t('activity.push.openSettings')}
+        </button>
+      </div>
+    );
+  }
+  return null;
 }
 
 /** What this device subscribes with: the browser push key, or (in the iPhone app) Apple's service when the server has it. */

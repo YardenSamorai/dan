@@ -32,7 +32,7 @@ import type { Permission } from '../domain/permissions';
 import { useI18n } from '../i18n/I18nProvider';
 import type { MessageKey } from '../i18n/messages';
 import { useMedia } from '../lib/useMedia';
-import { ActivityBell } from './ActivityBell';
+import { ActivityBell, PushRow } from './ActivityBell';
 import { AppUIProvider, useAppUI } from './AppUI';
 import { usePopover } from './usePopover';
 import { useWorkspace, WorkspaceProvider } from './workspace';
@@ -424,6 +424,7 @@ function Shell() {
               <ExternalIcon size={19} />
               <span className="sheet-row__text">{t('app.viewPage')}</span>
             </Link>
+            <PushRow />
             <div className="sheet-row sheet-row--static">
               <span className="sheet-row__text">{t('common.language')}</span>
               <LocaleSwitch />

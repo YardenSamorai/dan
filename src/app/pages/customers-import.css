@@ -56,7 +56,7 @@
 
 .imp__steps li[data-state='done'] .imp__step-dot {
   background: var(--accent);
-  color: #fff;
+  color: var(--white);
 }
 
 .imp__error {
@@ -272,7 +272,7 @@
   border: 1px solid transparent;
   border-radius: 8px;
   background: var(--accent);
-  color: #fff;
+  color: var(--white);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -353,7 +353,7 @@
 
 .imp__tag--go {
   background: var(--accent);
-  color: #fff;
+  color: var(--white);
 }
 
 .imp__more {
@@ -482,7 +482,7 @@
   height: 60px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--white);
 }
 
 .imp__done .imp__actions {
