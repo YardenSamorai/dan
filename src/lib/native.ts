@@ -43,6 +43,8 @@ export async function startNativeShell() {
     e.preventDefault();
     void openOutside(a.href);
   });
+  // Safari shows :active (the press highlight) only on pages that listen for touches.
+  document.addEventListener('touchstart', () => {}, { passive: true });
   addHaptics();
   void followTextSize();
   const { SplashScreen } = await import('@capacitor/splash-screen');

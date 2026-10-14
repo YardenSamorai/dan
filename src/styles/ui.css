@@ -740,7 +740,7 @@ textarea.field__input {
 
 .drawer[open]::backdrop,
 .dialog[open]::backdrop {
-  opacity: 1;
+  opacity: var(--sheet-fade, 1);
 }
 
 @starting-style {
