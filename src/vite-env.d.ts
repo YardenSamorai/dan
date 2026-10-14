@@ -17,6 +17,8 @@ interface ImportMetaEnv {
   /** WhatsApp + SMS messages included per business per month. */
   readonly VITE_MESSAGE_ALLOWANCE?: string;
   readonly VITE_USD_ILS?: string;
+  /** The live site, for the iPhone app's API calls and shared links. */
+  readonly VITE_SITE_URL?: string;
   /** YouTube/Vimeo links for the setup checklist. */
   readonly VITE_VIDEO_WELCOME?: string;
   readonly VITE_VIDEO_PAGE?: string;

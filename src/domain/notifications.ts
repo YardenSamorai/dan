@@ -1,3 +1,4 @@
+import { PUBLIC_SITE } from '../config/product';
 import { localeMeta, pickText, type Locale } from '../i18n/config';
 import { appointmentStart } from './scheduling';
 import { messageSubject, sessionPath } from './classes';
@@ -21,7 +22,12 @@ export function notificationsOf(b: Business): NotificationSettings {
 /** The booking page. On the server the site's address isn't known when a message is written, so `{link}` stays and delivery fills it in. */
 export const LINK_PLACEHOLDER = '{link}';
 export const bookingLink = (origin: string, slug: string) => `${origin}/book/${slug}`;
-const siteOrigin = () => (typeof location !== 'undefined' && location.origin ? location.origin : null);
+const siteOrigin = () => {
+  if (typeof location === 'undefined') return null;
+  // The iPhone app's pages come from the device (capacitor://…), not the site.
+  if (!/^https?:/.test(location.protocol)) return PUBLIC_SITE;
+  return location.origin;
+};
 
 /** A seat offer links straight to the session; everything else to the booking page. */
 export const messageLink = (origin: string, state: TenantData, a: Appointment, kind?: MessageKind) =>

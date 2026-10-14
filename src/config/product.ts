@@ -14,6 +14,9 @@ export const PRODUCT = {
 
 export const storageKey = (key: string) => `${PRODUCT.storagePrefix}.${key}`;
 
+/** The live site (VITE_SITE_URL), for pages that aren't served from it: the iPhone app's. */
+export const PUBLIC_SITE = env.VITE_SITE_URL?.trim().replace(/\/$/, '') || 'https://tornu.co.il';
+
 /**
  * Who runs the service, for the legal pages and the help page. Fill these in
  * (env vars) before launch; the name shows a "[…]" placeholder until then.

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && tsc -p tsconfig.server.json && vite build",
+    "app:build": "tsc -b && vite build && cap sync ios",
+    "app:assets": "capacitor-assets generate --ios",
     "test:api": "esbuild qa/api-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/api-test.mjs --log-level=warning && node node_modules/.tmp/api-test.mjs",
     "test:import": "esbuild qa/import-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/import-test.mjs --log-level=warning && node node_modules/.tmp/import-test.mjs",
     "test:insights": "esbuild qa/insights-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/insights-test.mjs --log-level=warning && node node_modules/.tmp/insights-test.mjs",
@@ -18,6 +20,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/app-launcher": "^8.0.1",
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
     "@supabase/supabase-js": "^2.117.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -26,6 +35,8 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3",
     "@types/node": "^22.20.5",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

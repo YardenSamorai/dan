@@ -8,6 +8,7 @@ import { customerActivity, type Activity } from '../domain/activity';
 import type { TenantData } from '../domain/types';
 import { localeMeta } from '../i18n/config';
 import { useI18n } from '../i18n/I18nProvider';
+import { isNativeApp } from '../lib/native';
 import { addAppManifest, disablePush, enablePush, existingDevice, onNotificationOpen, pushState, type PushState } from '../lib/push';
 import { useAppUI } from './AppUI';
 import { usePopover } from './usePopover';
@@ -62,7 +63,8 @@ export function PushControl() {
     };
   }, [key]);
 
-  if (!key || !state) return null;
+  // The iPhone app's web view has no web push; it needs Apple's own notifications.
+  if (!key || !state || isNativeApp) return null;
 
   const turnOn = async () => {
     setBusy(true);

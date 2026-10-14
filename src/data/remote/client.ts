@@ -1,4 +1,5 @@
 import { storageKey } from '../../config/product';
+import { isNativeApp, SITE_ORIGIN } from '../../lib/native';
 import { ApiError, type ApiErrorCode } from '../contracts';
 import { supabase } from './identity';
 
@@ -23,7 +24,7 @@ export async function rpc<T>(fn: string, ...args: unknown[]): Promise<T> {
   const token = await currentToken();
   let res: Response;
   try {
-    res = await fetch('/api/rpc', {
+    res = await fetch(`${isNativeApp ? SITE_ORIGIN : ''}/api/rpc`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) },
       body: JSON.stringify({ fn, args }),

@@ -6,6 +6,7 @@ import { AlertIcon, BusinessMark, ExternalIcon } from '../../components/ui/Icons
 import { Switch } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
 import { CAPABILITIES, MESSAGE_ALLOWANCE, USD_TO_ILS } from '../../config/product';
+import { SITE_HOST, SITE_ORIGIN } from '../../lib/native';
 import { ApiError, directory, INVITE_DAYS, platform, workspace, type MemberInfo } from '../../data';
 import { BUSINESS_TYPES, SLUG_PATTERN } from '../../domain/defaults';
 import { alertsOf, messageVars, notificationsOf, renderTemplate, TEMPLATE_VARS } from '../../domain/notifications';
@@ -661,7 +662,7 @@ function NotificationsSection() {
 
 // ── Team access ──────────────────────────────────────────────────────
 
-const inviteUrl = (slug: string, token: string) => `${location.origin}/join/${slug}/${token}`;
+const inviteUrl = (slug: string, token: string) => `${SITE_ORIGIN}/join/${slug}/${token}`;
 
 function TeamSection() {
   const { ctx, tenant, session, api } = useWorkspace();
@@ -866,12 +867,12 @@ function InviteForm({ onCopy }: { onCopy: (url: string) => void }) {
 
 // ── Calendar subscription links ──────────────────────────────────────
 
-const feedUrl = (slug: string, key: string) => `${location.origin}/api/ics/${slug}/${key}.ics`;
+const feedUrl = (slug: string, key: string) => `${SITE_ORIGIN}/api/ics/${slug}/${key}.ics`;
 
 function CalendarSection() {
   const { tenant } = useWorkspace();
   const { t, tx } = useI18n();
-  const local = /^(localhost|127\.|\[::1\])/.test(location.hostname);
+  const local = /^(localhost|127\.|\[::1\])/.test(SITE_HOST);
   const rows: { staffId: string | null; label: string }[] = [
     { staffId: null, label: t('settings.calendar.everyone') },
     ...tenant.staff.filter((s) => s.active).map((s) => ({ staffId: s.id, label: tx(s.name) })),

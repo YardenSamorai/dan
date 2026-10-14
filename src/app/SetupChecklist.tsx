@@ -5,6 +5,7 @@ import { useToast } from '../components/ui/Toast';
 import { embedUrl, VideoDialog } from '../components/ui/VideoDialog';
 import { VIDEOS } from '../config/product';
 import { SETUP_STEPS, setupProgress } from '../domain/setup';
+import { SITE_ORIGIN } from '../lib/native';
 import type { SetupStep } from '../domain/types';
 import { useI18n } from '../i18n/I18nProvider';
 import { useWorkspace } from './workspace';
@@ -21,7 +22,7 @@ export function SetupChecklist() {
   const progress = setupProgress(tenant);
   const doneCount = SETUP_STEPS.filter((s) => progress[s]).length;
   const next = SETUP_STEPS.find((s) => !progress[s]);
-  const pageUrl = `${location.origin}/book/${b.slug}`;
+  const pageUrl = `${SITE_ORIGIN}/book/${b.slug}`;
 
   const save = (setup: NonNullable<typeof b.setup>) => api.updateBusiness({ setup }).catch(() => toast(t('common.unknownError')));
   const tick = (s: SetupStep) => save({ done: [...new Set([...(b.setup?.done ?? []), s])], dismissed: b.setup?.dismissed });

@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { ToastProvider } from './components/ui/Toast';
 import { PRODUCT } from './config/product';
 import { useI18n } from './i18n/I18nProvider';
+import { isNativeApp, openOutside } from './lib/native';
 import { MarketingLayout } from './pages/marketing/MarketingLayout';
 import MarketingHome from './pages/marketing/MarketingHome';
 import { TenantChrome, TenantScope } from './pages/booking/TenantLayout';
@@ -69,6 +70,12 @@ function PageLoading() {
   );
 }
 
+/** The iPhone app has no sign-up of its own (Apple then requires deleting accounts in the app too): it opens the site's. */
+function SignUpOnSite() {
+  useEffect(() => void openOutside('/sign-up'), []);
+  return <Navigate to="/sign-in" replace />;
+}
+
 export function App() {
   useProductTitle();
   const { pathname } = useLocation();
@@ -79,14 +86,14 @@ export function App() {
         <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route element={<MarketingLayout />}>
-              <Route index element={<MarketingHome />} />
+              <Route index element={isNativeApp ? <Navigate to="/app" replace /> : <MarketingHome />} />
               <Route path="help" element={<HelpPage />} />
               <Route path="privacy" element={<PrivacyPage />} />
               <Route path="terms" element={<TermsPage />} />
               <Route path="accessibility" element={<AccessibilityPage />} />
             </Route>
             <Route path="sign-in" element={<SignInPage />} />
-            <Route path="sign-up" element={<SignUpPage />} />
+            <Route path="sign-up" element={isNativeApp ? <SignUpOnSite /> : <SignUpPage />} />
             <Route path="reset-password" element={<ResetPasswordPage />} />
             <Route path="join/:slug/:token" element={<JoinPage />} />
             <Route path="onboarding" element={<OnboardingPage />} />

@@ -6,6 +6,7 @@ import { ACCENT_KEYS, ACCENTS } from '../../components/ui/accents';
 import { BusinessMark, CheckIcon, ChevronDown, ChevronLeft, ClockIcon, CloseIcon, LinkIcon, MinusIcon, PinIcon, PlusIcon, UserIcon, UsersIcon } from '../../components/ui/Icons';
 import { Avatar, ProductWordmark } from '../../components/ui/bits';
 import { storageKey } from '../../config/product';
+import { SITE_HOST, SITE_ORIGIN } from '../../lib/native';
 import { ApiError, auth, directory } from '../../data';
 import { BUSINESS_TYPES, dayHours, latinSlug, range, SERVICE_TEMPLATES, SLUG_PATTERN, STAFF_COLORS, WEEKDAYS, weeklyFrom } from '../../domain/defaults';
 import { addDays, isValidTimeZone, todayISO, weekdayOf } from '../../domain/time';
@@ -170,7 +171,7 @@ const isUniform = (h: WeeklySchedule) => {
 };
 
 const weekOrder = (d: Draft): Weekday[] => (d.locale === 'he' || d.timezone === 'Asia/Jerusalem' ? WEEKDAYS : [1, 2, 3, 4, 5, 6, 0]);
-const host = () => window.location.host;
+const host = () => SITE_HOST;
 
 function useMoney(currency: string) {
   const { locale } = useI18n();
@@ -1030,7 +1031,7 @@ function Done({ slug, published, d }: { slug: string; published: boolean; d: Dra
   const [copied, setCopied] = useState(false);
   const [scene, setScene] = useState(true);
   const finale = useFinaleText(d);
-  const url = `${window.location.origin}/book/${slug}`;
+  const url = `${SITE_ORIGIN}/book/${slug}`;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(url);

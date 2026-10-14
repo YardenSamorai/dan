@@ -4,6 +4,7 @@ import { SLUG_PATTERN } from '../../domain/defaults';
 import { ApiError, type AuthService, type BusinessDirectory, type SessionInfo } from '../contracts';
 import { DEMO_BUSINESS_IDS } from '../demo/seed';
 import type { MockDatabase } from '../mock/db';
+import { isNativeApp } from '../../lib/native';
 import { currentToken, getToken, Resource, rpc, setToken } from './client';
 import { googleEnabled, supabase } from './identity';
 import { clearWorkspaceCache } from './workspace';
@@ -114,7 +115,8 @@ export const remoteAuth: AuthService = {
   ready: start,
   useSession: () => useSyncExternalStore(subscribe, () => session),
   method: supabase ? 'password' : 'email',
-  providers: { google: googleEnabled },
+  // Google needs a redirect back into the app, and next to it Apple requires Sign in with Apple.
+  providers: { google: googleEnabled && !isNativeApp },
 
   async signInWithPassword({ email, password }) {
     if (!supabase) throw new ApiError('invalid');

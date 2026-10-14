@@ -58,10 +58,40 @@ async function handleCron(req: Request, d: ApiDeps & { senders: Senders }, env: 
   return new Response(JSON.stringify({ ...result, channels: channelsOf(d.senders) }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 }
 
+/** The iPhone app's pages (Capacitor) call the API from their own origin. It signs in with a bearer token, never cookies. */
+const APP_ORIGINS = new Set(['capacitor://localhost']);
+
+function withAppOrigin(origin: string, res: Response): Response {
+  const out = new Response(res.body, res);
+  out.headers.set('access-control-allow-origin', origin);
+  out.headers.append('vary', 'origin');
+  return out;
+}
+
 /** `waitUntil` (Cloudflare) keeps the instance alive for work that finishes after the response. */
-export function handle(req: Request, env: Env = process.env, waitUntil?: (p: Promise<unknown>) => void): Promise<Response> {
-  const d = (deps ??= build(env));
+export async function handle(req: Request, env: Env = process.env, waitUntil?: (p: Promise<unknown>) => void): Promise<Response> {
   const path = new URL(req.url).pathname;
+  const origin = req.headers.get('origin') ?? '';
+  if (path === '/api/rpc' && APP_ORIGINS.has(origin)) {
+    if (req.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'access-control-allow-origin': origin,
+          'access-control-allow-methods': 'POST',
+          'access-control-allow-headers': 'authorization, content-type',
+          'access-control-max-age': '86400',
+          vary: 'origin',
+        },
+      });
+    }
+    return withAppOrigin(origin, await route(req, path, env, waitUntil));
+  }
+  return route(req, path, env, waitUntil);
+}
+
+function route(req: Request, path: string, env: Env, waitUntil?: (p: Promise<unknown>) => void): Promise<Response> {
+  const d = (deps ??= build(env));
   if (path === '/api/cron/messages') return handleCron(req, d, env);
   if (path === '/api/whatsapp/webhook') return handleWhatsAppWebhook(req, d, env, waitUntil);
   if (path.startsWith('/api/ics/')) return handleIcs(req, d);
