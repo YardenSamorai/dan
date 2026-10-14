@@ -2871,6 +2871,143 @@ fieldset:disabled .field__input {
   color: var(--danger);
 }
 
+.settings__body .panel + .panel,
+.settings__body .panel + .save-bar + .panel {
+  margin-block-start: var(--s-5);
+}
+
+.settings__body .panel__head {
+  padding-block: var(--s-3);
+}
+
+.usage-month {
+  inline-size: auto;
+  flex-shrink: 0;
+}
+
+.msg-kind__timing {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.msg-kind__timing select {
+  inline-size: auto;
+}
+
+.usage-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-table th,
+.usage-table td {
+  padding: var(--s-2) 0;
+  text-align: start;
+  font-weight: 400;
+}
+
+.usage-table td {
+  inline-size: 7rem;
+  text-align: end;
+}
+
+.usage-table thead th {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  border-block-end: 1px solid var(--line);
+}
+
+.usage-table tbody tr + tr th,
+.usage-table tbody tr + tr td {
+  border-block-start: 1px solid var(--line);
+}
+
+.usage-table tfoot th,
+.usage-table tfoot td {
+  font-weight: 650;
+  border-block-start: 1px solid var(--ink-3);
+}
+
+.usage-table + .settings__usage,
+.panel__body > .settings__usage {
+  margin-block-start: var(--s-4);
+}
+
+.panel__body > .field__hint:last-child {
+  margin-block-start: var(--s-3);
+}
+
+.msg-kinds {
+  display: grid;
+}
+
+.msg-kinds__alert {
+  margin: var(--s-4) var(--s-5) 0;
+}
+
+.msg-kind {
+  padding: var(--s-4) var(--s-5);
+}
+
+.msg-kind + .msg-kind {
+  border-block-start: 1px solid var(--line);
+}
+
+.msg-kind__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+
+.msg-kind__text {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.msg-kind__title {
+  font-size: var(--text-15);
+  font-weight: 600;
+}
+
+.msg-kind__price {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.msg-kind__price--marketing {
+  color: var(--ink-2);
+}
+
+.msg-kind__body {
+  margin-block-start: var(--s-4);
+}
+
+.msg-kind__wording summary {
+  cursor: pointer;
+  inline-size: fit-content;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.msg-kind__wording[open] summary {
+  margin-block-end: var(--s-3);
+}
+
+@media (max-width: 640px) {
+  .msg-kind__head {
+    flex-wrap: wrap;
+  }
+
+  .msg-kind__price {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+
 .settings__sub {
   margin-block-end: var(--s-2);
   font-size: 15px;

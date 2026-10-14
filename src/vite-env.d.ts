@@ -16,6 +16,7 @@ interface ImportMetaEnv {
   readonly VITE_A11Y_CONTACT?: string;
   /** WhatsApp + SMS messages included per business per month. */
   readonly VITE_MESSAGE_ALLOWANCE?: string;
+  readonly VITE_USD_ILS?: string;
   /** YouTube/Vimeo links for the setup checklist. */
   readonly VITE_VIDEO_WELCOME?: string;
   readonly VITE_VIDEO_PAGE?: string;

@@ -27,3 +27,13 @@ export function addUsage(usage: Business['usage'], month: string, delta: UsageCo
 
 /** Messages that count toward the plan's monthly allowance: WhatsApp and SMS. Email is free. */
 export const allowanceUsed = (c: UsageCounts | undefined) => (c?.whatsapp ?? 0) + (c?.whatsappMarketing ?? 0) + (c?.sms ?? 0);
+
+/** Meta's rate card for recipients in Israel, USD per delivered message (October 2026). */
+export const WHATSAPP_USD = { utility: 0.0053, marketing: 0.0353, authentication: 0.0053 };
+
+/** What Meta bills for one message of this kind on WhatsApp. */
+export const whatsappRateUsd = (kind: OutboxMessage['kind']) => WHATSAPP_USD[usageKey({ channel: 'whatsapp', kind }) === 'whatsappMarketing' ? 'marketing' : 'utility'];
+
+/** WhatsApp's charge for a month's counts, in USD. Lookup codes are counted as WhatsApp authentication. */
+export const whatsappCostUsd = (c: UsageCounts | undefined) =>
+  (c?.whatsapp ?? 0) * WHATSAPP_USD.utility + (c?.whatsappMarketing ?? 0) * WHATSAPP_USD.marketing + (c?.phoneCodes ?? 0) * WHATSAPP_USD.authentication;

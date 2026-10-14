@@ -5,14 +5,14 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { AlertIcon, BusinessMark, ExternalIcon } from '../../components/ui/Icons';
 import { Switch } from '../../components/ui/bits';
 import { useToast } from '../../components/ui/Toast';
-import { CAPABILITIES, MESSAGE_ALLOWANCE } from '../../config/product';
+import { CAPABILITIES, MESSAGE_ALLOWANCE, USD_TO_ILS } from '../../config/product';
 import { ApiError, directory, INVITE_DAYS, platform, workspace, type MemberInfo } from '../../data';
 import { BUSINESS_TYPES, SLUG_PATTERN } from '../../domain/defaults';
 import { alertsOf, messageVars, notificationsOf, renderTemplate, TEMPLATE_VARS } from '../../domain/notifications';
 import type { Permission } from '../../domain/permissions';
 import { businessNow, isClass, isUpcoming } from '../../domain/scheduling';
 import { isValidTimeZone } from '../../domain/time';
-import { allowanceUsed } from '../../domain/usage';
+import { allowanceUsed, usageMonth, WHATSAPP_USD, whatsappCostUsd, whatsappRateUsd } from '../../domain/usage';
 import { renderWhatsApp, WHATSAPP_TEMPLATES } from '../../domain/whatsapp';
 import type { BookingPolicies, Business, Channel, Invite, NotificationSettings, OwnerAlerts, TemplateKind } from '../../domain/types';
 import { localeMeta, locales, type Locale } from '../../i18n/config';
@@ -35,7 +35,6 @@ const SECTIONS: { id: Section; needs: Permission; previewOnly?: boolean }[] = [
   { id: 'data', needs: 'demo.reset', previewOnly: true },
 ];
 const KINDS: TemplateKind[] = ['confirmation', 'reminder', 'reschedule', 'cancellation', 'rebook', 'spotOpen'];
-const CHANNELS: Channel[] = ['whatsapp', 'sms', 'email'];
 const CURRENCIES = ['ILS', 'USD', 'EUR', 'GBP', 'AUD', 'CAD'];
 const ZONES = ['Asia/Jerusalem', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Australia/Sydney'];
 
@@ -373,14 +372,120 @@ function BrandingSection() {
 
 // ── Notifications ────────────────────────────────────────────────────
 
-/** Alerts to the business itself, sent to the email and phone from the business details. */
+/** Channels that really deliver here; empty while loading. */
+function useConnected(): Channel[] {
+  return platform.useInfo()?.channels ?? [];
+}
+
+/** Messages sent in a month and what WhatsApp charged for them. Per kind while the sent messages are still kept. */
+function MessageUsage() {
+  const { tenant } = useWorkspace();
+  const { t, fmt, locale } = useI18n();
+  const b = tenant.business;
+  const tz = b.timezone;
+  const current = usageMonth(new Date(), tz);
+  const months = [...new Set([current, ...Object.keys(b.usage ?? {})])].sort().reverse().slice(0, 6);
+  const [month, setMonth] = useState(current);
+  const counts = b.usage?.[month];
+  const money = (usd: number) =>
+    b.currency === 'ILS' ? fmt.money(Math.round(usd * USD_TO_ILS * 100) / 100) : new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(usd);
+  const sent = tenant.outbox.filter((m) => m.channel === 'whatsapp' && m.state === 'sent' && m.doneAt && usageMonth(new Date(m.doneAt), tz) === month);
+  const whatsapp = (counts?.whatsapp ?? 0) + (counts?.whatsappMarketing ?? 0);
+  const codes = counts?.phoneCodes ?? 0;
+  const others = (counts?.sms ?? 0) + (counts?.email ?? 0);
+  const byKind = KINDS.map((k) => ({ k, n: sent.filter((m) => m.kind === k).length })).filter((r) => r.n > 0);
+  const rows: { label: string; n: number; usd: number }[] =
+    byKind.reduce((s, r) => s + r.n, 0) === whatsapp
+      ? byKind.map(({ k, n }) => ({ label: t(`settings.notifications.kinds.${k}`), n, usd: n * whatsappRateUsd(k) }))
+      : [
+          { label: t('settings.usage.utility'), n: counts?.whatsapp ?? 0, usd: (counts?.whatsapp ?? 0) * WHATSAPP_USD.utility },
+          { label: t('settings.usage.marketing'), n: counts?.whatsappMarketing ?? 0, usd: (counts?.whatsappMarketing ?? 0) * WHATSAPP_USD.marketing },
+        ].filter((r) => r.n > 0);
+  if (codes) rows.push({ label: t('settings.usage.codes'), n: codes, usd: codes * WHATSAPP_USD.authentication });
+  const total = whatsapp + codes;
+  const used = allowanceUsed(counts);
+  const monthName = (m: string) => fmt.month(`${m}-15`);
+
+  return (
+    <section className="panel">
+      <header className="panel__head">
+        <div>
+          <h3 className="panel__title">{t('settings.usage.title')}</h3>
+          <p className="muted">{t('settings.usage.lede')}</p>
+        </div>
+        {months.length > 1 && (
+          <select className="field__input field__input--sm usage-month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label={t('settings.usage.month')}>
+            {months.map((m) => (
+              <option key={m} value={m}>
+                {monthName(m)}
+              </option>
+            ))}
+          </select>
+        )}
+      </header>
+      <div className="panel__body">
+        {total === 0 && others === 0 ? (
+          <p className="muted">{t(month === current ? 'settings.usage.noneYet' : 'settings.usage.none')}</p>
+        ) : (
+          <table className="usage-table">
+            <thead>
+              <tr>
+                <th scope="col">{t('settings.usage.kind')}</th>
+                <th scope="col">{t('settings.usage.count')}</th>
+                <th scope="col">{t('settings.usage.cost')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.label}>
+                  <th scope="row">{r.label}</th>
+                  <td>{fmt.number(r.n)}</td>
+                  <td>{money(r.usd)}</td>
+                </tr>
+              ))}
+              {others > 0 && (
+                <tr>
+                  <th scope="row">{t('settings.usage.others')}</th>
+                  <td>{fmt.number(others)}</td>
+                  <td>—</td>
+                </tr>
+              )}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row">{t('settings.usage.total')}</th>
+                <td>{fmt.number(total + others)}</td>
+                <td>{money(whatsappCostUsd(counts))}</td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
+        {MESSAGE_ALLOWANCE !== null && (
+          <div className="settings__usage">
+            <span className="meter" role="meter" aria-valuemin={0} aria-valuemax={MESSAGE_ALLOWANCE} aria-valuenow={Math.min(used, MESSAGE_ALLOWANCE)} aria-label={t('settings.usage.title')}>
+              <i style={{ width: `${Math.min(100, (used / MESSAGE_ALLOWANCE) * 100)}%` }} />
+            </span>
+            <span className={used > MESSAGE_ALLOWANCE ? 'settings__usage-over' : 'muted'}>
+              {used > MESSAGE_ALLOWANCE ? t('settings.usage.allowanceOver', { count: fmt.number(used - MESSAGE_ALLOWANCE) }) : t('settings.usage.allowance', { used: fmt.number(used), limit: fmt.number(MESSAGE_ALLOWANCE) })}
+            </span>
+          </div>
+        )}
+        <p className="field__hint">{t(b.currency === 'ILS' ? 'settings.usage.costHintIls' : 'settings.usage.costHint', { rate: String(USD_TO_ILS) })}</p>
+      </div>
+    </section>
+  );
+}
+
+/** Alerts to the business itself: the bell in the app, push on this device, and email / SMS once those are connected. */
 function OwnerAlertsPanel() {
   const { tenant, api } = useWorkspace();
   const { t } = useI18n();
+  const connected = useConnected();
   const d = useDraft<OwnerAlerts>(alertsOf(tenant.business));
   const v = d.value;
   const b = tenant.business;
-  const missing = v.channels.filter((c) => !(c === 'email' ? b.email : b.phone)?.trim());
+  const extra = (['email', 'sms'] as const).filter((c) => connected.includes(c));
+  const missing = v.channels.filter((c) => extra.includes(c) && !(c === 'email' ? b.email : b.phone)?.trim());
   return (
     <section className="panel">
       <header className="panel__head">
@@ -392,8 +497,12 @@ function OwnerAlertsPanel() {
       <div className="panel__body form-grid">
         <Switch checked={v.booked} onChange={(x) => d.set({ ...v, booked: x })} label={t('settings.alerts.booked')} />
         <Switch checked={v.changed} onChange={(x) => d.set({ ...v, changed: x })} label={t('settings.alerts.changed')} />
+        <p className="field__hint">{t('settings.alerts.bell')}</p>
+        <PushControl />
+        {extra.length > 0 && (
+          <>
         <div className="toolbar">
-          {(['email', 'sms'] as const).map((c) => {
+          {extra.map((c) => {
             const on = v.channels.includes(c);
             return (
               <button key={c} type="button" className="chip" aria-pressed={on} onClick={() => d.set({ ...v, channels: on ? v.channels.filter((x) => x !== c) : [...v.channels, c] })}>
@@ -406,7 +515,8 @@ function OwnerAlertsPanel() {
           {t('settings.alerts.where', { email: b.email || '—', phone: b.phone || '—' })} <Link to="/app/settings/business">{t('settings.alerts.edit')}</Link>
         </p>
         {missing.length > 0 && <p className="inline-alert inline-alert--warn">{t(`settings.alerts.missing.${missing[0]}`)}</p>}
-        <PushControl />
+          </>
+        )}
       </div>
       <SaveBar dirty={d.dirty} onReset={d.reset} onSave={() => api.updateBusiness({ alerts: v })} />
     </section>
@@ -415,69 +525,101 @@ function OwnerAlertsPanel() {
 
 function NotificationsSection() {
   const { tenant: state, api } = useWorkspace();
-  const { t, fmt } = useI18n();
+  const { t, fmt, locale } = useI18n();
+  const connected = useConnected();
+  const info = platform.useInfo();
   const d = useDraft<NotificationSettings>(notificationsOf(state.business));
   const rebookCount = state.services.filter((s) => s.active && s.rebookAfterDays).length;
   const v = d.value;
   const sample = state.appointments.find((a) => isUpcoming(a, new Date(), state.business.timezone)) ?? state.appointments[0];
-
-  const info = platform.useInfo();
-  const off = info ? CHANNELS.filter((c) => !info.channels.includes(c)) : [];
+  /** Channels with their own wording (the owner's templates); WhatsApp only sends its approved text. */
+  const worded: Channel[] = connected.filter((c) => c !== 'whatsapp');
+  const price = (usd: number) =>
+    state.business.currency === 'ILS' ? fmt.money(Math.round(usd * USD_TO_ILS * 100) / 100) : new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(usd);
+  const shownLocales = [state.business.defaultLocale, ...locales.filter((l) => l !== state.business.defaultLocale)];
 
   return (
     <>
-      {info && off.length > 0 && (
-        <p className="inline-alert inline-alert--warn">
-          <AlertIcon size={14} />{' '}
-          {info.channels.length
-            ? t('settings.notifications.partlyConnected', { on: fmt.list(info.channels.map((c) => t(`channel.${c}`))), off: fmt.list(off.map((c) => t(`channel.${c}`))) })
-            : t('settings.notifications.notConnected')}
-        </p>
-      )}
-      <OwnerAlertsPanel />
-      <p className="page__lede">{t('settings.notifications.lede')}</p>
+      <MessageUsage />
+      <section className="panel">
+        <header className="panel__head">
+          <div>
+            <h3 className="panel__title">{t('settings.notifications.title')}</h3>
+            <p className="muted">{t(connected.includes('whatsapp') ? 'settings.notifications.lede' : 'settings.notifications.ledeNoWhatsapp')}</p>
+          </div>
+        </header>
+        {info && connected.length === 0 && (
+          <p className="inline-alert inline-alert--warn msg-kinds__alert">
+            <AlertIcon size={14} /> {t('settings.notifications.notConnected')}
+          </p>
+        )}
+        <ul className="msg-kinds">
       {KINDS.filter((k) => k !== 'spotOpen' || state.services.some(isClass)).map((k) => {
         const cfg = v[k];
         const setCfg = (patch: Partial<typeof cfg>) => d.set({ ...v, [k]: { ...cfg, ...patch } });
+        const live = cfg.channels.filter((c) => connected.includes(c));
+        const on = cfg.enabled && (connected.length === 0 || live.length > 0);
+        const turn = (x: boolean) => setCfg(x ? { enabled: true, channels: live.length || !connected.length ? cfg.channels : connected.includes('whatsapp') ? ['whatsapp'] : connected } : { enabled: false });
+        const title = t(`settings.notifications.kinds.${k}`);
         return (
-          <section className="panel" key={k}>
-            <header className="panel__head">
-              <h3 className="panel__title">{t(`settings.notifications.kinds.${k}`)}</h3>
-              <Switch checked={cfg.enabled} onChange={(x) => setCfg({ enabled: x })} label={<span className="sr-only">{t(`settings.notifications.kinds.${k}`)}</span>} />
-            </header>
-            {cfg.enabled && (
-              <div className="panel__body form-grid">
+          <li className="msg-kind" key={k}>
+            <div className="msg-kind__head">
+              <div className="msg-kind__text">
+                <h4 className="msg-kind__title">{title}</h4>
+                <p className="muted">{t(`settings.notifications.when.${k}`)}</p>
+              </div>
+              <span className={`msg-kind__price${k === 'rebook' ? ' msg-kind__price--marketing' : ''}`}>
+                {t(k === 'rebook' ? 'settings.notifications.priceMarketing' : 'settings.notifications.price', { price: price(whatsappRateUsd(k)) })}
+              </span>
+              <Switch checked={on} onChange={turn} label={<span className="sr-only">{title}</span>} />
+            </div>
+            {on && (
+              <div className="msg-kind__body form-grid">
+                {k === 'reminder' && (
+                  <label className="msg-kind__timing">
+                    <span className="field__label">{t('settings.notifications.reminderTiming')}</span>
+                    <OptionSelect value={v.reminder.hoursBefore} options={[2, 6, 12, 24, 48]} render={(h) => t('units.hoursBefore', { count: h })} onChange={(h) => d.set({ ...v, reminder: { ...v.reminder, hoursBefore: h } })} />
+                  </label>
+                )}
                 {k === 'rebook' && (
                   <p className="field__hint">
                     {rebookCount ? t('settings.notifications.rebookHint', { count: rebookCount }) : t('settings.notifications.rebookNone')} <Link to="/app/services">{t('settings.notifications.rebookServices')}</Link>
                   </p>
                 )}
+                <details className="msg-kind__wording">
+                  <summary>{t('settings.notifications.wording')}</summary>
+                  <div className="field-row">
+                    {shownLocales.map((l) => (
+                      <div className="field" key={l}>
+                        <span className="field__hint">{localeMeta[l].label}</span>
+                        <p className="preview-bubble" dir={localeMeta[l].dir} lang={l}>
+                          {sample ? renderWhatsApp(k, l, messageVars(state, sample, l)) : WHATSAPP_TEMPLATES[k].text[l]}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="field__hint">{t('settings.notifications.wordingHint')}</p>
+                </details>
+                {worded.length > 0 && (
+                  <>
                 <div className="toolbar">
-                  {CHANNELS.map((c) => {
-                    const on = cfg.channels.includes(c);
+                  {connected.map((c) => {
+                    const sel = cfg.channels.includes(c);
                     return (
-                      <button key={c} type="button" className="chip" aria-pressed={on} onClick={() => setCfg({ channels: on ? cfg.channels.filter((x) => x !== c) : [...cfg.channels, c] })}>
+                      <button key={c} type="button" className="chip" aria-pressed={sel} onClick={() => setCfg({ channels: sel ? cfg.channels.filter((x) => x !== c) : [...cfg.channels, c] })}>
                         {t(`channel.${c}`)}
                       </button>
                     );
                   })}
-                  {k === 'reminder' && (
-                    <>
-                      <span className="toolbar__spacer" />
-                      <label className="cell-person">
-                        <span className="field__label">{t('settings.notifications.reminderTiming')}</span>
-                        <OptionSelect value={v.reminder.hoursBefore} options={[2, 6, 12, 24, 48]} render={(h) => t('units.hoursBefore', { count: h })} onChange={(h) => d.set({ ...v, reminder: { ...v.reminder, hoursBefore: h } })} />
-                      </label>
-                    </>
-                  )}
                 </div>
+                {cfg.channels.some((c) => worded.includes(c)) && (
                 <div className="field-row">
                   {locales.map((l) => {
                     const text = v.templates[k][l] ?? '';
                     return (
                       <div className="field" key={l}>
                         <label className="field__label" htmlFor={`tpl-${k}-${l}`}>
-                          {t('settings.notifications.template')} · {localeMeta[l].label}
+                          {t('settings.notifications.template', { channels: fmt.list(worded.filter((c) => cfg.channels.includes(c)).map((c) => t(`channel.${c}`))) })} · {localeMeta[l].label}
                         </label>
                         <textarea
                           id={`tpl-${k}-${l}`}
@@ -500,26 +642,19 @@ function NotificationsSection() {
                     );
                   })}
                 </div>
-                <p className="field__hint">{t('settings.notifications.variables', { vars: TEMPLATE_VARS.map((x) => `{${x}}`).join(' ') })}</p>
-                {cfg.channels.includes('whatsapp') && (
-                  <div className="field">
-                    <span className="field__label">{t('settings.notifications.whatsappTitle')}</span>
-                    <span className="field__hint">{t('settings.notifications.whatsappHint')}</span>
-                    <div className="field-row">
-                      {locales.map((l) => (
-                        <p key={l} className="preview-bubble" dir={localeMeta[l].dir} lang={l}>
-                          {sample ? renderWhatsApp(k, l, messageVars(state, sample, l)) : WHATSAPP_TEMPLATES[k].text[l]}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
+                )}
+                {cfg.channels.some((c) => worded.includes(c)) && <p className="field__hint">{t('settings.notifications.variables', { vars: TEMPLATE_VARS.map((x) => `{${x}}`).join(' ') })}</p>}
+                  </>
                 )}
               </div>
             )}
-          </section>
+          </li>
         );
       })}
+        </ul>
+      </section>
       <SaveBar dirty={d.dirty} onReset={d.reset} onSave={() => api.updateBusiness({ notifications: v })} />
+      <OwnerAlertsPanel />
     </>
   );
 }
@@ -848,12 +983,10 @@ function FeedRow({ staffId, label }: { staffId: string | null; label: string }) 
 
 function BillingSection() {
   const { tenant } = useWorkspace();
-  const { t, fmt } = useI18n();
+  const { t } = useI18n();
   const month = businessNow(tenant).date.slice(0, 7);
   const bookings = tenant.appointments.filter((a) => a.createdAt.slice(0, 7) === month).length;
   const staff = tenant.staff.filter((s) => s.active).length;
-  const sent = tenant.business.usage?.[month];
-  const used = allowanceUsed(sent);
   return (
     <>
       <p className="page__lede">{t('settings.billing.lede')}</p>
@@ -878,25 +1011,8 @@ function BillingSection() {
           </div>
           <div>
             <dt>{t('settings.billing.messages')}</dt>
-            <dd className="settings__usage">
-              <span className="settings__counts">
-                {(['whatsapp', 'sms', 'email'] as const).map((c) => (
-                  <span key={c}>
-                    {t(`channel.${c}`)} <strong>{fmt.number(c === 'whatsapp' ? (sent?.whatsapp ?? 0) + (sent?.whatsappMarketing ?? 0) : (sent?.[c] ?? 0))}</strong>
-                  </span>
-                ))}
-              </span>
-              {MESSAGE_ALLOWANCE !== null && (
-                <>
-                  <span className="meter" role="meter" aria-valuemin={0} aria-valuemax={MESSAGE_ALLOWANCE} aria-valuenow={Math.min(used, MESSAGE_ALLOWANCE)} aria-label={t('settings.billing.messages')}>
-                    <i style={{ width: `${Math.min(100, (used / MESSAGE_ALLOWANCE) * 100)}%` }} />
-                  </span>
-                  <span className={used > MESSAGE_ALLOWANCE ? 'settings__usage-over' : 'muted'}>
-                    {used > MESSAGE_ALLOWANCE ? t('settings.billing.allowanceOver', { count: fmt.number(used - MESSAGE_ALLOWANCE) }) : t('settings.billing.allowance', { used: fmt.number(used), limit: fmt.number(MESSAGE_ALLOWANCE) })}
-                  </span>
-                </>
-              )}
-              <span className="field__hint">{t('settings.billing.allowanceHint')}</span>
+            <dd>
+              <Link to="/app/settings/notifications">{t('settings.billing.messagesLink')}</Link>
             </dd>
           </div>
         </dl>

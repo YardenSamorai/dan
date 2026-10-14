@@ -45,6 +45,9 @@ export const VIDEOS: Partial<Record<string, string>> = {
 /** WhatsApp + SMS messages a business's plan includes each month (VITE_MESSAGE_ALLOWANCE). Unset = usage is shown without a limit. */
 export const MESSAGE_ALLOWANCE: number | null = Number(env.VITE_MESSAGE_ALLOWANCE) > 0 ? Math.floor(Number(env.VITE_MESSAGE_ALLOWANCE)) : null;
 
+/** Shekels per dollar, for showing WhatsApp's charges (billed in USD) to Israeli businesses (VITE_USD_ILS). */
+export const USD_TO_ILS = Number(env.VITE_USD_ILS) > 0 ? Number(env.VITE_USD_ILS) : 3.7;
+
 /**
  * What this build can actually do. The UI reads these flags so it never claims
  * an effect that doesn't happen (e.g. "SMS sent") while running on mock adapters.

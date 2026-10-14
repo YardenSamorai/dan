@@ -8,7 +8,7 @@
  * credits, priced only if SMS_CREDIT_ILS is set.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { allowanceUsed } from '../src/domain/usage';
+import { allowanceUsed, whatsappCostUsd } from '../src/domain/usage';
 import type { UsageCounts } from '../src/domain/types';
 import type { LText } from '../src/i18n/config';
 
@@ -20,9 +20,6 @@ function loadEnv(file: string) {
   }
 }
 loadEnv('.env');
-
-/** Meta's rate card for recipients in Israel, USD per delivered message (October 2026). */
-const WHATSAPP_USD = { utility: 0.0053, marketing: 0.0353 };
 
 const url = (process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? '').replace(/\/$/, '');
 const key = process.env.SUPABASE_SECRET_KEY;
@@ -50,10 +47,10 @@ const lines = rows
 console.log(`Messages in ${month}\n`);
 let total = 0;
 for (const { name, c } of lines) {
-  const wa = (c.whatsapp ?? 0) * WHATSAPP_USD.utility + (c.whatsappMarketing ?? 0) * WHATSAPP_USD.marketing;
+  const wa = whatsappCostUsd(c);
   total += wa;
   const sms = `SMS ${c.sms ?? 0} (${c.smsCredits ?? 0} credits${smsCredit ? `, ₪${((c.smsCredits ?? 0) * smsCredit).toFixed(2)}` : ''})`;
-  console.log(`${name}\n  WhatsApp ${c.whatsapp ?? 0} + marketing ${c.whatsappMarketing ?? 0} = ${usd(wa)} · ${sms} · email ${c.email ?? 0} · lookup codes ${c.phoneCodes ?? 0} (Meta's authentication rate)`);
+  console.log(`${name}\n  WhatsApp ${c.whatsapp ?? 0} + marketing ${c.whatsappMarketing ?? 0} = ${usd(wa)} · ${sms} · email ${c.email ?? 0} · lookup codes ${c.phoneCodes ?? 0}`);
 }
 if (!lines.length) console.log('No messages yet.');
 else console.log(`\nWhatsApp total: ${usd(total)}`);
