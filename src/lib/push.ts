@@ -23,22 +23,23 @@ const supported = () => typeof window !== 'undefined' && 'serviceWorker' in navi
 const APP_TOKEN_KEY = storageKey('apns-token');
 const plugin = () => import('@capacitor/push-notifications').then((m) => m.PushNotifications);
 
-/** Registers with Apple and waits for this device's token. */
-async function appToken(): Promise<string | null> {
+/** Registers with Apple and waits for this device's token; rejects with Apple's reason. */
+async function appToken(): Promise<string> {
   const push = await plugin();
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const handles: { remove: () => Promise<void> }[] = [];
-    const done = (token: string | null) => {
+    const done = (token: string | null, why = '') => {
       window.clearTimeout(timer);
       handles.forEach((h) => void h.remove());
-      resolve(token);
+      if (token) resolve(token);
+      else reject(new Error(why));
     };
-    const timer = window.setTimeout(() => done(null), 15_000);
+    const timer = window.setTimeout(() => done(null, 'no answer from Apple'), 15_000);
     void (async () => {
       handles.push(await push.addListener('registration', (t) => done(t.value)));
-      handles.push(await push.addListener('registrationError', () => done(null)));
+      handles.push(await push.addListener('registrationError', (e) => done(null, e.error)));
       await push.register();
-    })();
+    })().catch((e: unknown) => done(null, e instanceof Error ? e.message : String(e)));
   });
 }
 
@@ -54,7 +55,6 @@ async function enableAppPush(): Promise<PushDeviceInput | null> {
   const { receive } = await (await plugin()).requestPermissions();
   if (receive !== 'granted') return null;
   const token = await appToken();
-  if (!token) throw new Error('no token');
   localStorage.setItem(APP_TOKEN_KEY, token);
   return appDevice(token);
 }
@@ -93,7 +93,7 @@ export async function existingDevice(serverKey: string): Promise<PushDeviceInput
   if (isNativeApp) {
     if ((await appState()) !== 'on') return null;
     // Apple can hand out a new token (e.g. after a restore); keep the server's copy current.
-    const token = await appToken();
+    const token = await appToken().catch(() => null);
     if (token) localStorage.setItem(APP_TOKEN_KEY, token);
     return token ? appDevice(token) : null;
   }

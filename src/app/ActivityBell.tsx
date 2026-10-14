@@ -53,7 +53,11 @@ function usePush() {
   useEffect(() => {
     if (!key) return;
     let live = true;
-    void pushState().then((s) => live && setState(s));
+    // If the device never answers, offer the switch anyway: turning it on asks again and reports what went wrong.
+    const late = new Promise<PushState>((resolve) => window.setTimeout(() => resolve('off'), 4000));
+    void Promise.race([pushState(), late])
+      .catch((): PushState => 'off')
+      .then((s) => live && setState(s));
     return () => {
       live = false;
     };
@@ -71,7 +75,7 @@ function usePush() {
   const openSettings = () => (recheck(), void openAppSettings());
 
   const turnOn = async () => {
-    if (!key) return;
+    if (!key) return void toast(`${t('activity.push.failed')} (server)`);
     setBusy(true);
     try {
       const device = await enablePush(key);
@@ -82,8 +86,10 @@ function usePush() {
       await api.savePushDevice(device);
       setState('on');
       toast(t('activity.push.turnedOn'));
-    } catch {
-      toast(t('activity.push.failed'));
+    } catch (e) {
+      // In the app the reason is shown, so a failure on someone's phone can be told apart.
+      const why = isNativeApp ? ` (${e instanceof Error ? e.message : String(e)})` : '';
+      toast(t('activity.push.failed') + why);
     } finally {
       setBusy(false);
     }
@@ -101,7 +107,7 @@ function usePush() {
     }
   };
 
-  return { state: key ? state : null, busy, turnOn, turnOff, openSettings };
+  return { state: key ? state : isNativeApp ? 'off' : null, busy, turnOn, turnOff, openSettings };
 }
 
 /**
