@@ -9,7 +9,7 @@ import type { TenantData } from '../domain/types';
 import { localeMeta } from '../i18n/config';
 import { useI18n } from '../i18n/I18nProvider';
 import { isNativeApp } from '../lib/native';
-import { addAppManifest, disablePush, enablePush, existingDevice, onNotificationOpen, pushState, type PushState } from '../lib/push';
+import { addAppManifest, disablePush, enablePush, existingDevice, onNotificationOpen, openAppSettings, pushState, type PushState } from '../lib/push';
 import { useAppUI } from './AppUI';
 import { usePopover } from './usePopover';
 import { useWorkspace } from './workspace';
@@ -49,8 +49,7 @@ export function PushControl() {
   const { t } = useI18n();
   const { api } = useWorkspace();
   const toast = useToast();
-  const info = platform.useInfo();
-  const key = info?.pushKey;
+  const key = usePushKey();
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -63,8 +62,17 @@ export function PushControl() {
     };
   }, [key]);
 
-  // The iPhone app's web view has no web push; it needs Apple's own notifications.
-  if (!key || !state || isNativeApp) return null;
+  if (!key || !state) return null;
+
+  // Re-checked when the person comes back from the iPhone's Settings.
+  const recheck = () => {
+    const again = () => {
+      if (document.visibilityState !== 'visible') return;
+      document.removeEventListener('visibilitychange', again);
+      void pushState().then(setState);
+    };
+    document.addEventListener('visibilitychange', again);
+  };
 
   const turnOn = async () => {
     setBusy(true);
@@ -119,13 +127,29 @@ export function PushControl() {
       </div>
     );
   }
+  if (state === 'denied' && isNativeApp) {
+    return (
+      <div className="push-control push-control--off">
+        <p className="push-control__body">{t('activity.push.deniedApp')}</p>
+        <button type="button" className="btn btn--tinted btn--xs" onClick={() => (recheck(), void openAppSettings())}>
+          {t('activity.push.openSettings')}
+        </button>
+      </div>
+    );
+  }
   return <p className="push-control push-control__body">{t(`activity.push.${state}`)}</p>;
+}
+
+/** What this device subscribes with: the browser push key, or (in the iPhone app) Apple's service when the server has it. */
+function usePushKey(): string | undefined {
+  const info = platform.useInfo();
+  return isNativeApp ? (info?.appPush ? 'apns' : undefined) : info?.pushKey;
 }
 
 /** Keeps the server's copy of this browser's subscription current, once per visit (it can renew, or another person may have signed in here). */
 function usePushSync() {
   const { api, ctx } = useWorkspace();
-  const key = platform.useInfo()?.pushKey;
+  const key = usePushKey();
   useEffect(() => {
     if (!key) return;
     const flag = storageKey(`push.synced.${ctx.businessId}.${ctx.userId}`);

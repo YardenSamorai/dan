@@ -43,6 +43,34 @@ export async function startNativeShell() {
     e.preventDefault();
     void openOutside(a.href);
   });
+  addHaptics();
+  void followTextSize();
   const { SplashScreen } = await import('@capacitor/splash-screen');
   requestAnimationFrame(() => void SplashScreen.hide({ fadeOutDuration: 200 }));
+}
+
+/** A light tap under the finger for switches, choices and main buttons, as in iPhone apps. */
+function addHaptics() {
+  const haptics = import('@capacitor/haptics');
+  document.addEventListener('change', (e) => {
+    const el = e.target as HTMLInputElement;
+    if (el.type === 'checkbox' || el.type === 'radio') void haptics.then(({ Haptics }) => Haptics.selectionChanged());
+  });
+  document.addEventListener('click', (e) => {
+    const el = (e.target as Element | null)?.closest?.('button, a');
+    if (!el || (el as HTMLButtonElement).disabled) return;
+    if (el.matches('[aria-pressed], .segmented button, .locale-switch button')) void haptics.then(({ Haptics }) => Haptics.selectionChanged());
+    else if (el.matches('.btn--primary, .btn--ink, .btn--danger')) void haptics.then(({ Haptics, ImpactStyle }) => Haptics.impact({ style: ImpactStyle.Light }));
+  });
+}
+
+/** The iPhone's text size (Settings › Display › Text Size), capped where the layout still holds. */
+async function followTextSize() {
+  const [{ TextZoom }, { App }] = await Promise.all([import('@capacitor/text-zoom'), import('@capacitor/app')]);
+  const apply = async () => {
+    const { value } = await TextZoom.getPreferred();
+    await TextZoom.set({ value: Math.min(Math.max(value, 0.85), 1.35) });
+  };
+  await apply();
+  void App.addListener('resume', () => void apply());
 }

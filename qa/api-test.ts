@@ -3,7 +3,7 @@
  *   npm run test:api
  * Exercises booking conflicts, role scoping and authorization in server/handler.ts.
  */
-import { createHmac } from 'node:crypto';
+import { createHmac, generateKeyPairSync, verify } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -884,6 +884,34 @@ try {
     check('a cancellation is pushed', sent.length === 2, sent.length);
     check('subscriptions the push service dropped are forgotten', (await store.snapshot({})).tenants[BIZ].pushDevices?.length === 0);
     await call('workspace.call', [BIZ, 'updateBusiness', [{ alerts }]], owner);
+
+    // The iPhone app: Apple's push service, by device token.
+    const pair = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+    const apns = { keyId: 'KEY1234567', teamId: 'TEAM123456', privateKey: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(), topic: 'il.co.tornu.app', host: 'api.push.apple.com' };
+    const token = 'ab'.repeat(32);
+    const badToken = await call('workspace.call', [BIZ, 'savePushDevice', [{ endpoint: 'apns:not-a-token', p256dh: '', auth: '' }]], owner);
+    check('an app device token that isn’t one is refused', badToken.status === 400, badToken);
+    await call('workspace.call', [BIZ, 'savePushDevice', [{ endpoint: `apns:${token.toUpperCase()}`, p256dh: '', auth: '' }]], owner);
+    check('the app’s device is stored by its token', (await store.snapshot({})).tenants[BIZ].pushDevices?.[0]?.endpoint === `apns:${token}`);
+    sent.length = 0;
+    reply = 200;
+    const before = (await store.snapshot({})).tenants[BIZ];
+    const forApp = otherStaff && (await bookFor(otherStaff, '0506660003'));
+    await notifyDevices(store, null, [{ before, after: (await store.snapshot({})).tenants[BIZ] }], fakeFetch, apns);
+    check('a booking reaches the app through Apple', !!forApp && sent.length === 1 && sent[0].url === `https://api.push.apple.com/3/device/${token}`, sent.map((s) => s.url));
+    if (sent[0]) {
+      const h = sent[0].init.headers as Record<string, string>;
+      const [head, claims, sig] = h.authorization.replace(/^bearer /, '').split('.');
+      const signedOk = verify('sha256', Buffer.from(`${head}.${claims}`), { key: pair.publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(sig, 'base64url'));
+      const payload = JSON.parse(String(sent[0].init.body));
+      check('Apple gets a signed token for this team and key', signedOk && JSON.parse(Buffer.from(head, 'base64url').toString()).kid === apns.keyId && JSON.parse(Buffer.from(claims, 'base64url').toString()).iss === apns.teamId);
+      check('the app notification names the customer and opens the appointment', h['apns-topic'] === apns.topic && payload.aps.alert.body.includes('Push Test') && payload.url.includes(forApp.id), payload);
+    }
+    reply = 410;
+    const before2 = (await store.snapshot({})).tenants[BIZ];
+    if (forApp) await call('public.cancelBooking', [SLUG, forApp.id]);
+    await notifyDevices(store, null, [{ before: before2, after: (await store.snapshot({})).tenants[BIZ] }], fakeFetch, apns);
+    check('a device Apple says is gone is forgotten', (await store.snapshot({})).tenants[BIZ].pushDevices?.length === 0);
   }
 
   const persisted = new FileStore(join(dir, 'db.json'));

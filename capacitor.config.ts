@@ -8,10 +8,14 @@ const config: CapacitorConfig = {
   backgroundColor: '#F6F6F4',
   ios: {
     contentInset: 'never',
+    // Long-pressing a link shows no Safari preview.
+    allowsLinkPreview: false,
   },
   plugins: {
     SplashScreen: { launchAutoHide: false, backgroundColor: '#F6F6F4', showSpinner: false },
-    StatusBar: { style: 'LIGHT', overlaysWebView: true },
+    StatusBar: { overlaysWebView: true },
+    // Shown even while the app is open (the bell updates too).
+    PushNotifications: { presentationOptions: ['alert', 'sound', 'badge'] },
   },
 };
 

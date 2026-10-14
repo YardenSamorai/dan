@@ -5,12 +5,13 @@ import { handleIcs, handleRpc, type ApiDeps } from './handler';
 import { canSendCodes, channelsOf, dispatchMessages, sendersFromEnv, sendPhoneCode, type Senders } from './messaging';
 import { FileStore } from './store';
 import { SupabaseStore, supabaseAuthenticator, type SupabaseConfig } from './supabase';
+import { apnsKeysFromEnv, type ApnsKeys } from './apns';
 import { notifyDevices, pushKeysFromEnv, type PushKeys } from './push';
 import { handleWhatsAppWebhook } from './whatsappWebhook';
 
 type Env = Record<string, string | undefined>;
 
-type Deps = ApiDeps & { senders: Senders; push: PushKeys | null };
+type Deps = ApiDeps & { senders: Senders; push: PushKeys | null; apns: ApnsKeys | null };
 
 let deps: Deps | null = null;
 
@@ -36,7 +37,8 @@ function build(env: Env): Deps {
   const push = pushKeysFromEnv(env);
   // PHONE_CODES=off holds the booking lookup back, e.g. while WhatsApp's code template awaits approval.
   const sendCode: ApiDeps['sendCode'] = canSendCodes(senders) && env.PHONE_CODES?.trim() !== 'off' ? (t, to, code, locale) => sendPhoneCode(senders, t, to, code, locale) : undefined;
-  const shared = { senders, channels, push, pushKey: push?.publicKey, sendCode };
+  const apns = apnsKeysFromEnv(env);
+  const shared = { senders, channels, push, pushKey: push?.publicKey, apns, appPush: !!apns, sendCode };
   if (cfg) return { store: new SupabaseStore({ ...cfg, channels }), auth: supabaseAuthenticator(cfg), ...shared };
   if (env.NODE_ENV === 'production' && !env.ALLOW_DEV_BACKEND) {
     throw new Error('No production backend configured: set the Supabase environment variables.');
@@ -101,8 +103,8 @@ function route(req: Request, path: string, env: Env, waitUntil?: (p: Promise<unk
     background: waitUntil,
     // A booking's confirmation, the owner's alert and push notifications go out right away, not at the next scheduled pass.
     onSaved(changes) {
-      if (d.push && changes.some((c) => c.after.pushDevices?.length)) {
-        const work = notifyDevices(d.store, d.push, changes).catch((e) => console.error('[push]', e));
+      if ((d.push || d.apns) && changes.some((c) => c.after.pushDevices?.length)) {
+        const work = notifyDevices(d.store, d.push, changes, fetch, d.apns).catch((e) => console.error('[push]', e));
         if (waitUntil) waitUntil(work);
       }
       if (!channels.length) return;

@@ -23,7 +23,8 @@ import {
   UserIcon,
   UsersIcon,
 } from '../components/ui/Icons';
-import { Avatar, LocaleSwitch, PreviewNote, ProductWordmark } from '../components/ui/bits';
+import { Avatar, LocaleSwitch, PreviewNote, ProductWordmark, ThemeSwitch } from '../components/ui/bits';
+import { useAppTheme } from '../lib/theme';
 import { useToast } from '../components/ui/Toast';
 import { PRODUCT } from '../config/product';
 import { auth, type Membership, type SessionInfo } from '../data';
@@ -181,6 +182,10 @@ function AccountMenu() {
           <div className="popover__line">
             <span>{t('common.language')}</span>
             <LocaleSwitch />
+          </div>
+          <div className="popover__line">
+            <span>{t('common.theme')}</span>
+            <ThemeSwitch />
           </div>
           <Link to={`/book/${tenant.business.slug}`} target="_blank" className="menu-row menu-row--plain">
             <ExternalIcon size={15} /> <span className="menu-row__title">{t('app.viewPage')}</span>
@@ -423,6 +428,10 @@ function Shell() {
               <span className="sheet-row__text">{t('common.language')}</span>
               <LocaleSwitch />
             </div>
+            <div className="sheet-row sheet-row--static">
+              <span className="sheet-row__text">{t('common.theme')}</span>
+              <ThemeSwitch />
+            </div>
           </SheetGroup>
           <SheetGroup label={t('app.account.businesses')}>
             <BusinessList onDone={() => setMore(false)} />
@@ -496,6 +505,7 @@ function NoBusiness({ session }: { session: SessionInfo }) {
 export default function BusinessApp() {
   const session = auth.useSession();
   const location = useLocation();
+  useAppTheme();
   if (!session) return <Navigate to="/sign-in" replace state={{ from: location.pathname }} />;
   if (!session.active) return <NoBusiness session={session} />;
   return (

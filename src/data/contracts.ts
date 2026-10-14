@@ -478,6 +478,8 @@ export interface PlatformInfo {
   channels: Channel[];
   /** The server's public key for push notifications; missing when push isn't set up. */
   pushKey?: string;
+  /** The iPhone app can get notifications (Apple's push service is set up). */
+  appPush?: boolean;
   /** Customers can get a one-time code to look up their bookings (WhatsApp or SMS is connected). */
   phoneCodes?: boolean;
 }

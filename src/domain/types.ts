@@ -442,11 +442,12 @@ export interface OwnerAlerts {
   changed: boolean;
 }
 
-/** A browser that asked for push notifications about this business. Server-side only: never sent to browsers. */
+/** A browser (or the iPhone app) that asked for push notifications about this business. Server-side only: never sent to browsers. */
 export interface PushDevice {
   userId: string;
+  /** The browser's push address, or `apns:<device token>` for the iPhone app. */
   endpoint: string;
-  /** The browser's public key and auth secret (base64url), for encrypting what's sent. */
+  /** The browser's public key and auth secret (base64url), for encrypting what's sent. Empty for the app. */
   p256dh: string;
   auth: string;
   at: string;

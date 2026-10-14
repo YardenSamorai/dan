@@ -261,3 +261,19 @@ html[lang='he'] .display {
     transition: none;
   }
 }
+
+/* Inside the iPhone app: no gray tap flash, no long-press menus, no text
+   getting selected by a stray drag. Fields and anything marked
+   .selectable can still be selected. */
+.native-app {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.native-app :is(input, textarea, select, [contenteditable], .selectable) {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}

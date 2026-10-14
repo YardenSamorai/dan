@@ -3,6 +3,7 @@ import type { AppointmentStatus, Staff } from '../../domain/types';
 import { locales, localeMeta } from '../../i18n/config';
 import { useI18n } from '../../i18n/I18nProvider';
 import { CAPABILITIES, PRODUCT } from '../../config/product';
+import { setThemePref, THEME_PREFS, useThemePref } from '../../lib/theme';
 import { BusinessMark, ProductMark } from './Icons';
 
 export function initials(name: string) {
@@ -39,6 +40,21 @@ export function LocaleSwitch({ className }: { className?: string }) {
       {locales.map((l) => (
         <button key={l} type="button" lang={l} aria-pressed={l === locale} onClick={() => setLocale(l)} title={localeMeta[l].label}>
           {localeMeta[l].short}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Light, dark or the device's setting, for the business app. */
+export function ThemeSwitch() {
+  const { t } = useI18n();
+  const pref = useThemePref();
+  return (
+    <div className="locale-switch" role="group" aria-label={t('common.theme')}>
+      {THEME_PREFS.map((p) => (
+        <button key={p} type="button" aria-pressed={p === pref} onClick={() => setThemePref(p)}>
+          {t(`common.themes.${p}`)}
         </button>
       ))}
     </div>

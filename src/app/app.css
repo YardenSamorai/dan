@@ -1867,7 +1867,7 @@ a.list__row:active {
   height: 20px;
   border: 1.5px solid var(--line-strong, var(--ink-4, #c9c9cf));
   border-radius: 50%;
-  color: #fff;
+  color: var(--white);
 }
 
 .setup__step[data-done] .setup__check {
@@ -3172,5 +3172,43 @@ fieldset:disabled .field__input {
 
   .stats > div:nth-child(4) {
     border-block-start: 1px solid var(--line);
+  }
+}
+
+/* ── Dark theme: what the tokens alone don't cover ───────────────── */
+
+:root[data-theme='dark'] [data-accent] .biz-mark {
+  color: #fff;
+}
+
+:root[data-theme='dark'] .toast {
+  background: rgba(58, 58, 60, 0.96);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .cal {
+  --off: #111113;
+}
+
+:root[data-theme='dark'] .cal__head,
+:root[data-theme='dark'] .cal__corner {
+  background: rgba(28, 28, 30, 0.9);
+}
+
+:root[data-theme='dark'] .switch input::after {
+  background: #fff;
+}
+
+:root[data-theme='dark'] .switch input:checked {
+  background: var(--success);
+}
+
+:root[data-theme='dark'] .avatar {
+  color: color-mix(in srgb, var(--tone) 50%, #fff);
+}
+
+@media (hover: hover) {
+  :root[data-theme='dark'] .btn--ink:hover:not(:disabled) {
+    background: #fff;
   }
 }

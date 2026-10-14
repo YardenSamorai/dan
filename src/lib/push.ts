@@ -1,4 +1,7 @@
+import { storageKey } from '../config/product';
 import type { PushDeviceInput } from '../data/contracts';
+import { APNS_PREFIX } from '../domain/activity';
+import { isNativeApp } from './native';
 
 /**
  * The browser side of push notifications: permission, the service worker
@@ -15,12 +18,62 @@ const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.p
 const standalone = () => matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
 const supported = () => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
+// ── The iPhone app: Apple's notifications, through Capacitor ──────────
+
+const APP_TOKEN_KEY = storageKey('apns-token');
+const plugin = () => import('@capacitor/push-notifications').then((m) => m.PushNotifications);
+
+/** Registers with Apple and waits for this device's token. */
+async function appToken(): Promise<string | null> {
+  const push = await plugin();
+  return new Promise((resolve) => {
+    const handles: { remove: () => Promise<void> }[] = [];
+    const done = (token: string | null) => {
+      window.clearTimeout(timer);
+      handles.forEach((h) => void h.remove());
+      resolve(token);
+    };
+    const timer = window.setTimeout(() => done(null), 15_000);
+    void (async () => {
+      handles.push(await push.addListener('registration', (t) => done(t.value)));
+      handles.push(await push.addListener('registrationError', () => done(null)));
+      await push.register();
+    })();
+  });
+}
+
+const appDevice = (token: string): PushDeviceInput => ({ endpoint: APNS_PREFIX + token, p256dh: '', auth: '' });
+
+async function appState(): Promise<PushState> {
+  const { receive } = await (await plugin()).checkPermissions();
+  if (receive === 'denied') return 'denied';
+  return receive === 'granted' && localStorage.getItem(APP_TOKEN_KEY) ? 'on' : 'off';
+}
+
+async function enableAppPush(): Promise<PushDeviceInput | null> {
+  const { receive } = await (await plugin()).requestPermissions();
+  if (receive !== 'granted') return null;
+  const token = await appToken();
+  if (!token) throw new Error('no token');
+  localStorage.setItem(APP_TOKEN_KEY, token);
+  return appDevice(token);
+}
+
+/** The iPhone's notification settings for this app. */
+export async function openAppSettings() {
+  const { AppLauncher } = await import('@capacitor/app-launcher');
+  await AppLauncher.openUrl({ url: 'app-settings:' });
+}
+
+// ── Browsers: Web Push ────────────────────────────────────────────────
+
 async function currentSubscription(): Promise<PushSubscription | null> {
   const reg = await navigator.serviceWorker.getRegistration('/');
   return (await reg?.pushManager.getSubscription()) ?? null;
 }
 
 export async function pushState(): Promise<PushState> {
+  if (isNativeApp) return appState();
   if (!supported()) return isIOS() && !standalone() ? 'install' : 'unsupported';
   if (Notification.permission === 'denied') return 'denied';
   if (Notification.permission !== 'granted') return 'off';
@@ -37,6 +90,13 @@ function toDevice(sub: PushSubscription): PushDeviceInput | null {
 
 /** This browser's subscription, if notifications are already on; for keeping the server's copy current. */
 export async function existingDevice(serverKey: string): Promise<PushDeviceInput | null> {
+  if (isNativeApp) {
+    if ((await appState()) !== 'on') return null;
+    // Apple can hand out a new token (e.g. after a restore); keep the server's copy current.
+    const token = await appToken();
+    if (token) localStorage.setItem(APP_TOKEN_KEY, token);
+    return token ? appDevice(token) : null;
+  }
   if (!supported() || Notification.permission !== 'granted') return null;
   const sub = await currentSubscription();
   return sub && encode(sub.options.applicationServerKey) === serverKey ? toDevice(sub) : null;
@@ -44,6 +104,7 @@ export async function existingDevice(serverKey: string): Promise<PushDeviceInput
 
 /** Asks for permission (call it from a tap) and subscribes. Null when the person said no. */
 export async function enablePush(serverKey: string): Promise<PushDeviceInput | null> {
+  if (isNativeApp) return enableAppPush();
   // Asked first, while the tap still counts as the person's own action.
   if ((await Notification.requestPermission()) !== 'granted') return null;
   const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
@@ -60,6 +121,11 @@ export async function enablePush(serverKey: string): Promise<PushDeviceInput | n
 
 /** Unsubscribes this browser; returns the address the server should forget. */
 export async function disablePush(): Promise<string | null> {
+  if (isNativeApp) {
+    const token = localStorage.getItem(APP_TOKEN_KEY);
+    localStorage.removeItem(APP_TOKEN_KEY);
+    return token && APNS_PREFIX + token;
+  }
   if (!supported()) return null;
   const sub = await currentSubscription();
   if (!sub) return null;
@@ -85,6 +151,22 @@ export function addAppManifest(): () => void {
 
 /** Taps on a notification while the app is open arrive here (see public/sw.js). */
 export function onNotificationOpen(go: (url: string) => void): () => void {
+  if (isNativeApp) {
+    let handle: { remove: () => Promise<void> } | null = null;
+    let live = true;
+    void plugin()
+      .then((push) =>
+        push.addListener('pushNotificationActionPerformed', (a) => {
+          const url = (a.notification.data as { url?: unknown } | undefined)?.url;
+          if (typeof url === 'string' && url.startsWith('/')) go(new URL(url, location.origin).href);
+        }),
+      )
+      .then((h) => (live ? (handle = h) : void h.remove()));
+    return () => {
+      live = false;
+      void handle?.remove();
+    };
+  }
   if (!('serviceWorker' in navigator)) return () => {};
   const listen = (e: MessageEvent) => {
     const d = e.data as { type?: string; url?: string } | null;

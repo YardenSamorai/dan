@@ -1,4 +1,5 @@
-import { newActivity, type Activity } from '../src/domain/activity';
+import { apnsToken, newActivity, type Activity } from '../src/domain/activity';
+import { sendApns, type ApnsKeys } from './apns';
 import { alertsOf, renderOwnerAlert } from '../src/domain/notifications';
 import { can } from '../src/domain/permissions';
 import type { PushDevice, TenantData } from '../src/domain/types';
@@ -166,7 +167,12 @@ export interface TenantChange {
  * settings: owners and managers hear about everything, staff about their own
  * appointments. Subscriptions the push service says are gone are removed.
  */
-export async function notifyDevices(store: Store, keys: PushKeys, changes: TenantChange[], fetchImpl: typeof fetch = fetch) {
+export async function notifyDevices(store: Store, keys: PushKeys | null, changes: TenantChange[], fetchImpl: typeof fetch = fetch, apns: ApnsKeys | null = null) {
+  const deliver = (d: PushDevice, message: PushMessage): Promise<'sent' | 'gone' | 'failed'> => {
+    const token = apnsToken(d.endpoint);
+    if (token) return apns ? sendApns(token, message, apns, fetchImpl) : Promise.resolve('failed');
+    return keys ? sendPush(d, message, keys, fetchImpl) : Promise.resolve('failed');
+  };
   for (const { before, after } of changes) {
     const devices = after.pushDevices ?? [];
     if (!devices.length) continue;
@@ -182,7 +188,7 @@ export async function notifyDevices(store: Store, keys: PushKeys, changes: Tenan
         return !!m && (can(m.role, 'calendar.all') || m.staffId === x.appointment.staffId);
       });
       const message = messageFor(after, x);
-      const results = await Promise.all(to.map((d) => sendPush(d, message, keys, fetchImpl)));
+      const results = await Promise.all(to.map((d) => deliver(d, message)));
       results.forEach((r, i) => r === 'gone' && gone.add(to[i].endpoint));
     }
     if (gone.size) await forgetDevices(store, id, gone);

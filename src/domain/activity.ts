@@ -54,9 +54,18 @@ export function isPushEndpoint(endpoint: string): boolean {
 
 const B64URL = /^[A-Za-z0-9_-]+$/;
 
-/** A browser's subscription as it arrives from the page, or null if it doesn't look like one. */
+/** The iPhone app's devices: Apple's device token (hex) in place of a web push address. */
+export const APNS_PREFIX = 'apns:';
+const APNS_TOKEN = /^[0-9a-f]{64,200}$/;
+export const apnsToken = (endpoint: string) => (endpoint.startsWith(APNS_PREFIX) ? endpoint.slice(APNS_PREFIX.length) : null);
+
+/** A browser's subscription (or the app's device token) as it arrives from the page, or null if it doesn't look like one. */
 export function cleanPushDevice(v: unknown): Pick<PushDevice, 'endpoint' | 'p256dh' | 'auth'> | null {
   const d = v as Partial<PushDevice> | null;
+  if (d && typeof d.endpoint === 'string' && d.endpoint.startsWith(APNS_PREFIX)) {
+    const token = d.endpoint.slice(APNS_PREFIX.length).toLowerCase();
+    return APNS_TOKEN.test(token) ? { endpoint: APNS_PREFIX + token, p256dh: '', auth: '' } : null;
+  }
   if (!d || typeof d.endpoint !== 'string' || typeof d.p256dh !== 'string' || typeof d.auth !== 'string') return null;
   if (!isPushEndpoint(d.endpoint)) return null;
   // An uncompressed P-256 point (65 bytes) and a 16-byte secret, base64url.

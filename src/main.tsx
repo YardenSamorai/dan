@@ -5,11 +5,13 @@ import { App } from './App';
 import { auth } from './data';
 import { I18nProvider, primeDocumentLocale } from './i18n/I18nProvider';
 import { startNativeShell } from './lib/native';
+import { primeTheme } from './lib/theme';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/ui.css';
 
 primeDocumentLocale();
+primeTheme();
 
 void auth.ready().finally(() => {
   createRoot(document.getElementById('root')!).render(

@@ -24,6 +24,7 @@ interface Call {
   store: Store;
   channels: readonly Channel[];
   pushKey?: string;
+  appPush?: boolean;
   sendCode?: ApiDeps['sendCode'];
   /** Work that runs only once this call's changes are saved (dropped if the save is retried). */
   afterSave: (task: () => Promise<unknown>) => void;
@@ -157,7 +158,7 @@ const FNS: Record<string, Fn> = {
 
   /** Which message channels actually deliver here, so the UI never claims more. */
   'platform.info': {
-    run: (_, c) => ({ channels: c.channels, ...(c.pushKey && { pushKey: c.pushKey }), ...(c.sendCode && { phoneCodes: true }) }),
+    run: (_, c) => ({ channels: c.channels, ...(c.pushKey && { pushKey: c.pushKey }), ...(c.appPush && { appPush: true }), ...(c.sendCode && { phoneCodes: true }) }),
   },
 
   'auth.demoAccounts': {
@@ -293,6 +294,8 @@ export interface ApiDeps {
   channels?: readonly Channel[];
   /** VAPID public key, when push notifications are set up. */
   pushKey?: string;
+  /** Apple's push service is set up, for the iPhone app. */
+  appPush?: boolean;
   /** Delivers a customer's one-time code; missing when no channel can. */
   sendCode?: (t: TenantData, to: string, code: string, locale: Locale) => Promise<unknown>;
 }
@@ -344,6 +347,7 @@ export async function handleRpc(req: Request, deps: ApiDeps, hooks: RpcHooks = {
     store: deps.store,
     channels: deps.channels ?? [],
     pushKey: deps.pushKey,
+    appPush: deps.appPush,
     sendCode: deps.sendCode,
     afterSave: (task) => tasks.push(task),
   };
