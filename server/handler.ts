@@ -250,7 +250,7 @@ const FNS: Record<string, Fn> = {
   },
 
   'workspace.tenant': {
-    hint: ([businessId], c) => ({ userId: c.userId, businessId: str(businessId) }),
+    hint: ([businessId], c) => ({ userId: c.userId, businessId: str(businessId), namedBusinessesOnly: true }),
     run: ([businessId], c, db) => {
       const ctx = memberCtx(db(), requireUser(c), str(businessId));
       const t = db().tenants[ctx.businessId];
@@ -259,11 +259,12 @@ const FNS: Record<string, Fn> = {
     },
   },
   'workspace.members': {
-    hint: ([businessId], c) => ({ userId: c.userId, businessId: str(businessId) }),
+    hint: ([businessId], c) => ({ userId: c.userId, businessId: str(businessId), namedBusinessesOnly: true }),
     run: ([businessId], c, db) => membersOf(db(), memberCtx(db(), requireUser(c), str(businessId))),
   },
   'workspace.call': {
     hint: ([businessId, method, args], c) => ({
+      namedBusinessesOnly: true,
       userId: c.userId,
       businessId: str(businessId),
       slugs: method === 'updateBusiness' && args?.[0]?.slug ? [str(args[0].slug)] : [],

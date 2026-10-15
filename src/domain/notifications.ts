@@ -1,4 +1,5 @@
 import { PUBLIC_SITE } from '../config/product';
+import { dateFormatter } from './dateFormat';
 import { localeMeta, pickText, type Locale } from '../i18n/config';
 import { appointmentStart } from './scheduling';
 import { messageSubject, sessionPath } from './classes';
@@ -45,8 +46,8 @@ export function messageVars(state: TenantData, a: Appointment, locale: Locale, k
   return {
     name: customer?.name.split(' ')[0] ?? '',
     service: pickText(service?.name, locale),
-    date: new Intl.DateTimeFormat(intl, { weekday: 'long', day: 'numeric', month: 'long', timeZone }).format(start),
-    time: new Intl.DateTimeFormat(intl, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone }).format(start),
+    date: dateFormatter(intl, { weekday: 'long', day: 'numeric', month: 'long', timeZone }).format(start),
+    time: dateFormatter(intl, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone }).format(start),
     staff: pickText(staff?.name, locale).split(' ')[0],
     business: pickText(state.business.name, locale),
     code: a.code,

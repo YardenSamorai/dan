@@ -83,7 +83,7 @@ export class SupabaseStore implements Store {
     const who = [userId && `user_id.eq.${userId}`, businessId && `business_id.in.${list([businessId])}`].filter(Boolean);
     const memberRows = who.length ? await this.rest<MemberRow[]>(`members?select=*&or=${q(`(${who.join(',')})`)}`) : [];
 
-    const businessIds = new Set(memberRows.map((m) => m.business_id));
+    const businessIds = new Set(hint.namedBusinessesOnly ? [] : memberRows.map((m) => m.business_id));
     if (businessId) businessIds.add(businessId);
     const wanted = [businessIds.size && `id.in.${list(businessIds)}`, slugs.length && `slug.in.${list(slugs)}`].filter(Boolean);
     const userIds = new Set(memberRows.map((m) => m.user_id));

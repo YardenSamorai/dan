@@ -7,6 +7,8 @@ import type { Channel } from '../src/domain/types';
 
 /** What a request may need loaded. A store may load more; never less. */
 export interface Hint {
+  /** Load named businesses only, while retaining memberships for authorization. */
+  namedBusinessesOnly?: boolean;
   userId?: string | null;
   businessId?: string;
   slugs?: string[];

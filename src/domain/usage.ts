@@ -1,11 +1,12 @@
 import type { Business, OutboxMessage, UsageCounts } from './types';
+import { dateFormatter } from './dateFormat';
 
 /** Months of history kept on the business. */
 const KEEP_MONTHS = 13;
 
 /** "2026-10": the month of `at` in the business's timezone. */
 export function usageMonth(at: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', timeZone }).formatToParts(at);
+  const parts = dateFormatter('en-CA', { year: 'numeric', month: '2-digit', timeZone }).formatToParts(at);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
   return `${get('year')}-${get('month')}`;
 }

@@ -9,6 +9,7 @@
     "app:build": "tsc -b && vite build && cap sync ios",
     "app:assets": "capacitor-assets generate --ios",
     "test:api": "esbuild qa/api-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/api-test.mjs --log-level=warning && node node_modules/.tmp/api-test.mjs",
+    "test:store": "esbuild qa/supabase-store-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/supabase-store-test.mjs --log-level=warning && node node_modules/.tmp/supabase-store-test.mjs",
     "test:import": "esbuild qa/import-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/import-test.mjs --log-level=warning && node node_modules/.tmp/import-test.mjs",
     "test:insights": "esbuild qa/insights-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/insights-test.mjs --log-level=warning && node node_modules/.tmp/insights-test.mjs",
     "test:supabase": "esbuild qa/supabase-test.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.tmp/supabase-test.mjs --log-level=warning && node node_modules/.tmp/supabase-test.mjs",
