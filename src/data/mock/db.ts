@@ -52,8 +52,13 @@ function rebase(db: MockDatabase): MockDatabase {
   return { ...db, seededOn: today, tenants };
 }
 
+/** Production snapshots need the envelope, never the generated demo records. */
+export function emptyDatabase(): MockDatabase {
+  return { version: SEED_VERSION, seededOn: todayISO(), users: [], members: [], tenants: {} };
+}
+
 export function freshDatabase(): MockDatabase {
-  return { version: SEED_VERSION, seededOn: todayISO(), ...buildDemoDatabase() };
+  return { ...emptyDatabase(), ...buildDemoDatabase() };
 }
 
 /** Slide a stored database's demo tenants to today, or reseed when the seed format changed. */

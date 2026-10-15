@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { ApiError } from '../src/data/contracts';
-import { freshDatabase, type MockDatabase } from '../src/data/mock/db';
+import { emptyDatabase, type MockDatabase } from '../src/data/mock/db';
 import { SLUG_PATTERN } from '../src/domain/defaults';
 import { nextMessageAt } from '../src/domain/notifications';
 import type { BusinessMember, User } from '../src/domain/platform';
@@ -99,8 +99,7 @@ export class SupabaseStore implements Store {
       tenants[row.id] = row.data;
       this.versions.set(row.data, row.version);
     }
-    const base = freshDatabase();
-    return { version: base.version, seededOn: base.seededOn, users: profileRows.map(toUser), members: memberRows.map(toMember), tenants };
+    return { ...emptyDatabase(), users: profileRows.map(toUser), members: memberRows.map(toMember), tenants };
   }
 
   async commit(before: MockDatabase, after: MockDatabase) {
